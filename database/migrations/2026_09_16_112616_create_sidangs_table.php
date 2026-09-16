@@ -9,13 +9,16 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up(): void
-    {
-        Schema::create('sidangs', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
-        });
-    }
+public function up(): void
+{
+    Schema::create('sidangs', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('mahasiswa_id')->constrained()->cascadeOnDelete();
+        $table->enum('jenis', ['komprehensif', 'skripsi']);
+        $table->date('tanggal_sidang')->nullable();
+        $table->timestamps();
+    });
+}
 
     /**
      * Reverse the migrations.
