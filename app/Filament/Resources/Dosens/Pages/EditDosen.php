@@ -1,14 +1,14 @@
 <?php
 
-namespace App\Filament\Resources\Sidangs\Pages;
+namespace App\Filament\Resources\Dosens\Pages;
 
-use App\Filament\Resources\Sidangs\SidangResource;
+use App\Filament\Resources\Dosens\DosenResource;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
-class EditSidang extends EditRecord
+class EditDosen extends EditRecord
 {
-    protected static string $resource = SidangResource::class;
+    protected static string $resource = DosenResource::class;
 
     protected function getHeaderActions(): array
     {

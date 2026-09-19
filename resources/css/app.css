@@ -6,4 +6,62 @@
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* Navy — warna utama identitas sistem (header, sidebar, elemen struktural) */
+    --color-brand-50: #f4f6fb;
+    --color-brand-100: #e7ebf6;
+    --color-brand-200: #c9d3ea;
+    --color-brand-300: #9caed8;
+    --color-brand-400: #6a83c0;
+    --color-brand-500: #4761a8;
+    --color-brand-600: #35488c;
+    --color-brand-700: #2b3a71;
+    --color-brand-800: #232f5e;
+    --color-brand-900: #1c2547;
+    --color-brand-950: #11162d;
+
+    /* Emas — aksen, mengikuti identitas warna Universitas Sriwijaya */
+    --color-gold-50: #fdf9ec;
+    --color-gold-100: #faf0cd;
+    --color-gold-200: #f4e096;
+    --color-gold-300: #edcb5c;
+    --color-gold-400: #e6b632;
+    --color-gold-500: #d79f1e;
+    --color-gold-600: #b87d17;
+    --color-gold-700: #955c17;
+    --color-gold-800: #7a4a19;
+    --color-gold-900: #673e1a;
+}
+
+@layer components {
+    .btn-primary {
+        @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 bg-brand-800 text-white hover:bg-brand-900 focus:outline-none focus:ring-2 focus:ring-brand-700 focus:ring-offset-2;
+    }
+    .btn-gold {
+        @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 bg-gold-500 text-brand-950 hover:bg-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-600 focus:ring-offset-2;
+    }
+    .btn-secondary {
+        @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2;
+    }
+    .btn-danger {
+        @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 bg-rose-600 text-white hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-600 focus:ring-offset-2;
+    }
+    .card {
+        @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+    }
+    .field-label {
+        @apply mb-1 block text-sm font-medium text-slate-700;
+    }
+    .field-input {
+        @apply block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600;
+    }
+    .field-error {
+        @apply mt-1 text-xs text-rose-600;
+    }
+    .nav-link {
+        @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-brand-100/80 transition hover:bg-white/10 hover:text-white;
+    }
+    .nav-link-active {
+        @apply bg-white/10 text-white;
+    }
 }

@@ -14,27 +14,28 @@ class DokumensTable
     {
         return $table
             ->columns([
-                TextColumn::make('sidang_id')
-                    ->numeric()
-                    ->sortable(),
+                TextColumn::make('sidang.mahasiswa.nama')
+                    ->label('Mahasiswa')
+                    ->searchable(),
                 TextColumn::make('jenis_dokumen')
+                    ->formatStateUsing(fn ($state) => $state?->label())
+                    ->badge()
                     ->searchable(),
                 TextColumn::make('nomor_sk')
+                    ->searchable()
+                    ->toggleable(),
+                TextColumn::make('nama_file_asli')
+                    ->label('File')
                     ->searchable(),
-                TextColumn::make('file_path')
-                    ->searchable(),
-                TextColumn::make('uploaded_by')
-                    ->numeric()
-                    ->sortable(),
+                TextColumn::make('uploader.email')
+                    ->label('Diunggah oleh')
+                    ->toggleable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('created_at', 'desc')
             ->filters([
                 //
             ])

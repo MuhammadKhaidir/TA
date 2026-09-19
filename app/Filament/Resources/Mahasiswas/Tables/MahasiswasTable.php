@@ -14,9 +14,9 @@ class MahasiswasTable
     {
         return $table
             ->columns([
-                TextColumn::make('user_id')
-                    ->numeric()
-                    ->sortable(),
+                TextColumn::make('user.email')
+                    ->label('Akun')
+                    ->toggleable(),
                 TextColumn::make('nim')
                     ->searchable(),
                 TextColumn::make('nama')
@@ -25,6 +25,14 @@ class MahasiswasTable
                     ->searchable(),
                 TextColumn::make('angkatan')
                     ->searchable(),
+                TextColumn::make('no_hp')
+                    ->label('No. HP')
+                    ->toggleable(),
+                TextColumn::make('jumlah_konsultasi')
+                    ->label('Konsultasi')
+                    ->badge()
+                    ->color(fn (int $state): string => $state >= 12 ? 'success' : 'warning')
+                    ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

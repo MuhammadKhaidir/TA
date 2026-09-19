@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Sidangs\Pages;
 
 use App\Filament\Resources\Sidangs\SidangResource;
-use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListSidangs extends ListRecords
@@ -13,7 +12,9 @@ class ListSidangs extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            // Sidang hanya dapat dibuat melalui alur pengajuan mahasiswa
+            // (lihat SidangWorkflowService), sehingga tidak disediakan
+            // aksi "Buat" manual di panel admin.
         ];
     }
 }
