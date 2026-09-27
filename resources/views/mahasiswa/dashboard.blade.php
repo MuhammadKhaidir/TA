@@ -7,6 +7,7 @@
 @section('content')
     @php
         $sidangAktif = $sidangs->first(fn ($s) => $s->status !== \App\Enums\SidangStatus::Selesai);
+        $memenuhiSyarat = $mahasiswa?->memenuhiSyaratKonsultasi() ?? false;
     @endphp
 
     @if (! $mahasiswa)
@@ -14,73 +15,123 @@
             Akun Anda belum tertaut ke data mahasiswa. Hubungi Administrator.
         </div>
     @else
-        @if ($sidangAktif)
-            <div class="card mb-6 p-5">
-                <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h3 class="text-lg font-semibold text-slate-900">{{ $sidangAktif->judul_ta ?? 'Sidang ' . $sidangAktif->jenis->label() }}</h3>
-                        <p class="text-sm text-slate-500">{{ $sidangAktif->jenis->label() }} &middot; Diajukan {{ $sidangAktif->tanggal_pengajuan->translatedFormat('d M Y') }}</p>
-                    </div>
-                    @include('partials.status-badge', ['status' => $sidangAktif->status])
-                </div>
+        {{--
+            Menu proses mahasiswa. Setiap menu = 1 kartu yang bisa diklik
+            (accordion): syarat, status pengajuan yang sudah berjalan (bila
+            ada), dan tombol/form aksi untuk menjalankannya baru muncul
+            setelah kartu dibuka. Badge status tetap terlihat walau kartu
+            tertutup. Kalau nanti ada menu proses lain, tinggal tambah
+            <x-menu-proses> baru di bawah ini dengan pola yang sama.
+        --}}
+        <div class="space-y-4">
+            <x-menu-proses
+                title="Pengajuan Sidang Tugas Akhir"
+                subtitle="Ujian Komprehensif / Sidang Skripsi &middot; Langkah 1 Bagan Alir POS 020/POS/FASILKOM/2026"
+                :badge="$sidangAktif?->status"
+            >
+                <x-slot:syarat>
+                    <li class="flex items-start gap-2">
+                        <span class="mt-0.5 {{ $memenuhiSyarat ? 'text-emerald-600' : 'text-rose-500' }}">
+                            {{ $memenuhiSyarat ? '✓' : '✗' }}
+                        </span>
+                        <span>
+                            Minimal {{ \App\Models\Mahasiswa::MINIMAL_KONSULTASI }} kali konsultasi pembimbingan
+                            &mdash; tercatat <strong>{{ $mahasiswa->jumlah_konsultasi }} kali</strong>.
+                            @unless ($memenuhiSyarat)
+                                Belum terpenuhi, sehingga pengajuan akan otomatis berstatus
+                                <em>Ditunda</em> sampai SekDep/Koor. Prodi memperbarui data konsultasi Anda.
+                            @endunless
+                        </span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="mt-0.5 text-slate-400">&bull;</span>
+                        <span>DKN (Daftar Kumpulan Nilai) &mdash; berkas PDF. Boleh disusulkan setelah pengajuan bila belum siap.</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="mt-0.5 text-slate-400">&bull;</span>
+                        <span>Bukti kelulusan USEP &mdash; berkas PDF. Boleh disusulkan setelah pengajuan bila belum siap.</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="mt-0.5 text-slate-400">&bull;</span>
+                        <span>SK Pembimbing TA &mdash; berkas PDF. Boleh disusulkan setelah pengajuan bila belum siap.</span>
+                    </li>
+                </x-slot:syarat>
 
-                @if ($sidangAktif->status === \App\Enums\SidangStatus::Ditunda)
-                    <p class="mb-4 text-sm text-rose-600">
-                        Pengajuan ditunda: Anda baru melakukan {{ $mahasiswa->jumlah_konsultasi }} dari minimal {{ \App\Models\Mahasiswa::MINIMAL_KONSULTASI }} kali konsultasi. SekDep/Koor. Prodi akan memperbarui data ini setelah syarat terpenuhi.
-                    </p>
-                @elseif ($sidangAktif->tanggal_sidang)
-                    <p class="mb-4 text-sm text-slate-600">
-                        Jadwal sidang: <span class="font-medium text-slate-900">{{ $sidangAktif->tanggal_sidang->translatedFormat('d M Y') }} pukul {{ \Illuminate\Support\Carbon::parse($sidangAktif->jam_sidang)->format('H:i') }}</span>
-                        di {{ $sidangAktif->tempat ?? '-' }}.
-                    </p>
+                @if ($sidangAktif)
+                    <x-slot:keterangan>
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                <p class="text-sm font-medium text-slate-800">
+                                    {{ $sidangAktif->judul_ta ?? 'Sidang ' . $sidangAktif->jenis->label() }}
+                                </p>
+                                <span class="text-xs text-slate-400">
+                                    Diajukan {{ $sidangAktif->tanggal_pengajuan->translatedFormat('d M Y') }}
+                                </span>
+                            </div>
+
+                            @if ($sidangAktif->status === \App\Enums\SidangStatus::Ditunda)
+                                <p class="text-sm text-rose-600">
+                                    Pengajuan ditunda: baru {{ $mahasiswa->jumlah_konsultasi }} dari minimal
+                                    {{ \App\Models\Mahasiswa::MINIMAL_KONSULTASI }} kali konsultasi.
+                                </p>
+                            @elseif ($sidangAktif->tanggal_sidang)
+                                <p class="text-sm text-slate-600">
+                                    Jadwal sidang:
+                                    <span class="font-medium text-slate-900">
+                                        {{ $sidangAktif->tanggal_sidang->translatedFormat('d M Y') }}
+                                        pukul {{ \Illuminate\Support\Carbon::parse($sidangAktif->jam_sidang)->format('H:i') }}
+                                    </span>
+                                    di {{ $sidangAktif->tempat ?? '-' }}.
+                                </p>
+                            @else
+                                <p class="text-sm text-slate-500">
+                                    Menunggu proses lebih lanjut oleh {{ $sidangAktif->status->labelPerananBerikutnya() }}.
+                                </p>
+                            @endif
+
+                            <a href="{{ route('sidang.show', $sidangAktif) }}" class="btn-secondary mt-3 !py-1.5 text-xs">
+                                Lihat Detail &amp; Riwayat Proses
+                            </a>
+                        </div>
+                    </x-slot:keterangan>
                 @else
-                    <p class="mb-4 text-sm text-slate-500">Menunggu proses lebih lanjut oleh {{ $sidangAktif->status->labelPerananBerikutnya() }}.</p>
+                    <form method="POST" action="{{ route('mahasiswa.sidang.ajukan') }}" enctype="multipart/form-data" class="space-y-4">
+                        @csrf
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="field-label">Jenis Ujian</label>
+                                <select name="jenis" class="field-input" required>
+                                    <option value="komprehensif">Ujian Komprehensif</option>
+                                    <option value="skripsi">Sidang Skripsi</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="field-label">Judul Tugas Akhir</label>
+                                <input type="text" name="judul_ta" class="field-input" placeholder="Judul TA Anda">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                            <div>
+                                <label class="field-label">DKN (PDF)</label>
+                                <input type="file" name="dkn_file" accept="application/pdf" class="field-input">
+                            </div>
+                            <div>
+                                <label class="field-label">Bukti Kelulusan USEP (PDF)</label>
+                                <input type="file" name="usep_file" accept="application/pdf" class="field-input">
+                            </div>
+                            <div>
+                                <label class="field-label">SK Pembimbing TA (PDF)</label>
+                                <input type="file" name="sk_pembimbing_file" accept="application/pdf" class="field-input">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary">Ajukan Sidang</button>
+                    </form>
                 @endif
-
-                <a href="{{ route('sidang.show', $sidangAktif) }}" class="btn-primary">Lihat Detail &amp; Riwayat Proses</a>
-            </div>
-        @else
-            <div class="card mb-6 p-5">
-                <h3 class="mb-1 text-lg font-semibold text-slate-900">Ajukan Sidang Tugas Akhir</h3>
-                <p class="mb-4 text-sm text-slate-500">Langkah 1 &mdash; lengkapi berkas persyaratan sebelum diserahkan ke SekDep/Koor. Prodi.</p>
-
-                <form method="POST" action="{{ route('mahasiswa.sidang.ajukan') }}" enctype="multipart/form-data" class="space-y-4">
-                    @csrf
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <label class="field-label">Jenis Ujian</label>
-                            <select name="jenis" class="field-input" required>
-                                <option value="komprehensif">Ujian Komprehensif</option>
-                                <option value="skripsi">Sidang Skripsi</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="field-label">Judul Tugas Akhir</label>
-                            <input type="text" name="judul_ta" class="field-input" placeholder="Judul TA Anda">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                        <div>
-                            <label class="field-label">DKN (PDF)</label>
-                            <input type="file" name="dkn_file" accept="application/pdf" class="field-input">
-                        </div>
-                        <div>
-                            <label class="field-label">Bukti Kelulusan USEP (PDF)</label>
-                            <input type="file" name="usep_file" accept="application/pdf" class="field-input">
-                        </div>
-                        <div>
-                            <label class="field-label">SK Pembimbing TA (PDF)</label>
-                            <input type="file" name="sk_pembimbing_file" accept="application/pdf" class="field-input">
-                        </div>
-                    </div>
-                    <p class="text-xs text-slate-400">Syarat: minimal {{ \App\Models\Mahasiswa::MINIMAL_KONSULTASI }} kali konsultasi (tercatat: {{ $mahasiswa->jumlah_konsultasi }} kali). Jika belum terpenuhi, pengajuan akan ditunda otomatis.</p>
-                    <button type="submit" class="btn-primary">Ajukan Sidang</button>
-                </form>
-            </div>
-        @endif
+            </x-menu-proses>
+        </div>
 
         @if ($sidangs->isNotEmpty())
-            <div class="card p-5">
+            <div class="card mt-6 p-5">
                 <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Riwayat Pengajuan</h3>
                 <ul class="divide-y divide-slate-100">
                     @foreach ($sidangs as $s)
