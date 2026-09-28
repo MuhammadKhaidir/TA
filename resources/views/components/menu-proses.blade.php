@@ -1,39 +1,35 @@
 {{--
-    Kartu menu proses yang bisa diklik (accordion, tanpa JS — pakai <details> native).
-
-    Saat ringkasan (summary) diklik, panel di bawahnya terbuka menampilkan:
-      1. Syarat      — slot bernama `syarat` (isi dengan <li> ... </li>)
-      2. Keterangan  — slot bernama `keterangan`, opsional. Untuk menampilkan
-                        status pengajuan yang sudah berjalan/diproses.
-      3. Aksi        — slot default ($slot). Tombol/aksi atau form pengajuan.
-
-    Badge status (bila ada) tetap terlihat di ringkasan walau panel tertutup,
-    supaya mahasiswa langsung tahu status tanpa perlu membuka panel.
-
-    Pola ini sengaja dibuat generik agar mudah dipakai lagi untuk menu-menu
-    proses lain (mis. pengajuan surat lain) di masa depan:
-
-        <x-menu-proses title="..." subtitle="..." :badge="$status">
-            <x-slot:syarat> <li>...</li> </x-slot:syarat>
-            <x-slot:keterangan> ... </x-slot:keterangan>
-            ...aksi/form...
-        </x-menu-proses>
+    Kartu menu proses (accordion native, tanpa JS).
+    Panel berisi tiga bagian:
+      1. Syarat      - slot `syarat` (isi dengan <li>)
+      2. Keterangan  - slot `keterangan`, opsional, untuk status pengajuan berjalan
+      3. Aksi        - slot default, tombol atau form pengajuan
+    Badge status tetap tampil di ringkasan walau panel tertutup.
 --}}
 @props([
     'title',
     'subtitle' => null,
     'badge' => null, // instance \App\Enums\SidangStatus atau null
     'open' => false,
+    'aksiTitle' => 'Formulir Pengajuan',
 ])
 
-<details {{ $attributes->merge(['class' => 'card group']) }} @if($open) open @endif>
-    <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-5 select-none">
-        <div>
-            <h3 class="text-sm font-semibold text-slate-900">{{ $title }}</h3>
-            @if ($subtitle)
-                <p class="text-xs text-slate-500">{{ $subtitle }}</p>
-            @endif
+<details {{ $attributes->merge(['class' => 'card group overflow-hidden']) }} @if($open) open @endif>
+    <summary class="flex cursor-pointer list-none select-none items-center justify-between gap-4 px-6 py-5 transition-colors hover:bg-slate-50/70 [&::-webkit-details-marker]:hidden">
+        <div class="flex items-center gap-4">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5">
+                    <path fill-rule="evenodd" d="M4 4a2 2 0 0 1 2-2h4.586A2 2 0 0 1 12 2.586L15.414 6A2 2 0 0 1 16 7.414V16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4Zm2 6a1 1 0 0 1 1-1h6a1 1 0 1 1 0 2H7a1 1 0 0 1-1-1Zm1 3a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2H7Z" clip-rule="evenodd" />
+                </svg>
+            </span>
+            <div>
+                <h3 class="text-sm font-semibold text-slate-900">{{ $title }}</h3>
+                @if ($subtitle)
+                    <p class="mt-0.5 text-xs text-slate-500">{{ $subtitle }}</p>
+                @endif
+            </div>
         </div>
+
         <div class="flex items-center gap-3">
             @if ($badge)
                 @include('partials.status-badge', ['status' => $badge])
@@ -45,27 +41,28 @@
         </div>
     </summary>
 
-    <div class="space-y-5 border-t border-slate-100 p-5">
+    <div class="divide-y divide-slate-100 border-t border-slate-100">
         @isset($syarat)
-            <div>
-                <h4 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Syarat</h4>
-                <ul class="space-y-1.5 text-sm text-slate-600">
+            <section class="px-6 py-5">
+                <h4 class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Syarat</h4>
+                <ul class="space-y-4 text-sm text-slate-600">
                     {{ $syarat }}
                 </ul>
-            </div>
+            </section>
         @endisset
 
         @isset($keterangan)
-            <div>
-                <h4 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Status Pengajuan</h4>
+            <section class="px-6 py-5">
+                <h4 class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Status Pengajuan</h4>
                 {{ $keterangan }}
-            </div>
+            </section>
         @endisset
 
         @if ($slot->isNotEmpty())
-            <div>
+            <section class="px-6 py-5">
+                <h4 class="mb-4 text-xs font-semibold uppercase tracking-wider text-slate-500">{{ $aksiTitle }}</h4>
                 {{ $slot }}
-            </div>
+            </section>
         @endif
     </div>
 </details>
