@@ -3,7 +3,9 @@
     - Desktop (lg ke atas): tinggi persis 1 layar, tanpa scroll halaman. Ukuran teks, jarak, dan input
       ikut mengecil/membesar mengikuti tinggi layar (clamp + vh).
     - Layar kecil: panel foto disembunyikan, halaman boleh scroll biasa.
-    Latar panel kiri: public/images/UnsriBG.png
+    Latar panel kiri: public/images/UnsriBG.png, tampil UTUH (tanpa crop); hanya tepi atasnya dilembutkan.
+    Panel kiri = setengah layar. Kalau rasio foto beda dengan panel, foto menempel di bawah dan
+    sisa ruang di atasnya diwarnai otomatis dengan warna tepi atas foto.
     Butuh palet sand/ink dan kelas mhs-* dari patch dashboard mahasiswa.
 --}}
 <!DOCTYPE html>
@@ -21,18 +23,18 @@
 
     <div class="flex min-h-screen lg:h-screen lg:overflow-hidden">
         {{-- Panel informasi (kiri) --}}
-        <div class="relative hidden w-1/2 flex-col overflow-hidden bg-gradient-to-b from-sand-50 to-sand-100 px-[clamp(2rem,5vw,4rem)] py-[clamp(1.25rem,4.5vh,3rem)] lg:flex">
-            {{-- Foto: selebar panel, menempel di bawah, menghilang halus ke atas --}}
+        <div id="panel-kiri" class="relative hidden w-1/2 shrink-0 flex-col overflow-hidden border-r border-sand-400 bg-sand-100 px-[clamp(2rem,5vw,4rem)] py-[clamp(1.25rem,4.5vh,3rem)] lg:flex">
+            {{-- Foto utuh, tidak di-crop. Hanya tepi atasnya yang dilembutkan (12% teratas) supaya menyatu
+                 dengan warna latar panel. Ubah angka 12% untuk memperkuat / memperlemah. --}}
             @if ($latar)
-                <img src="{{ $latar }}" alt=""
-                     class="pointer-events-none absolute inset-x-0 bottom-0 h-auto w-full saturate-[.8] sepia-[.3]"
-                     style="-webkit-mask-image: linear-gradient(to top, #000 0%, #000 40%, transparent 100%); mask-image: linear-gradient(to top, #000 0%, #000 40%, transparent 100%);">
+                <div class="pointer-events-none absolute inset-x-0 bottom-0">
+                    <img id="latar-foto" src="{{ $latar }}" alt="" class="block h-auto max-h-screen w-full object-contain object-bottom"
+                         style="-webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%); mask-image: linear-gradient(to bottom, transparent 0%, #000 12%);">
+                </div>
             @endif
-            {{-- Pudarkan ke krem. Naikkan angka /xx kalau teks kurang jelas, turunkan kalau foto terlalu pucat. --}}
-            <div class="pointer-events-none absolute inset-0 bg-gradient-to-b from-sand-50 via-sand-50/70 to-sand-50/10"></div>
 
-            {{-- Ornamen sudut kanan atas (hanya layar lebar) --}}
-            <svg class="pointer-events-none absolute right-0 top-0 hidden h-[36vh] w-auto text-gold-400 2xl:block" viewBox="0 0 100 340" aria-hidden="true">
+            {{-- Ornamen sudut kanan atas --}}
+            <svg class="pointer-events-none absolute right-0 top-0 hidden h-[36vh] w-auto text-gold-400 xl:block" viewBox="0 0 100 340" aria-hidden="true">
                 <polygon points="50,0 100,0 100,42 50,95" fill="currentColor" opacity=".4" />
                 <path d="M8 340V186L100 82" fill="none" stroke="currentColor" stroke-width="16" opacity=".4" />
             </svg>
@@ -63,7 +65,7 @@
 
             <div class="relative z-10 flex items-center gap-4">
                 <span class="h-px w-10 bg-sand-400"></span>
-                <p class="text-xs text-ink-700">Fakultas Ilmu Komputer &middot; Universitas Sriwijaya</p>
+                <p class="text-xs text-ink-700"></p>
             </div>
         </div>
 
@@ -154,6 +156,29 @@
             </div>
         </div>
     </div>
+
+    <script>
+        // Kalau rasio foto beda dengan panel, ruang kosong di atas foto diwarnai
+        // dengan warna rata-rata tepi atas foto supaya menyatu dengan tepi atas yang dilembutkan.
+        (function () {
+            var foto = document.getElementById('latar-foto');
+            var panel = document.getElementById('panel-kiri');
+            if (! foto || ! panel) return;
+            function warnai() {
+                try {
+                    var c = document.createElement('canvas');
+                    c.width = 1; c.height = 1;
+                    var ctx = c.getContext('2d');
+                    var tinggi = Math.max(4, Math.round(foto.naturalHeight * 0.01));
+                    ctx.drawImage(foto, 0, 0, foto.naturalWidth, tinggi, 0, 0, 1, 1);
+                    var d = ctx.getImageData(0, 0, 1, 1).data;
+                    panel.style.backgroundColor = 'rgb(' + d[0] + ',' + d[1] + ',' + d[2] + ')';
+                } catch (e) { /* biarkan warna krem bawaan */ }
+            }
+            if (foto.complete && foto.naturalWidth) warnai();
+            else foto.addEventListener('load', warnai);
+        })();
+    </script>
 
     <script>
         // Tampilkan / sembunyikan kata sandi.
