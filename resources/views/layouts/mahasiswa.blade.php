@@ -1,12 +1,10 @@
 {{--
-    Layout induk untuk semua peran selain mahasiswa (SekDep, Penata, Pengelola, dst).
-    Tampilannya disamakan dengan layouts/mahasiswa (palet sand + ink, sidebar krem).
+    Layout khusus dashboard mahasiswa (sidebar krem + header ringkas).
+    Layout lain (layouts/app) tetap dipakai oleh peran selain mahasiswa.
 
     Section yang dipakai:
       title, page-title, page-subtitle, content
-
-    Butuh (dari patch dashboard mahasiswa): palet sand/ink + kelas mhs-* di app.css,
-    dan komponen <x-mhs.icon>.
+      data-ta-url (opsional) - tautan menu "Data Tugas Akhir"; kosong = menu nonaktif
 --}}
 <!DOCTYPE html>
 <html lang="id">
@@ -18,38 +16,11 @@
 </head>
 <body class="bg-sand-50 font-sans text-ink-900 antialiased">
     @php
+        $dataTaUrl = trim($__env->yieldContent('data-ta-url'));
         // Ilustrasi gedung (opsional): taruh berkas di public/images/gedung-fasilkom.png
         $gedung = file_exists(public_path('images/gedung-fasilkom.png')) ? asset('images/gedung-fasilkom.png') : null;
         $pengguna = auth()->user();
         $mhsLogin = $pengguna?->mahasiswa;
-
-        // Menu per peran: [peran => [nama route, label]]
-        $navItems = [
-            'mahasiswa' => ['mahasiswa.dashboard', 'Dashboard Saya'],
-            'sekdep_koor_prodi' => ['sekdep.dashboard', 'SekDep / Koor. Prodi'],
-            'penata' => ['penata.dashboard', 'Penata'],
-            'pengelola_layanan' => ['pengelola.dashboard', 'Pengelola Layanan'],
-            'pengadministrasi_perkantoran' => ['administrasi.dashboard', 'Pengadministrasi'],
-            'dosen_penguji' => ['dosen.dashboard', 'Dosen Penguji'],
-        ];
-
-        // Dihitung sekali, dipakai bersama oleh sidebar dan navigasi layar kecil.
-        $menu = [];
-        if ($pengguna) {
-            foreach ($navItems as $peran => [$namaRoute, $label]) {
-                if ($pengguna->hasRole($peran)) {
-                    $menu[] = [
-                        'url' => route($namaRoute),
-                        'label' => $label,
-                        'ikon' => 'home',
-                        'aktif' => request()->routeIs($namaRoute),
-                    ];
-                }
-            }
-            if ($pengguna->hasRole('admin')) {
-                $menu[] = ['url' => '/admin', 'label' => 'Panel Admin', 'ikon' => 'shield', 'aktif' => false];
-            }
-        }
     @endphp
 
     <div class="flex min-h-screen bg-gradient-to-br from-sand-50 via-sand-50 to-sand-100">
@@ -77,17 +48,27 @@
             </div>
 
             <nav class="relative z-10 flex-1 space-y-1.5 px-4 py-2">
-                @foreach ($menu as $item)
-                    <a href="{{ $item['url'] }}"
-                       class="mhs-nav-link {{ $item['aktif'] ? 'mhs-nav-link-active' : '' }}"
-                       @if ($item['aktif']) aria-current="page" @endif>
-                        <x-mhs.icon :name="$item['ikon']" class="h-6 w-6 {{ $item['aktif'] ? 'text-sand-600' : 'text-ink-600' }}" />
-                        {{ $item['label'] }}
+                <a href="{{ route('mahasiswa.dashboard') }}"
+                   class="mhs-nav-link {{ request()->routeIs('mahasiswa.dashboard') ? 'mhs-nav-link-active' : '' }}"
+                   @if (request()->routeIs('mahasiswa.dashboard')) aria-current="page" @endif>
+                    <x-mhs.icon name="home" class="h-6 w-6 text-sand-600" />
+                    Dashboard
+                </a>
+
+                @if ($dataTaUrl !== '')
+                    <a href="{{ $dataTaUrl }}" class="mhs-nav-link">
+                        <x-mhs.icon name="doc" class="h-6 w-6 text-ink-600" />
+                        Data Tugas Akhir
                     </a>
-                @endforeach
+                @else
+                    <span class="mhs-nav-link cursor-not-allowed opacity-50" aria-disabled="true" title="Belum ada pengajuan">
+                        <x-mhs.icon name="doc" class="h-6 w-6 text-ink-600" />
+                        Data Tugas Akhir
+                    </span>
+                @endif
             </nav>
 
-            <div class="relative z-10 flex items-center gap-2.5 px-7 py-5 text-sm text-ink-600" title="POS 020/POS/FASILKOM/2026">
+            <div class="relative z-10 flex items-center gap-2.5 px-7 py-5 text-sm text-ink-600">
                 <x-mhs.icon name="shield" class="h-5 w-5 text-ink-700" />
                 Bagan Alir POS
             </div>
@@ -113,26 +94,21 @@
                             </span>
                             <span class="hidden text-left leading-tight sm:block">
                                 <span class="block text-sm font-semibold text-ink-900">{{ $pengguna->name }}</span>
-                                <span class="block text-xs text-ink-500">{{ str($pengguna->getRoleNames()->first() ?? '-')->headline() }}</span>
+                                <span class="block text-xs text-ink-500">{{ str($pengguna->getRoleNames()->first() ?? 'mahasiswa')->headline() }}</span>
                             </span>
                             <x-mhs.icon name="chevron-down" class="h-4 w-4 text-ink-500" />
                         </summary>
 
                         <div class="absolute right-0 mt-2 w-64 rounded-2xl border border-sand-200 bg-white p-2 shadow-lg">
-                            <div class="border-b border-sand-200 px-3 pb-3 pt-2">
-                                @if ($mhsLogin)
+                            @if ($mhsLogin)
+                                <div class="border-b border-sand-200 px-3 pb-3 pt-2">
                                     <p class="mhs-eyebrow">NIM</p>
                                     <p class="text-sm font-medium text-ink-900">{{ $mhsLogin->nim }}</p>
                                     @if ($mhsLogin->prodi)
                                         <p class="mt-0.5 text-xs text-ink-500">{{ $mhsLogin->prodi }}</p>
                                     @endif
-                                @else
-                                    <p class="mhs-eyebrow">Peran</p>
-                                    <p class="text-sm font-medium text-ink-900">
-                                        {{ $pengguna->getRoleNames()->map(fn ($r) => str($r)->headline())->join(', ') ?: '-' }}
-                                    </p>
-                                @endif
-                            </div>
+                                </div>
+                            @endif
                             <form method="POST" action="{{ route('logout') }}" class="pt-1">
                                 @csrf
                                 <button type="submit" class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink-800 transition hover:bg-sand-100">
@@ -146,16 +122,15 @@
             </header>
 
             {{-- Navigasi ringkas untuk layar kecil (sidebar disembunyikan di bawah lg) --}}
-            @if (count($menu) > 0)
-                <nav class="relative z-10 flex gap-2 overflow-x-auto border-b border-sand-200/80 bg-sand-100/70 px-6 py-2.5 lg:hidden">
-                    @foreach ($menu as $item)
-                        <a href="{{ $item['url'] }}"
-                           class="whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium {{ $item['aktif'] ? 'bg-sand-300/70 text-ink-900' : 'text-ink-700' }}">
-                            {{ $item['label'] }}
-                        </a>
-                    @endforeach
-                </nav>
-            @endif
+            <nav class="relative z-10 flex gap-2 border-b border-sand-200/80 bg-sand-100/70 px-6 py-2.5 lg:hidden">
+                <a href="{{ route('mahasiswa.dashboard') }}"
+                   class="rounded-full px-4 py-1.5 text-sm font-medium {{ request()->routeIs('mahasiswa.dashboard') ? 'bg-sand-300/70 text-ink-900' : 'text-ink-700' }}">
+                    Dashboard
+                </a>
+                @if ($dataTaUrl !== '')
+                    <a href="{{ $dataTaUrl }}" class="rounded-full px-4 py-1.5 text-sm font-medium text-ink-700">Data Tugas Akhir</a>
+                @endif
+            </nav>
 
             <main class="relative z-10 flex-1 px-6 py-8 lg:px-10">
                 @if (session('success'))

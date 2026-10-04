@@ -65,3 +65,82 @@
         @apply bg-white/10 text-white;
     }
 }
+@theme {
+    /* Pasir hangat & tinta navy — palet khusus tampilan dashboard mahasiswa */
+    --color-sand-50: #fdfbf7;
+    --color-sand-100: #f8f2e8;
+    --color-sand-200: #f0e6d6;
+    --color-sand-300: #e6d6bd;
+    --color-sand-400: #d2b88f;
+    --color-sand-500: #b8955f;
+    --color-sand-600: #98743f;
+    --color-sand-700: #765732;
+
+    --color-ink-400: #9aa1b2;
+    --color-ink-500: #747c91;
+    --color-ink-600: #565e75;
+    --color-ink-700: #3a4460;
+    --color-ink-800: #263153;
+    --color-ink-900: #19223f;
+}
+
+@layer components {
+    /* ---- Dashboard mahasiswa (prefix mhs-) ---- */
+    .mhs-card {
+        @apply rounded-2xl border border-sand-200 bg-white/70 shadow-[0_1px_3px_rgba(118,87,50,0.06)];
+    }
+    .mhs-eyebrow {
+        @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500;
+    }
+    .mhs-icon-bubble {
+        @apply flex shrink-0 items-center justify-center rounded-full bg-sand-200 text-sand-600;
+    }
+    .mhs-nav-link {
+        @apply flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-medium text-ink-800 transition hover:bg-sand-200/70;
+    }
+    .mhs-nav-link-active {
+        @apply bg-sand-300/60 font-semibold;
+    }
+    .mhs-label {
+        @apply mb-1.5 block text-sm font-medium text-ink-700;
+    }
+    .mhs-input {
+        @apply block w-full rounded-xl border border-sand-300 bg-white/80 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:border-sand-500 focus:outline-none focus:ring-2 focus:ring-sand-300;
+    }
+    .mhs-btn-primary {
+        @apply inline-flex items-center justify-center gap-1.5 rounded-xl bg-ink-800 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-ink-900 focus:outline-none focus:ring-2 focus:ring-ink-700 focus:ring-offset-2 focus:ring-offset-sand-50 disabled:cursor-not-allowed disabled:opacity-50;
+    }
+    .mhs-btn-secondary {
+        @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-sand-300 bg-white/80 px-4 py-2 text-sm font-medium text-ink-800 transition hover:bg-sand-100 focus:outline-none focus:ring-2 focus:ring-sand-400;
+    }
+}
+
+/*
+ * TARUH PALING BAWAH resources/css/app.css (setelah blok mhs-).
+ *
+ * Halaman non-mahasiswa (mis. partials.antrean-card) masih memakai kelas lama:
+ * card, btn-primary, btn-secondary, field-label, field-input.
+ * Blok ini menimpa tampilannya ke gaya sand/ink supaya halaman-halaman itu
+ * ikut seragam tanpa perlu diedit satu per satu.
+ */
+@layer components {
+    .card {
+        @apply rounded-2xl border border-sand-200 bg-white/70 shadow-[0_1px_3px_rgba(118,87,50,0.06)];
+    }
+
+    .btn-primary {
+        @apply inline-flex items-center justify-center gap-1.5 rounded-xl bg-ink-800 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-ink-900 focus:outline-none focus:ring-2 focus:ring-ink-700 focus:ring-offset-2 focus:ring-offset-sand-50 disabled:cursor-not-allowed disabled:opacity-50;
+    }
+
+    .btn-secondary {
+        @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-sand-300 bg-white/80 px-4 py-2 text-sm font-medium text-ink-800 transition hover:bg-sand-100 focus:outline-none focus:ring-2 focus:ring-sand-400 disabled:cursor-not-allowed disabled:opacity-50;
+    }
+
+    .field-label {
+        @apply mb-1.5 block text-sm font-medium text-ink-700;
+    }
+
+    .field-input {
+        @apply block w-full rounded-xl border border-sand-300 bg-white/80 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:border-sand-500 focus:outline-none focus:ring-2 focus:ring-sand-300;
+    }
+}
