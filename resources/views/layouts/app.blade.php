@@ -15,6 +15,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title', 'Sistem TA') &mdash; Fasilkom Unsri</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>
+        /* Animasi fade-in untuk konten halaman (dipakai semua halaman yang extends layout ini) */
+        @keyframes halaman-masuk {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+        .halaman-masuk {
+            animation: halaman-masuk .5s ease-out backwards;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .halaman-masuk { animation: none; }
+        }
+    </style>
 </head>
 <body class="bg-sand-50 font-sans text-ink-900 antialiased">
     @php
@@ -157,7 +170,7 @@
                 </nav>
             @endif
 
-            <main class="relative z-10 flex-1 px-6 py-8 lg:px-10">
+            <main class="halaman-masuk relative z-10 flex-1 px-6 py-8 lg:px-10">
                 @if (session('success'))
                     <div class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3.5 text-sm text-emerald-800">
                         {{ session('success') }}
