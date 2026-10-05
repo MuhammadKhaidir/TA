@@ -69,7 +69,7 @@
                     <span class="h-px w-10 bg-sand-400"></span>
                 </div>
                 <h1 class="mt-[clamp(0.5rem,2vh,1.25rem)] max-w-[30rem] text-balance font-serif text-[length:clamp(1.75rem,min(5vh,3vw),3rem)] font-bold leading-[1.25] text-ink-900">
-                    Mendigitalkan alur pendaftaran sidang.
+                    PENDAFTARAN TUGAS AKHIR MAHASISWA.
                 </h1>
             </div>
 
