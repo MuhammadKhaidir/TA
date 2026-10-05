@@ -3,8 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Enums\SidangStatus;
+use App\Models\Konsultasi;
 use App\Models\Sidang;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class DashboardController extends Controller
 {
@@ -22,7 +28,73 @@ class DashboardController extends Controller
         return view('mahasiswa.dashboard', [
             'mahasiswa' => $mahasiswa,
             'sidangs' => $sidangs,
+            'konsultasis' => $mahasiswa?->konsultasis()->latest('tanggal')->get() ?? collect(),
         ]);
+    }
+
+    // ------------------------------------------------------------------
+    // Checklist konsultasi pembimbingan (mahasiswa)
+    // jumlah_konsultasi di-increment/decrement (bukan dihitung ulang) supaya
+    // angka awal yang sudah diisi SekDep/Koor. Prodi tidak tertimpa.
+    // ------------------------------------------------------------------
+
+    public function catatKonsultasi(Request $request): RedirectResponse
+    {
+        $mahasiswa = Auth::user()->mahasiswa;
+        abort_unless($mahasiswa, 403, 'Akun Anda belum tertaut ke data mahasiswa.');
+
+        $data = $request->validate([
+            'tanggal' => [
+                'required', 'date', 'before_or_equal:today',
+                Rule::unique('konsultasis', 'tanggal')->where('mahasiswa_id', $mahasiswa->id),
+            ],
+            'catatan' => ['nullable', 'string', 'max:255'],
+            'bukti' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+        ], [
+            'tanggal.unique' => 'Konsultasi pada tanggal tersebut sudah dicentang.',
+            'tanggal.before_or_equal' => 'Tanggal konsultasi tidak boleh di masa depan.',
+        ]);
+
+        DB::transaction(function () use ($mahasiswa, $data, $request) {
+            $mahasiswa->konsultasis()->create([
+                'tanggal' => $data['tanggal'],
+                'catatan' => $data['catatan'] ?? null,
+                'bukti_path' => $request->file('bukti')?->store("konsultasi/{$mahasiswa->id}", 'public'),
+            ]);
+            $mahasiswa->increment('jumlah_konsultasi');
+        });
+
+        return redirect(route('mahasiswa.dashboard').'#konsultasi-pembimbingan')
+            ->with('success', 'Konsultasi berhasil dicentang.');
+    }
+
+    public function hapusKonsultasi(Konsultasi $konsultasi): RedirectResponse
+    {
+        $mahasiswa = Auth::user()->mahasiswa;
+        abort_unless($mahasiswa && $konsultasi->mahasiswa_id === $mahasiswa->id, 403);
+
+        DB::transaction(function () use ($mahasiswa, $konsultasi) {
+            if ($konsultasi->bukti_path) {
+                Storage::disk('public')->delete($konsultasi->bukti_path);
+            }
+            $konsultasi->delete();
+            $mahasiswa->update(['jumlah_konsultasi' => max(0, $mahasiswa->jumlah_konsultasi - 1)]);
+        });
+
+        return redirect(route('mahasiswa.dashboard').'#konsultasi-pembimbingan')
+            ->with('success', 'Centang konsultasi dihapus.');
+    }
+
+    public function buktiKonsultasi(Konsultasi $konsultasi)
+    {
+        $user = Auth::user();
+        abort_unless(
+            $user->hasAnyRole(['admin', 'sekdep_koor_prodi']) || $user->mahasiswa?->id === $konsultasi->mahasiswa_id,
+            403
+        );
+        abort_unless($konsultasi->bukti_path && Storage::disk('public')->exists($konsultasi->bukti_path), 404);
+
+        return Storage::disk('public')->response($konsultasi->bukti_path);
     }
 
     public function sekdep()

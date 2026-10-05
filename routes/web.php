@@ -19,13 +19,18 @@ Route::middleware(['auth'])->group(function () {
     // dengan otorisasi granular ditangani di dalam SidangController.
     Route::get('/sidang/{sidang}', [SidangController::class, 'show'])->name('sidang.show');
     Route::get('/sidang/{sidang}/dokumen/{dokumen}/unduh', [SidangController::class, 'unduhDokumen'])->name('sidang.dokumen.unduh');
+    // Foto bukti konsultasi: pemilik, SekDep/Koor. Prodi, atau admin (dicek di controller).
+    Route::get('/konsultasi/{konsultasi}/bukti', [DashboardController::class, 'buktiKonsultasi'])->name('konsultasi.bukti');
 
     // ------------------------------------------------------------
     // Mahasiswa — Langkah 1
     // ------------------------------------------------------------
     Route::middleware('role:mahasiswa')->prefix('mahasiswa')->name('mahasiswa.')->group(function () {
         Route::get('/', [DashboardController::class, 'mahasiswa'])->name('dashboard');
+        Route::post('/konsultasi', [DashboardController::class, 'catatKonsultasi'])->name('konsultasi.catat');
+        Route::delete('/konsultasi/{konsultasi}', [DashboardController::class, 'hapusKonsultasi'])->name('konsultasi.hapus');
         Route::post('/sidang', [SidangController::class, 'ajukan'])->name('sidang.ajukan');
+Route::delete('/sidang/{sidang}', [SidangController::class, 'batalkan'])->name('sidang.batalkan');
         Route::post('/sidang/{sidang}/dokumen', [SidangController::class, 'unggahDokumen'])->name('sidang.dokumen.unggah');
     });
 

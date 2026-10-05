@@ -87,16 +87,36 @@ class SidangController extends Controller
 
         $data = $request->validate([
             'jenis' => ['required', 'in:komprehensif,skripsi'],
-            'judul_ta' => ['nullable', 'string', 'max:255'],
-            'dkn_file' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
-            'usep_file' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
-            'sk_pembimbing_file' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
+            'judul_ta' => ['required', 'string', 'max:255'],
+            'dkn_file' => ['required', 'file', 'mimes:pdf', 'max:5120'],
+            'usep_file' => ['required', 'file', 'mimes:pdf', 'max:5120'],
+            'sk_pembimbing_file' => ['required', 'file', 'mimes:pdf', 'max:5120'],
+        ], [
+            'jenis.required' => 'Jenis ujian wajib dipilih.',
+            'judul_ta.required' => 'Judul Tugas Akhir wajib diisi.',
+            'dkn_file.required' => 'Berkas DKN wajib diunggah.',
+            'usep_file.required' => 'Bukti kelulusan USEP wajib diunggah.',
+            'sk_pembimbing_file.required' => 'SK Pembimbing TA wajib diunggah.',
         ]);
 
         return $this->jalankan(
             fn () => $this->service->ajukanSidang($mahasiswa, $data, Auth::user()),
             'Pengajuan sidang berhasil dikirim ke SekDep/Koor. Prodi.'
         );
+    }
+
+    public function batalkan(Sidang $sidang): RedirectResponse
+    {
+        abort_unless($sidang->mahasiswa_id === Auth::user()->mahasiswa?->id, 403);
+
+        try {
+            $this->service->batalkanPengajuan($sidang);
+        } catch (WorkflowException $e) {
+            return back()->withErrors(['workflow' => $e->getMessage()]);
+        }
+
+        return redirect()->route('mahasiswa.dashboard')
+            ->with('success', 'Pengajuan sidang dibatalkan. Anda dapat mengajukan ulang dengan data yang benar.');
     }
 
     public function unggahDokumen(Request $request, Sidang $sidang): RedirectResponse

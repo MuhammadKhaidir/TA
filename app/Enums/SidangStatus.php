@@ -12,6 +12,7 @@ namespace App\Enums;
  */
 enum SidangStatus: string
 {
+    
     case Diajukan = 'diajukan';
     case MenungguVerifikasiPenata = 'menunggu_verifikasi_penata';
     case MenungguProsesSk = 'menunggu_proses_sk';
@@ -80,6 +81,16 @@ enum SidangStatus: string
             default => $this->langkahSelesai() + 1,
         };
     }
+
+
+    public function bisaDibatalkan(): bool
+{
+    // Isi dengan status yang belum disetujui pihak lain.
+    // Cek nama case di enum ini, jangan asal copy.
+    return in_array($this, [self::Diajukan, self::Ditunda], true);
+}
+
+    
 
     /**
      * Nama peran (cocok dengan kolom "name" pada tabel roles) yang harus

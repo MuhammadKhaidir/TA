@@ -187,4 +187,13 @@ class Sidang extends Model
             'user_id' => $userId,
         ]);
     }
+
+    /**
+     * Pengajuan masih boleh dibatalkan mahasiswa selama belum diproses pihak lain:
+     * masih menunggu SekDep/Koor. Prodi (Diajukan) atau ditunda karena konsultasi.
+     */
+    public function bolehDibatalkan(): bool
+    {
+        return in_array($this->status, [SidangStatus::Diajukan, SidangStatus::Ditunda], true);
+    }
 }

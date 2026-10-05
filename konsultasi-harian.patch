@@ -1,0 +1,308 @@
+diff --git a/app/Http/Controllers/DashboardController.php b/app/Http/Controllers/DashboardController.php
+index d41df65..ce788f7 100644
+--- a/app/Http/Controllers/DashboardController.php
++++ b/app/Http/Controllers/DashboardController.php
+@@ -3,8 +3,14 @@
+ namespace App\Http\Controllers;
+ 
+ use App\Enums\SidangStatus;
++use App\Models\Konsultasi;
+ use App\Models\Sidang;
++use Illuminate\Http\RedirectResponse;
++use Illuminate\Http\Request;
+ use Illuminate\Support\Facades\Auth;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Storage;
++use Illuminate\Validation\Rule;
+ 
+ class DashboardController extends Controller
+ {
+@@ -22,9 +28,75 @@ public function mahasiswa()
+         return view('mahasiswa.dashboard', [
+             'mahasiswa' => $mahasiswa,
+             'sidangs' => $sidangs,
++            'konsultasis' => $mahasiswa?->konsultasis()->latest('tanggal')->get() ?? collect(),
+         ]);
+     }
+ 
++    // ------------------------------------------------------------------
++    // Checklist konsultasi pembimbingan (mahasiswa)
++    // jumlah_konsultasi di-increment/decrement (bukan dihitung ulang) supaya
++    // angka awal yang sudah diisi SekDep/Koor. Prodi tidak tertimpa.
++    // ------------------------------------------------------------------
++
++    public function catatKonsultasi(Request $request): RedirectResponse
++    {
++        $mahasiswa = Auth::user()->mahasiswa;
++        abort_unless($mahasiswa, 403, 'Akun Anda belum tertaut ke data mahasiswa.');
++
++        $data = $request->validate([
++            'tanggal' => [
++                'required', 'date', 'before_or_equal:today',
++                Rule::unique('konsultasis', 'tanggal')->where('mahasiswa_id', $mahasiswa->id),
++            ],
++            'catatan' => ['nullable', 'string', 'max:255'],
++            'bukti' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
++        ], [
++            'tanggal.unique' => 'Konsultasi pada tanggal tersebut sudah dicentang.',
++            'tanggal.before_or_equal' => 'Tanggal konsultasi tidak boleh di masa depan.',
++        ]);
++
++        DB::transaction(function () use ($mahasiswa, $data, $request) {
++            $mahasiswa->konsultasis()->create([
++                'tanggal' => $data['tanggal'],
++                'catatan' => $data['catatan'] ?? null,
++                'bukti_path' => $request->file('bukti')?->store("konsultasi/{$mahasiswa->id}", 'public'),
++            ]);
++            $mahasiswa->increment('jumlah_konsultasi');
++        });
++
++        return redirect(route('mahasiswa.dashboard').'#konsultasi-pembimbingan')
++            ->with('success', 'Konsultasi berhasil dicentang.');
++    }
++
++    public function hapusKonsultasi(Konsultasi $konsultasi): RedirectResponse
++    {
++        $mahasiswa = Auth::user()->mahasiswa;
++        abort_unless($mahasiswa && $konsultasi->mahasiswa_id === $mahasiswa->id, 403);
++
++        DB::transaction(function () use ($mahasiswa, $konsultasi) {
++            if ($konsultasi->bukti_path) {
++                Storage::disk('public')->delete($konsultasi->bukti_path);
++            }
++            $konsultasi->delete();
++            $mahasiswa->update(['jumlah_konsultasi' => max(0, $mahasiswa->jumlah_konsultasi - 1)]);
++        });
++
++        return redirect(route('mahasiswa.dashboard').'#konsultasi-pembimbingan')
++            ->with('success', 'Centang konsultasi dihapus.');
++    }
++
++    public function buktiKonsultasi(Konsultasi $konsultasi)
++    {
++        $user = Auth::user();
++        abort_unless(
++            $user->hasAnyRole(['admin', 'sekdep_koor_prodi']) || $user->mahasiswa?->id === $konsultasi->mahasiswa_id,
++            403
++        );
++        abort_unless($konsultasi->bukti_path && Storage::disk('public')->exists($konsultasi->bukti_path), 404);
++
++        return Storage::disk('public')->response($konsultasi->bukti_path);
++    }
++
+     public function sekdep()
+     {
+         $antrean = Sidang::with('mahasiswa')
+diff --git a/app/Models/Konsultasi.php b/app/Models/Konsultasi.php
+new file mode 100644
+index 0000000..a9b8a22
+--- /dev/null
++++ b/app/Models/Konsultasi.php
+@@ -0,0 +1,21 @@
++<?php
++
++namespace App\Models;
++
++use Illuminate\Database\Eloquent\Model;
++use Illuminate\Database\Eloquent\Relations\BelongsTo;
++
++class Konsultasi extends Model
++{
++    protected $fillable = ['mahasiswa_id', 'tanggal', 'catatan', 'bukti_path'];
++
++    protected function casts(): array
++    {
++        return ['tanggal' => 'date'];
++    }
++
++    public function mahasiswa(): BelongsTo
++    {
++        return $this->belongsTo(Mahasiswa::class);
++    }
++}
+diff --git a/app/Models/Mahasiswa.php b/app/Models/Mahasiswa.php
+index 9ae6f41..09fbcf5 100644
+--- a/app/Models/Mahasiswa.php
++++ b/app/Models/Mahasiswa.php
+@@ -35,6 +35,11 @@ public function sidangs(): HasMany
+         return $this->hasMany(Sidang::class);
+     }
+ 
++    public function konsultasis(): HasMany
++    {
++        return $this->hasMany(Konsultasi::class);
++    }
++
+     /**
+      * Peringatan POS #1: syarat minimal 12x konsultasi sebelum sidang.
+      */
+diff --git a/database/migrations/2026_10_06_100000_create_konsultasis_table.php b/database/migrations/2026_10_06_100000_create_konsultasis_table.php
+new file mode 100644
+index 0000000..b757b2e
+--- /dev/null
++++ b/database/migrations/2026_10_06_100000_create_konsultasis_table.php
+@@ -0,0 +1,28 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\Schema;
++
++return new class extends Migration
++{
++    public function up(): void
++    {
++        Schema::create('konsultasis', function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('mahasiswa_id')->constrained()->cascadeOnDelete();
++            $table->date('tanggal');
++            $table->string('catatan')->nullable();
++            $table->string('bukti_path')->nullable(); // foto bukti, opsional
++            $table->timestamps();
++
++            // Satu centang per hari per mahasiswa.
++            $table->unique(['mahasiswa_id', 'tanggal']);
++        });
++    }
++
++    public function down(): void
++    {
++        Schema::dropIfExists('konsultasis');
++    }
++};
+diff --git a/resources/views/mahasiswa/dashboard.blade.php b/resources/views/mahasiswa/dashboard.blade.php
+index 6e9bc84..92cfc2d 100644
+--- a/resources/views/mahasiswa/dashboard.blade.php
++++ b/resources/views/mahasiswa/dashboard.blade.php
+@@ -19,6 +19,7 @@
+             'SK Pembimbing TA',
+         ];
+         $tautanAktif = $sidangAktif ? route('sidang.show', $sidangAktif) : '#pengajuan-sidang';
++        $sudahHariIni = $konsultasis->contains(fn ($k) => $k->tanggal->isToday());
+     @endphp
+ 
+     @if (! $mahasiswa)
+@@ -35,7 +36,7 @@
+         {{-- Ringkasan --}}
+         <div class="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+             {{-- Konsultasi --}}
+-            <a href="#pengajuan-sidang" class="mhs-card group relative flex items-start gap-4 p-6 transition hover:border-sand-300 hover:bg-white/90">
++            <a href="#konsultasi-pembimbingan" class="mhs-card group relative flex items-start gap-4 p-6 transition hover:border-sand-300 hover:bg-white/90">
+                 <span class="mhs-icon-bubble h-12 w-12">
+                     <x-mhs.icon name="doc" class="h-6 w-6 text-sand-600" />
+                 </span>
+@@ -111,6 +112,93 @@
+             Menu proses lain cukup ditambah dengan pola yang sama di bawah ini.
+         --}}
+         <div class="space-y-5">
++            <x-menu-proses
++                id="konsultasi-pembimbingan"
++                title="Konsultasi Pembimbingan"
++                subtitle="Centang setiap hari konsultasi dengan pembimbing. Foto bukti boleh dilampirkan (opsional)."
++                aksiTitle="Centang Konsultasi"
++                :open="! $memenuhiSyarat || $errors->hasAny(['tanggal', 'catatan', 'bukti'])"
++            >
++                <x-slot:keterangan>
++                    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
++                        <h4 class="text-sm font-semibold uppercase tracking-wider text-ink-600">Riwayat Konsultasi</h4>
++                        <span class="text-sm {{ $sudahHariIni ? 'text-emerald-700' : 'text-ink-500' }}">
++                            {{ $sudahHariIni ? 'Hari ini sudah dicentang' : 'Hari ini belum dicentang' }}
++                        </span>
++                    </div>
++
++                    @forelse ($konsultasis as $k)
++                        @if ($loop->first)
++                            <ul class="max-h-80 divide-y divide-sand-200/80 overflow-y-auto rounded-xl border border-sand-200 px-4">
++                        @endif
++                        <li class="flex items-center gap-3 py-3">
++                            <x-mhs.icon name="check-circle" class="h-6 w-6 shrink-0 text-emerald-600" />
++                            <div class="min-w-0 flex-1">
++                                <p class="text-sm font-medium text-ink-900">{{ $k->tanggal->translatedFormat('l, d M Y') }}</p>
++                                @if ($k->catatan)
++                                    <p class="truncate text-xs text-ink-600">{{ $k->catatan }}</p>
++                                @endif
++                            </div>
++                            @if ($k->bukti_path)
++                                <a href="{{ route('konsultasi.bukti', $k) }}" target="_blank" rel="noopener" title="Lihat bukti">
++                                    <img src="{{ route('konsultasi.bukti', $k) }}" alt="Bukti konsultasi" loading="lazy"
++                                         class="h-10 w-10 rounded-lg border border-sand-200 object-cover">
++                                </a>
++                            @endif
++                            <form method="POST" action="{{ route('mahasiswa.konsultasi.hapus', $k) }}"
++                                  onsubmit="return confirm('Hapus centang konsultasi ini?')">
++                                @csrf
++                                @method('DELETE')
++                                <button type="submit" class="text-xs font-medium text-rose-600 hover:underline">Hapus</button>
++                            </form>
++                        </li>
++                        @if ($loop->last)
++                            </ul>
++                        @endif
++                    @empty
++                        <p class="rounded-xl border border-dashed border-sand-300 px-4 py-5 text-sm text-ink-500">
++                            Belum ada konsultasi yang dicentang.
++                        </p>
++                    @endforelse
++                </x-slot:keterangan>
++
++                <form method="POST" action="{{ route('mahasiswa.konsultasi.catat') }}" enctype="multipart/form-data" class="space-y-4">
++                    @csrf
++                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
++                        <div>
++                            <label class="mhs-label">Tanggal Konsultasi</label>
++                            <input type="date" name="tanggal" value="{{ old('tanggal', now()->toDateString()) }}"
++                                   max="{{ now()->toDateString() }}" class="mhs-input" required>
++                            @error('tanggal')
++                                <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
++                            @enderror
++                        </div>
++                        <div>
++                            <label class="mhs-label">Catatan (opsional)</label>
++                            <input type="text" name="catatan" value="{{ old('catatan') }}" maxlength="255"
++                                   class="mhs-input" placeholder="Bahas apa hari ini?">
++                            @error('catatan')
++                                <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
++                            @enderror
++                        </div>
++                        <div>
++                            <label class="mhs-label">Foto Bukti (opsional)</label>
++                            <input type="file" name="bukti" accept="image/*"
++                                   class="mhs-input text-sm text-ink-600 file:mr-3 file:rounded-lg file:border-0 file:bg-sand-200 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-ink-800 hover:file:bg-sand-300">
++                            @error('bukti')
++                                <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
++                            @enderror
++                        </div>
++                    </div>
++                    <div class="flex flex-col gap-3 border-t border-sand-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
++                        <p class="text-sm text-ink-600">
++                            Tercatat {{ $mahasiswa->jumlah_konsultasi }} dari minimal {{ $minimalKonsultasi }} kali.
++                        </p>
++                        <button type="submit" class="mhs-btn-primary">Centang Konsultasi</button>
++                    </div>
++                </form>
++            </x-menu-proses>
++
+             <x-menu-proses
+                 id="pengajuan-sidang"
+                 title="Pengajuan Sidang Tugas Akhir"
+diff --git a/routes/web.php b/routes/web.php
+index f55424c..879e37f 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -19,12 +19,16 @@
+     // dengan otorisasi granular ditangani di dalam SidangController.
+     Route::get('/sidang/{sidang}', [SidangController::class, 'show'])->name('sidang.show');
+     Route::get('/sidang/{sidang}/dokumen/{dokumen}/unduh', [SidangController::class, 'unduhDokumen'])->name('sidang.dokumen.unduh');
++    // Foto bukti konsultasi: pemilik, SekDep/Koor. Prodi, atau admin (dicek di controller).
++    Route::get('/konsultasi/{konsultasi}/bukti', [DashboardController::class, 'buktiKonsultasi'])->name('konsultasi.bukti');
+ 
+     // ------------------------------------------------------------
+     // Mahasiswa — Langkah 1
+     // ------------------------------------------------------------
+     Route::middleware('role:mahasiswa')->prefix('mahasiswa')->name('mahasiswa.')->group(function () {
+         Route::get('/', [DashboardController::class, 'mahasiswa'])->name('dashboard');
++        Route::post('/konsultasi', [DashboardController::class, 'catatKonsultasi'])->name('konsultasi.catat');
++        Route::delete('/konsultasi/{konsultasi}', [DashboardController::class, 'hapusKonsultasi'])->name('konsultasi.hapus');
+         Route::post('/sidang', [SidangController::class, 'ajukan'])->name('sidang.ajukan');
+         Route::post('/sidang/{sidang}/dokumen', [SidangController::class, 'unggahDokumen'])->name('sidang.dokumen.unggah');
+     });

@@ -19,6 +19,7 @@
             'SK Pembimbing TA',
         ];
         $tautanAktif = $sidangAktif ? route('sidang.show', $sidangAktif) : '#pengajuan-sidang';
+        $sudahHariIni = $konsultasis->contains(fn ($k) => $k->tanggal->isToday());
     @endphp
 
     @if (! $mahasiswa)
@@ -35,7 +36,7 @@
         {{-- Ringkasan --}}
         <div class="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
             {{-- Konsultasi --}}
-            <a href="#pengajuan-sidang" class="mhs-card group relative flex items-start gap-4 p-6 transition hover:border-sand-300 hover:bg-white/90">
+            <a href="#konsultasi-pembimbingan" class="mhs-card group relative flex items-start gap-4 p-6 transition hover:border-sand-300 hover:bg-white/90">
                 <span class="mhs-icon-bubble h-12 w-12">
                     <x-mhs.icon name="doc" class="h-6 w-6 text-sand-600" />
                 </span>
@@ -112,6 +113,93 @@
         --}}
         <div class="space-y-5">
             <x-menu-proses
+                id="konsultasi-pembimbingan"
+                title="Konsultasi Pembimbingan"
+                subtitle="Centang setiap hari konsultasi dengan pembimbing. Foto bukti boleh dilampirkan (opsional)."
+                aksiTitle="Centang Konsultasi"
+                :open="! $memenuhiSyarat || $errors->hasAny(['tanggal', 'catatan', 'bukti'])"
+            >
+                <x-slot:keterangan>
+                    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <h4 class="text-sm font-semibold uppercase tracking-wider text-ink-600">Riwayat Konsultasi</h4>
+                        <span class="text-sm {{ $sudahHariIni ? 'text-emerald-700' : 'text-ink-500' }}">
+                            {{ $sudahHariIni ? 'Hari ini sudah dicentang' : 'Hari ini belum dicentang' }}
+                        </span>
+                    </div>
+
+                    @forelse ($konsultasis as $k)
+                        @if ($loop->first)
+                            <ul class="max-h-80 divide-y divide-sand-200/80 overflow-y-auto rounded-xl border border-sand-200 px-4">
+                        @endif
+                        <li class="flex items-center gap-3 py-3">
+                            <x-mhs.icon name="check-circle" class="h-6 w-6 shrink-0 text-emerald-600" />
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-medium text-ink-900">{{ $k->tanggal->translatedFormat('l, d M Y') }}</p>
+                                @if ($k->catatan)
+                                    <p class="truncate text-xs text-ink-600">{{ $k->catatan }}</p>
+                                @endif
+                            </div>
+                            @if ($k->bukti_path)
+                                <a href="{{ route('konsultasi.bukti', $k) }}" target="_blank" rel="noopener" title="Lihat bukti">
+                                    <img src="{{ route('konsultasi.bukti', $k) }}" alt="Bukti konsultasi" loading="lazy"
+                                         class="h-10 w-10 rounded-lg border border-sand-200 object-cover">
+                                </a>
+                            @endif
+                            <form method="POST" action="{{ route('mahasiswa.konsultasi.hapus', $k) }}"
+                                  onsubmit="return confirm('Hapus centang konsultasi ini?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="text-xs font-medium text-rose-600 hover:underline">Hapus</button>
+                            </form>
+                        </li>
+                        @if ($loop->last)
+                            </ul>
+                        @endif
+                    @empty
+                        <p class="rounded-xl border border-dashed border-sand-300 px-4 py-5 text-sm text-ink-500">
+                            Belum ada konsultasi yang dicentang.
+                        </p>
+                    @endforelse
+                </x-slot:keterangan>
+
+                <form method="POST" action="{{ route('mahasiswa.konsultasi.catat') }}" enctype="multipart/form-data" class="space-y-4">
+                    @csrf
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div>
+                            <label class="mhs-label">Tanggal Konsultasi</label>
+                            <input type="date" name="tanggal" value="{{ old('tanggal', now()->toDateString()) }}"
+                                   max="{{ now()->toDateString() }}" class="mhs-input" required>
+                            @error('tanggal')
+                                <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label class="mhs-label">Catatan (opsional)</label>
+                            <input type="text" name="catatan" value="{{ old('catatan') }}" maxlength="255"
+                                   class="mhs-input" placeholder="Bahas apa hari ini?">
+                            @error('catatan')
+                                <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label class="mhs-label">Foto Bukti (opsional)</label>
+                            <input type="file" name="bukti" accept="image/*"
+                                   class="mhs-input text-sm text-ink-600 file:mr-3 file:rounded-lg file:border-0 file:bg-sand-200 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-ink-800 hover:file:bg-sand-300">
+                            @error('bukti')
+                                <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-3 border-t border-sand-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                        <p class="text-sm text-ink-600">
+                            Tercatat {{ $mahasiswa->jumlah_konsultasi }} dari minimal {{ $minimalKonsultasi }} kali.
+                        </p>
+                        <button type="submit" class="mhs-btn-primary">Centang Konsultasi</button>
+                    </div>
+                </form>
+            </x-menu-proses>
+
+            <x-menu-proses
                 id="pengajuan-sidang"
                 title="Pengajuan Sidang Tugas Akhir"
                 subtitle="Ujian Komprehensif / Sidang Skripsi - Langkah 1 Bagan Alir POS 020/POS/FASILKOM/2026"
@@ -148,7 +236,7 @@
                             <div class="min-w-0">
                                 <p class="text-[15px] font-semibold text-ink-900">{{ $berkas }}</p>
                                 <p class="mt-0.5 text-sm text-ink-600">
-                                    Berkas PDF. Boleh disusulkan setelah pengajuan bila belum siap.
+                                    Berkas PDF, wajib diunggah saat mengajukan sidang.
                                 </p>
                             </div>
                         </li>
@@ -212,6 +300,21 @@
                                     <x-mhs.icon name="chevron-right" class="h-4 w-4" />
                                 </a>
                             </div>
+
+                            @if ($sidangAktif->bolehDibatalkan())
+                                <form method="POST" action="{{ route('mahasiswa.sidang.batalkan', $sidangAktif) }}"
+                                      onsubmit="return confirm('Batalkan pengajuan ini? Data dan berkas yang sudah diunggah akan dihapus, lalu Anda bisa mengajukan ulang.')"
+                                      class="flex flex-col gap-3 rounded-xl border border-rose-200 bg-rose-50/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                                    @csrf
+                                    @method('DELETE')
+                                    <p class="text-sm text-rose-800">
+                                        Salah isi data? Pengajuan masih bisa dibatalkan selama belum diproses pihak lain.
+                                    </p>
+                                    <button type="submit" class="shrink-0 rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100">
+                                        Batalkan Pengajuan
+                                    </button>
+                                </form>
+                            @endif
                         </div>
                     </x-slot:keterangan>
                 @else
@@ -219,7 +322,8 @@
                         @csrf
 
                         <div>
-                            <h5 class="mb-3 text-sm font-semibold text-ink-900">Data Pengajuan</h5>
+                            <h5 class="text-sm font-semibold text-ink-900">Data Pengajuan</h5>
+                            <p class="mb-3 mt-0.5 text-xs text-ink-500">Semua kolom wajib diisi.</p>
                             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
                                     <label class="mhs-label">Jenis Ujian</label>
@@ -233,7 +337,7 @@
                                 </div>
                                 <div>
                                     <label class="mhs-label">Judul Tugas Akhir</label>
-                                    <input type="text" name="judul_ta" value="{{ old('judul_ta') }}" class="mhs-input" placeholder="Judul TA Anda">
+                                    <input type="text" name="judul_ta" value="{{ old('judul_ta') }}" class="mhs-input" placeholder="Judul TA Anda" required>
                                     @error('judul_ta')
                                         <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
                                     @enderror
@@ -244,7 +348,7 @@
                         <div>
                             <h5 class="text-sm font-semibold text-ink-900">Berkas Pendukung</h5>
                             <p class="mb-3 mt-0.5 text-xs text-ink-500">
-                                Berkas yang belum siap dapat disusulkan setelah pengajuan.
+                                Semua berkas wajib diunggah (PDF, maksimal 5 MB per berkas).
                             </p>
                             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                                 @foreach ([
@@ -254,7 +358,7 @@
                                 ] as [$nama, $label])
                                     <div>
                                         <label class="mhs-label">{{ $label }}</label>
-                                        <input type="file" name="{{ $nama }}" accept="application/pdf"
+                                        <input type="file" name="{{ $nama }}" accept="application/pdf" required
                                                class="mhs-input text-sm text-ink-600 file:mr-3 file:rounded-lg file:border-0 file:bg-sand-200 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-ink-800 hover:file:bg-sand-300">
                                         @error($nama)
                                             <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>

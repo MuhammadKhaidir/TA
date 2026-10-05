@@ -35,6 +35,11 @@ class Mahasiswa extends Model
         return $this->hasMany(Sidang::class);
     }
 
+    public function konsultasis(): HasMany
+    {
+        return $this->hasMany(Konsultasi::class);
+    }
+
     /**
      * Peringatan POS #1: syarat minimal 12x konsultasi sebelum sidang.
      */

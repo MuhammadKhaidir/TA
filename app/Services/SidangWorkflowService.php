@@ -636,4 +636,24 @@ class SidangWorkflowService
 
         $dokumen->delete();
     }
+
+    /**
+     * Mahasiswa membatalkan pengajuan yang belum diproses pihak lain (salah isi data, dsb).
+     * Pengajuan dihapus beserta berkas & riwayatnya (relasi cascade) supaya bisa diajukan ulang.
+     */
+    public function batalkanPengajuan(Sidang $sidang): void
+    {
+        if (! $sidang->bolehDibatalkan()) {
+            throw new WorkflowException(
+                "Pengajuan tidak dapat dibatalkan karena sudah diproses (status \"{$sidang->status->label()}\")."
+            );
+        }
+
+        $berkas = $sidang->dokumens()->pluck('file_path')->all();
+
+        $sidang->delete();
+
+        // Hapus file fisik setelah baris database terhapus.
+        Storage::disk('public')->delete($berkas);
+    }
 }
