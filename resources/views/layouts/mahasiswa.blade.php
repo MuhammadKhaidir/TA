@@ -4,7 +4,9 @@
 
     Section yang dipakai:
       title, page-title, page-subtitle, content
-      data-ta-url (opsional) - tautan menu "Data Tugas Akhir"; kosong = menu nonaktif
+      data-ta-url (opsional) - override tautan menu "Data Tugas Akhir".
+                  Kalau tidak diisi, layout menghitung sendiri dari pengajuan
+                  terbaru mahasiswa, jadi menunya sama di semua halaman.
 --}}
 <!DOCTYPE html>
 <html lang="id">
@@ -16,11 +18,33 @@
 </head>
 <body class="bg-sand-50 font-sans text-ink-900 antialiased">
     @php
-        $dataTaUrl = trim($__env->yieldContent('data-ta-url'));
         // Ilustrasi gedung (opsional): taruh berkas di public/images/gedung-fasilkom.png
         $gedung = file_exists(public_path('images/gedung-fasilkom.png')) ? asset('images/gedung-fasilkom.png') : null;
         $pengguna = auth()->user();
         $mhsLogin = $pengguna?->mahasiswa;
+
+        // Tautan "Data Tugas Akhir" dihitung di layout supaya sama di semua halaman.
+        // NOTE: sidangs() = tebakan nama relasi di model Mahasiswa, sesuaikan kalau beda.
+        $sidangTerbaru = $mhsLogin?->sidangs()->latest('tanggal_pengajuan')->first();
+        $dataTaUrl = trim($__env->yieldContent('data-ta-url'))
+            ?: ($sidangTerbaru ? route('sidang.show', $sidangTerbaru) : '');
+
+        // Satu sumber menu untuk sidebar desktop & nav mobile.
+        // 'active' menentukan halaman mana yang lagi dibuka.
+        $menu = [
+            [
+                'label'  => 'Dashboard',
+                'icon'   => 'home',
+                'url'    => route('mahasiswa.dashboard'),
+                'active' => request()->routeIs('mahasiswa.dashboard'),
+            ],
+            [
+                'label'  => 'Data Tugas Akhir',
+                'icon'   => 'doc',
+                'url'    => $dataTaUrl ?: null,
+                'active' => request()->routeIs('sidang.*'),
+            ],
+        ];
     @endphp
 
     <div class="flex min-h-screen bg-gradient-to-br from-sand-50 via-sand-50 to-sand-100">
@@ -48,24 +72,24 @@
             </div>
 
             <nav class="relative z-10 flex-1 space-y-1.5 px-4 py-2">
-                <a href="{{ route('mahasiswa.dashboard') }}"
-                   class="mhs-nav-link {{ request()->routeIs('mahasiswa.dashboard') ? 'mhs-nav-link-active' : '' }}"
-                   @if (request()->routeIs('mahasiswa.dashboard')) aria-current="page" @endif>
-                    <x-mhs.icon name="home" class="h-6 w-6 text-sand-600" />
-                    Dashboard
-                </a>
-
-                @if ($dataTaUrl !== '')
-                    <a href="{{ $dataTaUrl }}" class="mhs-nav-link">
-                        <x-mhs.icon name="doc" class="h-6 w-6 text-ink-600" />
-                        Data Tugas Akhir
-                    </a>
-                @else
-                    <span class="mhs-nav-link cursor-not-allowed opacity-50" aria-disabled="true" title="Belum ada pengajuan">
-                        <x-mhs.icon name="doc" class="h-6 w-6 text-ink-600" />
-                        Data Tugas Akhir
-                    </span>
-                @endif
+                @foreach ($menu as $item)
+                    @if ($item['url'])
+                        <a href="{{ $item['url'] }}"
+                           class="mhs-nav-link relative {{ $item['active'] ? 'mhs-nav-link-active' : '' }}"
+                           @if ($item['active']) aria-current="page" @endif>
+                            @if ($item['active'])
+                                <span class="absolute -left-3 top-1/2 h-7 w-1.5 -translate-y-1/2 rounded-full bg-sand-600" aria-hidden="true"></span>
+                            @endif
+                            <x-mhs.icon :name="$item['icon']" :class="$item['active'] ? 'h-6 w-6 text-sand-600' : 'h-6 w-6 text-ink-600'" />
+                            {{ $item['label'] }}
+                        </a>
+                    @else
+                        <span class="mhs-nav-link cursor-not-allowed opacity-50" aria-disabled="true" title="Belum ada pengajuan">
+                            <x-mhs.icon :name="$item['icon']" class="h-6 w-6 text-ink-600" />
+                            {{ $item['label'] }}
+                        </span>
+                    @endif
+                @endforeach
             </nav>
 
             <div class="relative z-10 flex items-center gap-2.5 px-7 py-5 text-sm text-ink-600">
@@ -123,13 +147,19 @@
 
             {{-- Navigasi ringkas untuk layar kecil (sidebar disembunyikan di bawah lg) --}}
             <nav class="relative z-10 flex gap-2 border-b border-sand-200/80 bg-sand-100/70 px-6 py-2.5 lg:hidden">
-                <a href="{{ route('mahasiswa.dashboard') }}"
-                   class="rounded-full px-4 py-1.5 text-sm font-medium {{ request()->routeIs('mahasiswa.dashboard') ? 'bg-sand-300/70 text-ink-900' : 'text-ink-700' }}">
-                    Dashboard
-                </a>
-                @if ($dataTaUrl !== '')
-                    <a href="{{ $dataTaUrl }}" class="rounded-full px-4 py-1.5 text-sm font-medium text-ink-700">Data Tugas Akhir</a>
-                @endif
+                @foreach ($menu as $item)
+                    @if ($item['url'])
+                        <a href="{{ $item['url'] }}"
+                           class="rounded-full px-4 py-1.5 text-sm font-medium {{ $item['active'] ? 'bg-sand-300/70 text-ink-900' : 'text-ink-700' }}"
+                           @if ($item['active']) aria-current="page" @endif>
+                            {{ $item['label'] }}
+                        </a>
+                    @else
+                        <span class="cursor-not-allowed rounded-full px-4 py-1.5 text-sm font-medium text-ink-700 opacity-50" aria-disabled="true">
+                            {{ $item['label'] }}
+                        </span>
+                    @endif
+                @endforeach
             </nav>
 
             <main class="relative z-10 flex-1 px-6 py-8 lg:px-10">

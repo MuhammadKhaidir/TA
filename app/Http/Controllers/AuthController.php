@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Models\Mahasiswa;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
@@ -46,6 +49,52 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         return $this->redirectByRole();
+    }
+
+        public function showRegister()
+    {
+        if (Auth::check()) {
+            return $this->redirectByRole();
+        }
+
+        return view('auth.register');
+    }
+
+    public function register(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'nim' => ['required', 'string', 'max:30', 'unique:mahasiswas,nim'],
+            'prodi' => ['required', 'string', 'max:255'],
+            'angkatan' => ['required', 'digits:4'],
+        ]);
+
+        // Peran selalu "mahasiswa" — sengaja tidak diambil dari input form.
+        $user = DB::transaction(function () use ($data) {
+            $user = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => $data['password'], // di-hash otomatis oleh cast 'hashed' di model User
+            ]);
+            $user->assignRole('mahasiswa');
+
+            Mahasiswa::create([
+                'user_id' => $user->id,
+                'nim' => $data['nim'],
+                'nama' => $data['name'],
+                'prodi' => $data['prodi'],
+                'angkatan' => $data['angkatan'],
+            ]);
+
+            return $user;
+        });
+
+        Auth::login($user);
+        $request->session()->regenerate();
+
+        return redirect()->route('mahasiswa.dashboard');
     }
 
     public function logout(Request $request)

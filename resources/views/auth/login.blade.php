@@ -3,9 +3,10 @@
     - Desktop (lg ke atas): tinggi persis 1 layar, tanpa scroll halaman. Ukuran teks, jarak, dan input
       ikut mengecil/membesar mengikuti tinggi layar (clamp + vh).
     - Layar kecil: panel foto disembunyikan, halaman boleh scroll biasa.
-    Latar panel kiri: public/images/UnsriBG.png, tampil UTUH (tanpa crop); hanya tepi atasnya dilembutkan.
-    Panel kiri = setengah layar. Kalau rasio foto beda dengan panel, foto menempel di bawah dan
-    sisa ruang di atasnya diwarnai otomatis dengan warna tepi atas foto.
+    Latar panel kiri: slideshow public/images/UnsriBG.png + FasilkomUnsri.png (ganti tiap 5 detik, transisi opacity),
+    tampil UTUH (tanpa crop); hanya tepi atas dan kanannya dilembutkan.
+    Panel kiri = setengah layar, tanpa warna sendiri dan tanpa garis pembatas: gradasi krem dipasang di
+    pembungkus halaman sehingga kiri dan kanan satu warna.
     Butuh palet sand/ink dan kelas mhs-* dari patch dashboard mahasiswa.
 --}}
 <!DOCTYPE html>
@@ -18,18 +19,29 @@
 </head>
 <body class="bg-sand-50 font-sans text-ink-900 antialiased">
     @php
-        $latar = file_exists(public_path('images/UnsriBG.png')) ? asset('images/UnsriBG.png') : null;
+        // Foto latar panel kiri, bergantian tiap 5 detik. Tambah nama berkas di sini kalau mau lebih banyak.
+        $fotoLatar = collect(['UnsriBG.png', 'FasilkomUnsri.png'])
+            ->filter(fn ($berkas) => file_exists(public_path('images/' . $berkas)))
+            ->map(fn ($berkas) => asset('images/' . $berkas))
+            ->values()
+            ->all();
     @endphp
 
-    <div class="flex min-h-screen lg:h-screen lg:overflow-hidden">
+    <div class="flex min-h-screen bg-gradient-to-br from-sand-50 to-sand-100/60 lg:h-screen lg:overflow-hidden">
         {{-- Panel informasi (kiri) --}}
-        <div id="panel-kiri" class="relative hidden w-1/2 shrink-0 flex-col overflow-hidden border-r border-sand-400 bg-sand-100 px-[clamp(2rem,5vw,4rem)] py-[clamp(1.25rem,4.5vh,3rem)] lg:flex">
-            {{-- Foto utuh, tidak di-crop. Hanya tepi atasnya yang dilembutkan (12% teratas) supaya menyatu
-                 dengan warna latar panel. Ubah angka 12% untuk memperkuat / memperlemah. --}}
-            @if ($latar)
-                <div class="pointer-events-none absolute inset-x-0 bottom-0">
-                    <img id="latar-foto" src="{{ $latar }}" alt="" class="block h-auto max-h-screen w-full object-contain object-bottom"
-                         style="-webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%); mask-image: linear-gradient(to bottom, transparent 0%, #000 12%);">
+        <div class="relative hidden w-1/2 shrink-0 flex-col overflow-hidden px-[clamp(2rem,5vw,4rem)] py-[clamp(1.25rem,4.5vh,3rem)] lg:flex">
+            {{-- Foto latar (slideshow): tiap foto tampil utuh, tidak di-crop. Tepi atas (12%) dan kanan (15%)
+                 dilembutkan supaya menyatu dengan latar. Pergantian foto: lihat skrip di bawah. --}}
+            @if (count($fotoLatar) > 0)
+                <div class="pointer-events-none absolute inset-x-0 bottom-0 grid">
+                    @foreach ($fotoLatar as $i => $url)
+                        <div data-slide
+                             class="col-start-1 row-start-1 self-end transition-opacity duration-1000 ease-in-out motion-reduce:transition-none {{ $i === 0 ? 'opacity-100' : 'opacity-0' }}"
+                             style="-webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%); mask-image: linear-gradient(to bottom, transparent 0%, #000 12%);">
+                            <img src="{{ $url }}" alt="" class="block h-auto max-h-screen w-full object-contain object-bottom"
+                                 style="-webkit-mask-image: linear-gradient(to left, transparent 0%, #000 15%); mask-image: linear-gradient(to left, transparent 0%, #000 15%);">
+                        </div>
+                    @endforeach
                 </div>
             @endif
 
@@ -49,18 +61,16 @@
                 </div>
             </div>
 
-            {{-- Pesan utama --}}
-            <div class="relative z-10 max-w-[38rem] flex-1 pt-[clamp(1rem,9vh,6rem)]">
-                <div class="flex items-center gap-4">
+            {{-- Judul (tengah) --}}
+            <div class="relative z-10 flex flex-1 flex-col items-center justify-center pb-[clamp(0rem,8vh,5rem)] text-center">
+                <div class="flex items-center justify-center gap-4">
                     <span class="h-px w-10 bg-sand-400"></span>
                     <p class="text-[13px] font-semibold tracking-[0.12em] text-sand-500">POS 020/POS/FASILKOM/2026</p>
+                    <span class="h-px w-10 bg-sand-400"></span>
                 </div>
-                <h1 class="mt-[clamp(0.5rem,2vh,1.25rem)] font-serif text-[length:clamp(1.5rem,min(4.2vh,2.6vw),2.5rem)] font-bold leading-[1.3] text-ink-900">
-                    Mendigitalkan alur pendaftaran sidang, dari pengajuan mahasiswa hingga nilai lengkap di SIMAK.
+                <h1 class="mt-[clamp(0.5rem,2vh,1.25rem)] max-w-[30rem] text-balance font-serif text-[length:clamp(1.75rem,min(5vh,3vw),3rem)] font-bold leading-[1.25] text-ink-900">
+                    Mendigitalkan alur pendaftaran sidang.
                 </h1>
-                <p class="mt-[clamp(0.5rem,2vh,1.5rem)] max-w-lg text-[length:clamp(0.8125rem,1.9vh,0.9375rem)] leading-relaxed text-ink-600">
-                    16 langkah pada Bagan Alir POS &mdash; Mahasiswa, SekDep/Koor. Prodi, Penata, Pengelola Layanan, Pengadministrasi Perkantoran, dan Dosen Penguji &mdash; tercatat dan dapat ditelusuri di satu tempat.
-                </p>
             </div>
 
             <div class="relative z-10 flex items-center gap-4">
@@ -70,7 +80,7 @@
         </div>
 
         {{-- Form login (kanan). Kalau layar sangat pendek, hanya panel ini yang scroll, bukan seluruh halaman. --}}
-        <div class="flex w-full flex-1 flex-col bg-gradient-to-br from-sand-50 to-sand-100/60 px-6 py-8 lg:overflow-y-auto lg:px-10 lg:py-6">
+        <div class="flex w-full flex-1 flex-col px-6 py-8 lg:overflow-y-auto lg:px-10 lg:py-6">
             <div class="m-auto w-full max-w-[34rem]">
                 {{-- Merek ringkas untuk layar kecil --}}
                 <div class="mb-5 flex items-center gap-3 lg:hidden">
@@ -137,6 +147,10 @@
                         <button type="submit" class="mhs-btn-primary w-full rounded-lg py-[clamp(0.5rem,1.6vh,0.75rem)] font-serif">Masuk</button>
                     </form>
 
+                                        <a href="{{ route('register') }}" class="mhs-btn-secondary mt-[clamp(0.5rem,1.5vh,0.75rem)] w-full rounded-lg py-[clamp(0.5rem,1.6vh,0.75rem)] font-serif">
+                        Belum punya akun? Registrasi
+                    </a>
+
                     <div class="mt-[clamp(0.75rem,2.5vh,1.5rem)] rounded-lg border border-sand-200 bg-sand-50 px-4 py-3">
                         <p class="font-serif text-xs font-semibold text-ink-900">
                             Akun demo (prototipe) &mdash; kata sandi:
@@ -158,25 +172,28 @@
     </div>
 
     <script>
-        // Kalau rasio foto beda dengan panel, ruang kosong di atas foto diwarnai
-        // dengan warna rata-rata tepi atas foto supaya menyatu dengan tepi atas yang dilembutkan.
+        // Ganti foto latar tiap 5 detik dengan transisi opacity.
+        // Foto baru memudar masuk DI ATAS foto lama, baru foto lama disembunyikan (tidak ada kedipan).
         (function () {
-            var foto = document.getElementById('latar-foto');
-            var panel = document.getElementById('panel-kiri');
-            if (! foto || ! panel) return;
-            function warnai() {
-                try {
-                    var c = document.createElement('canvas');
-                    c.width = 1; c.height = 1;
-                    var ctx = c.getContext('2d');
-                    var tinggi = Math.max(4, Math.round(foto.naturalHeight * 0.01));
-                    ctx.drawImage(foto, 0, 0, foto.naturalWidth, tinggi, 0, 0, 1, 1);
-                    var d = ctx.getImageData(0, 0, 1, 1).data;
-                    panel.style.backgroundColor = 'rgb(' + d[0] + ',' + d[1] + ',' + d[2] + ')';
-                } catch (e) { /* biarkan warna krem bawaan */ }
-            }
-            if (foto.complete && foto.naturalWidth) warnai();
-            else foto.addEventListener('load', warnai);
+            var slides = document.querySelectorAll('[data-slide]');
+            if (slides.length < 2) return;
+            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+            var i = 0;
+            slides[0].style.zIndex = 2;
+            setInterval(function () {
+                var lama = slides[i];
+                i = (i + 1) % slides.length;
+                var baru = slides[i];
+
+                baru.style.zIndex = 2;
+                lama.style.zIndex = 1;
+                baru.classList.replace('opacity-0', 'opacity-100');
+
+                setTimeout(function () {
+                    lama.classList.replace('opacity-100', 'opacity-0');
+                }, 1000);
+            }, 5000);
         })();
     </script>
 

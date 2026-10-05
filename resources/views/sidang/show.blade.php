@@ -1,8 +1,9 @@
-@extends('layouts.app')
+{{-- Mahasiswa pakai layout sidebar krem (sama dengan dashboard), peran lain tetap layouts.app --}}
+@extends(auth()->user()?->hasRole('mahasiswa') ? 'layouts.mahasiswa' : 'layouts.app')
 
-@section('title', 'Detail Sidang &mdash; ' . $sidang->mahasiswa->nama)
+@section('title', 'Detail Sidang — ' . $sidang->mahasiswa->nama)
 @section('page-title', 'Detail Sidang Tugas Akhir')
-@section('page-subtitle', $sidang->mahasiswa->nama . ' &middot; ' . $sidang->mahasiswa->nim)
+@section('page-subtitle', $sidang->mahasiswa->nama . ' · ' . $sidang->mahasiswa->nim)
 
 @section('content')
     @php
