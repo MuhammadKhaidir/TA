@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Database\UniqueConstraintViolationException;
 
 class DashboardController extends Controller
 {
@@ -38,35 +39,54 @@ class DashboardController extends Controller
     // angka awal yang sudah diisi SekDep/Koor. Prodi tidak tertimpa.
     // ------------------------------------------------------------------
 
-    public function catatKonsultasi(Request $request): RedirectResponse
-    {
-        $mahasiswa = Auth::user()->mahasiswa;
-        abort_unless($mahasiswa, 403, 'Akun Anda belum tertaut ke data mahasiswa.');
+ public function catatKonsultasi(Request $request): RedirectResponse
+{
+    $mahasiswa = Auth::user()->mahasiswa;
+    abort_unless($mahasiswa, 403, 'Akun Anda belum tertaut ke data mahasiswa.');
 
-        $data = $request->validate([
-            'tanggal' => [
-                'required', 'date', 'before_or_equal:today',
-                Rule::unique('konsultasis', 'tanggal')->where('mahasiswa_id', $mahasiswa->id),
-            ],
-            'catatan' => ['nullable', 'string', 'max:255'],
-            'bukti' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
-        ], [
-            'tanggal.unique' => 'Konsultasi pada tanggal tersebut sudah dicentang.',
-            'tanggal.before_or_equal' => 'Tanggal konsultasi tidak boleh di masa depan.',
-        ]);
+    $data = $request->validate([
+        'tanggal' => [
+            'bail', 'required', 'date', 'before_or_equal:today',
+            function (string $attribute, mixed $value, \Closure $fail) use ($mahasiswa) {
+                // whereDate: cocok untuk baris yang tersimpan sebagai "2026-10-06 00:00:00"
+                if ($mahasiswa->konsultasis()->whereDate('tanggal', $value)->exists()) {
+                    $fail('Konsultasi pada tanggal tersebut sudah dicentang.');
+                }
+            },
+        ],
+        'catatan' => ['nullable', 'string', 'max:255'],
+        'bukti' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+    ], [
+        'tanggal.before_or_equal' => 'Tanggal konsultasi tidak boleh di masa depan.',
+    ]);
 
-        DB::transaction(function () use ($mahasiswa, $data, $request) {
+    $buktiPath = null;
+
+    try {
+        DB::transaction(function () use ($mahasiswa, $data, $request, &$buktiPath) {
+            $buktiPath = $request->file('bukti')?->store("konsultasi/{$mahasiswa->id}", 'public');
+
             $mahasiswa->konsultasis()->create([
                 'tanggal' => $data['tanggal'],
                 'catatan' => $data['catatan'] ?? null,
-                'bukti_path' => $request->file('bukti')?->store("konsultasi/{$mahasiswa->id}", 'public'),
+                'bukti_path' => $buktiPath,
             ]);
             $mahasiswa->increment('jumlah_konsultasi');
         });
+    } catch (UniqueConstraintViolationException) {
+        // Jaga-jaga kalau tombol diklik dua kali cepat: buang foto yang sudah terlanjur tersimpan.
+        if ($buktiPath) {
+            Storage::disk('public')->delete($buktiPath);
+        }
 
-        return redirect(route('mahasiswa.dashboard').'#konsultasi-pembimbingan')
-            ->with('success', 'Konsultasi berhasil dicentang.');
+        return back()
+            ->withInput()
+            ->withErrors(['tanggal' => 'Konsultasi pada tanggal tersebut sudah dicentang.']);
     }
+
+    return redirect(route('mahasiswa.dashboard').'#konsultasi-pembimbingan')
+        ->with('success', 'Konsultasi berhasil dicentang.');
+}
 
     public function hapusKonsultasi(Konsultasi $konsultasi): RedirectResponse
     {

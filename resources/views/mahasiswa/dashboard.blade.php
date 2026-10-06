@@ -115,7 +115,7 @@
             <x-menu-proses
                 id="konsultasi-pembimbingan"
                 title="Konsultasi Pembimbingan"
-                subtitle="Centang setiap hari konsultasi dengan pembimbing. Foto bukti boleh dilampirkan (opsional)."
+                subtitle="Centang setiap hari konsultasi dengan pembimbing. Foto bukti surat dilampirkan (opsional)."
                 aksiTitle="Centang Konsultasi"
                 :open="! $memenuhiSyarat || $errors->hasAny(['tanggal', 'catatan', 'bukti'])"
             >
@@ -182,7 +182,7 @@
                             @enderror
                         </div>
                         <div>
-                            <label class="mhs-label">Foto Bukti (opsional)</label>
+                            <label class="mhs-label">Foto Bukti surat(opsional)</label>
                             <input type="file" name="bukti" accept="image/*"
                                    class="mhs-input text-sm text-ink-600 file:mr-3 file:rounded-lg file:border-0 file:bg-sand-200 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-ink-800 hover:file:bg-sand-300">
                             @error('bukti')

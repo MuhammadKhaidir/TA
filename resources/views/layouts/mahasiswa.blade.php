@@ -176,7 +176,7 @@
             </nav>
 
             {{-- Footer sidebar --}}
-            <div class="relative z-10 flex items-center gap-3 border-t border-sand-200/70 bg-sand-50/70 px-7 py-5 text-sm text-ink-600 backdrop-blur-sm">
+            <div class="relative z-10 flex items-center gap-3 border-t border-sand-200/70 px-7 py-5 text-sm text-ink-600">
                 <svg viewBox="0 0 24 24" class="h-5 w-5 shrink-0 text-ink-600" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z" />
                     <circle cx="12" cy="10" r="2.4" />
