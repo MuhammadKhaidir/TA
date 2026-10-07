@@ -102,7 +102,7 @@ class DashboardController extends Controller
         });
 
         return redirect(route('mahasiswa.dashboard').'#konsultasi-pembimbingan')
-            ->with('success', 'Centang konsultasi dihapus.');
+            ->with('success', 'konsultasi dihapus.');
     }
 
     public function buktiKonsultasi(Konsultasi $konsultasi)
