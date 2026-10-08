@@ -194,7 +194,7 @@
                         <p class="text-sm text-ink-600">
                             Tercatat {{ $mahasiswa->jumlah_konsultasi }} dari minimal {{ $minimalKonsultasi }} kali.
                         </p>
-                        <button type="submit" class="mhs-btn-primary">Centang Konsultasi</button>
+                        <button type="submit" class="mhs-btn-primary">Tandai Konsultasi</button>
                     </div>
                 </form>
             </x-menu-proses>
