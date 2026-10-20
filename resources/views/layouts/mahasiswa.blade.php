@@ -79,11 +79,9 @@
         $pengguna = auth()->user();
         $mhsLogin = $pengguna?->mahasiswa;
 
-        // Tautan "Data Tugas Akhir" dihitung di layout supaya sama di semua halaman.
-        // NOTE: sidangs() = tebakan nama relasi di model Mahasiswa, sesuaikan kalau beda.
-        $sidangTerbaru = $mhsLogin?->sidangs()->latest('tanggal_pengajuan')->first();
-        $dataTaUrl = trim($__env->yieldContent('data-ta-url'))
-            ?: ($sidangTerbaru ? route('sidang.show', $sidangTerbaru) : '');
+        // Tautan detail TA/KP dihitung di layout supaya sama di semua halaman.
+        $taTerbaru = $mhsLogin?->pengajuans()->where('jenis', 'ta')->latest('id')->first();
+        $kpTerbaru = $mhsLogin?->pengajuans()->where('jenis', 'kp')->latest('id')->first();
 
         // Satu sumber menu untuk sidebar desktop & drawer mobile.
         // 'active' menentukan halaman mana yang lagi dibuka.
@@ -95,10 +93,16 @@
                 'active' => request()->routeIs('mahasiswa.dashboard'),
             ],
             [
-                'label'  => 'Data Tugas Akhir',
+                'label'  => 'Tugas Akhir (TA)',
                 'icon'   => 'doc',
-                'url'    => $dataTaUrl ?: null,
-                'active' => request()->routeIs('sidang.*'),
+                'url'    => $taTerbaru ? route('pengajuan.show', $taTerbaru) : route('mahasiswa.dashboard').'#pengajuan-ta',
+                'active' => $taTerbaru && request()->routeIs('pengajuan.show') && request()->route('pengajuan')?->is($taTerbaru),
+            ],
+            [
+                'label'  => 'Kerja Praktik (KP)',
+                'icon'   => 'calendar',
+                'url'    => $kpTerbaru ? route('pengajuan.show', $kpTerbaru) : route('mahasiswa.dashboard').'#pengajuan-kp',
+                'active' => $kpTerbaru && request()->routeIs('pengajuan.show') && request()->route('pengajuan')?->is($kpTerbaru),
             ],
         ];
     @endphp
@@ -181,7 +185,7 @@
                     <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z" />
                     <circle cx="12" cy="10" r="2.4" />
                 </svg>
-                <span>Bagan Alir POS</span>
+                <span>Administrasi TA &amp; KP</span>
                 <span class="h-px w-14 bg-sand-300" aria-hidden="true"></span>
             </div>
         </aside>

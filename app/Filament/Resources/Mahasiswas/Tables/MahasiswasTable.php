@@ -6,6 +6,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 class MahasiswasTable
@@ -21,18 +22,15 @@ class MahasiswasTable
                     ->searchable(),
                 TextColumn::make('nama')
                     ->searchable(),
-                TextColumn::make('prodi')
+                TextColumn::make('prodi.nama')
+                    ->label('Program studi')
+                    ->placeholder('Belum diatur')
                     ->searchable(),
                 TextColumn::make('angkatan')
                     ->searchable(),
                 TextColumn::make('no_hp')
                     ->label('No. HP')
                     ->toggleable(),
-                TextColumn::make('jumlah_konsultasi')
-                    ->label('Konsultasi')
-                    ->badge()
-                    ->color(fn (int $state): string => $state >= 12 ? 'success' : 'warning')
-                    ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -43,7 +41,9 @@ class MahasiswasTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('prodi_id')
+                    ->label('Program studi')
+                    ->relationship('prodi', 'nama'),
             ])
             ->recordActions([
                 EditAction::make(),

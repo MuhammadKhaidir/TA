@@ -22,18 +22,16 @@ class MahasiswaForm
                     ->unique(ignoreRecord: true),
                 TextInput::make('nama')
                     ->required(),
-                TextInput::make('prodi')
+                Select::make('prodi_id')
+                    ->label('Program studi')
+                    ->relationship('prodi', 'nama')
+                    ->searchable()
+                    ->preload()
                     ->required(),
                 TextInput::make('angkatan')
                     ->required(),
                 TextInput::make('no_hp')
                     ->tel(),
-                TextInput::make('jumlah_konsultasi')
-                    ->label('Jumlah Konsultasi')
-                    ->helperText('Syarat minimal 12 kali sebelum sidang (Peringatan POS #1).')
-                    ->numeric()
-                    ->default(0)
-                    ->required(),
             ]);
     }
 }

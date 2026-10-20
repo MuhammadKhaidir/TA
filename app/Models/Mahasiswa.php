@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\JenisPengajuan;
+use App\Enums\StatusBimbingan;
+use App\Enums\StatusPengajuan;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,41 +15,50 @@ class Mahasiswa extends Model
         'user_id',
         'nim',
         'nama',
-        'prodi',
+        'prodi_id',
         'angkatan',
         'no_hp',
-        'jumlah_konsultasi',
     ];
-
-    protected function casts(): array
-    {
-        return [
-            'jumlah_konsultasi' => 'integer',
-        ];
-    }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function sidangs(): HasMany
+    public function prodi(): BelongsTo
     {
-        return $this->hasMany(Sidang::class);
+        return $this->belongsTo(Prodi::class);
     }
 
-    public function konsultasis(): HasMany
+    public function pengajuans(): HasMany
     {
-        return $this->hasMany(Konsultasi::class);
+        return $this->hasMany(Pengajuan::class);
     }
 
-    /**
-     * Peringatan POS #1: syarat minimal 12x konsultasi sebelum sidang.
-     */
-    public const MINIMAL_KONSULTASI = 12;
-
-    public function memenuhiSyaratKonsultasi(): bool
+    public function bimbingans(): HasMany
     {
-        return $this->jumlah_konsultasi >= self::MINIMAL_KONSULTASI;
+        return $this->hasMany(Bimbingan::class);
+    }
+
+    /** Pengajuan TA/KP yang masih berjalan (belum selesai) untuk satu jenis. */
+    public function pengajuanBerjalan(JenisPengajuan $jenis): ?Pengajuan
+    {
+        return $this->pengajuans()
+            ->where('jenis', $jenis->value)
+            ->where('status', '!=', StatusPengajuan::Selesai->value)
+            ->latest('id')
+            ->first();
+    }
+
+    /** @return array{tercatat: int, divalidasi: int, minimal: ?int} */
+    public function ringkasanBimbingan(JenisPengajuan $jenis): array
+    {
+        $query = $this->bimbingans()->where('jenis', $jenis->value);
+
+        return [
+            'tercatat' => (clone $query)->count(),
+            'divalidasi' => (clone $query)->where('status_validasi', StatusBimbingan::Divalidasi->value)->count(),
+            'minimal' => Pengaturan::minimalBimbingan($jenis->value),
+        ];
     }
 }

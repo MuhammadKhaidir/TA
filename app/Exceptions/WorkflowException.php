@@ -5,10 +5,10 @@ namespace App\Exceptions;
 use RuntimeException;
 
 /**
- * Dilempar ketika sebuah aksi pada alur POS tidak dapat dilakukan, misalnya
- * karena status sidang belum berada pada langkah yang sesuai, atau pelaku
- * tidak berwenang atas sidang tersebut (contoh: dosen yang bukan anggota
- * dewan penguji mencoba menginput nilai).
+ * Dilempar ketika sebuah aksi pada alur administrasi TA/KP tidak dapat dilakukan,
+ * misalnya karena status pengajuan belum berada pada tahap yang sesuai, atau data
+ * pendukungnya tidak valid (dosen pembimbing tidak aktif, dokumen wajib belum lengkap).
+ * Pesannya aman ditampilkan langsung kepada pengguna.
  */
 class WorkflowException extends RuntimeException
 {

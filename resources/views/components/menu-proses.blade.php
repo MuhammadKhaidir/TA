@@ -10,7 +10,7 @@
 @props([
     'title',
     'subtitle' => null,
-    'badge' => null, // instance \App\Enums\SidangStatus atau null
+    'badge' => null, // instance \App\Enums\StatusPengajuan atau null
     'open' => false,
     'aksiTitle' => 'Formulir Pengajuan',
 ])

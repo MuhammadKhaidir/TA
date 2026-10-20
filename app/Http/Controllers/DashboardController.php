@@ -2,214 +2,148 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\SidangStatus;
-use App\Models\Konsultasi;
-use App\Models\Sidang;
-use Illuminate\Http\RedirectResponse;
+use App\Enums\JenisPengajuan;
+use App\Enums\JenisPersyaratan;
+use App\Enums\StatusAdministrasi;
+use App\Enums\StatusAkademik;
+use App\Enums\StatusBimbingan;
+use App\Enums\StatusPengajuan;
+use App\Enums\StatusSurat;
+use App\Models\Bimbingan;
+use App\Models\JenisSurat;
+use App\Models\Pengajuan;
+use App\Models\Pengaturan;
+use App\Models\PeriodeAkademik;
+use App\Models\Persyaratan;
+use App\Models\Prodi;
+use App\Models\StrukturLaporan;
+use App\Models\SuratPermohonan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
-use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\Gate;
 
 class DashboardController extends Controller
 {
     public function mahasiswa()
     {
-        $mahasiswa = Auth::user()->mahasiswa;
+        $mahasiswa = Auth::user()->mahasiswa?->load('prodi');
 
-        $sidangs = $mahasiswa
-            ? Sidang::where('mahasiswa_id', $mahasiswa->id)
-                ->with(['pengujis', 'dokumens'])
-                ->latest('tanggal_pengajuan')
-                ->get()
-            : collect();
+        if (! $mahasiswa) {
+            return view('mahasiswa.dashboard', ['mahasiswa' => null]);
+        }
+
+        $terbaru = fn (JenisPengajuan $jenis) => $mahasiswa->pengajuans()
+            ->where('jenis', $jenis->value)
+            ->with(['dospem', 'dokumens.persyaratan', 'suratKeputusan', 'suratPermohonans.jenisSurat'])
+            ->latest('id')
+            ->first();
+
+        $ta = $terbaru(JenisPengajuan::Ta);
+        $kp = $terbaru(JenisPengajuan::Kp);
 
         return view('mahasiswa.dashboard', [
             'mahasiswa' => $mahasiswa,
-            'sidangs' => $sidangs,
-            'konsultasis' => $mahasiswa?->konsultasis()->latest('tanggal')->get() ?? collect(),
+            'ta' => $ta,
+            'kp' => $kp,
+            'persyaratanTa' => Persyaratan::berlakuUntuk(JenisPersyaratan::TaPengajuan, $mahasiswa->prodi_id)->get(),
+            'persyaratanKp' => Persyaratan::berlakuUntuk(JenisPersyaratan::KpPengajuan, $mahasiswa->prodi_id)->get(),
+            'lampiranKp' => Persyaratan::berlakuUntuk(JenisPersyaratan::KpLampiran, $mahasiswa->prodi_id)->get(),
+            'lampiranAktif' => Pengaturan::lampiranKpAktif(),
+            'bimbingan' => [
+                'ta' => $mahasiswa->bimbingans()->where('jenis', 'ta')->latest('tanggal')->get(),
+                'kp' => $mahasiswa->bimbingans()->where('jenis', 'kp')->latest('tanggal')->get(),
+            ],
+            'ringkasan' => [
+                'ta' => $mahasiswa->ringkasanBimbingan(JenisPengajuan::Ta),
+                'kp' => $mahasiswa->ringkasanBimbingan(JenisPengajuan::Kp),
+            ],
+            'jenisSurats' => JenisSurat::query()->where('aktif', true)->orderBy('nama')->get(),
+            'struktur' => StrukturLaporan::query()->where('aktif', true)->orderBy('urutan')->orderBy('id')->get(),
         ]);
     }
 
-    // ------------------------------------------------------------------
-    // Checklist konsultasi pembimbingan (mahasiswa)
-    // jumlah_konsultasi di-increment/decrement (bukan dihitung ulang) supaya
-    // angka awal yang sudah diisi SekDep/Koor. Prodi tidak tertimpa.
-    // ------------------------------------------------------------------
-
- public function catatKonsultasi(Request $request): RedirectResponse
-{
-    $mahasiswa = Auth::user()->mahasiswa;
-    abort_unless($mahasiswa, 403, 'Akun Anda belum tertaut ke data mahasiswa.');
-
-    $data = $request->validate([
-        'tanggal' => [
-            'bail', 'required', 'date', 'before_or_equal:today',
-            function (string $attribute, mixed $value, \Closure $fail) use ($mahasiswa) {
-                // whereDate: cocok untuk baris yang tersimpan sebagai "2026-10-06 00:00:00"
-                if ($mahasiswa->konsultasis()->whereDate('tanggal', $value)->exists()) {
-                    $fail('Konsultasi pada tanggal tersebut sudah dicentang.');
-                }
-            },
-        ],
-        'catatan' => ['nullable', 'string', 'max:255'],
-        'bukti' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
-    ], [
-        'tanggal.before_or_equal' => 'Tanggal konsultasi tidak boleh di masa depan.',
-    ]);
-
-    $buktiPath = null;
-
-    try {
-        DB::transaction(function () use ($mahasiswa, $data, $request, &$buktiPath) {
-            $buktiPath = $request->file('bukti')?->store("konsultasi/{$mahasiswa->id}", 'public');
-
-            $mahasiswa->konsultasis()->create([
-                'tanggal' => $data['tanggal'],
-                'catatan' => $data['catatan'] ?? null,
-                'bukti_path' => $buktiPath,
-            ]);
-            $mahasiswa->increment('jumlah_konsultasi');
-        });
-    } catch (UniqueConstraintViolationException) {
-        // Jaga-jaga kalau tombol diklik dua kali cepat: buang foto yang sudah terlanjur tersimpan.
-        if ($buktiPath) {
-            Storage::disk('public')->delete($buktiPath);
-        }
-
-        return back()
-            ->withInput()
-            ->withErrors(['tanggal' => 'Konsultasi pada tanggal tersebut sudah dicentang.']);
-    }
-
-    return redirect(route('mahasiswa.dashboard').'#konsultasi-pembimbingan')
-        ->with('success', 'Konsultasi berhasil dicentang.');
-}
-
-    public function hapusKonsultasi(Konsultasi $konsultasi): RedirectResponse
-    {
-        $mahasiswa = Auth::user()->mahasiswa;
-        abort_unless($mahasiswa && $konsultasi->mahasiswa_id === $mahasiswa->id, 403);
-
-        DB::transaction(function () use ($mahasiswa, $konsultasi) {
-            if ($konsultasi->bukti_path) {
-                Storage::disk('public')->delete($konsultasi->bukti_path);
-            }
-            $konsultasi->delete();
-            $mahasiswa->update(['jumlah_konsultasi' => max(0, $mahasiswa->jumlah_konsultasi - 1)]);
-        });
-
-        return redirect(route('mahasiswa.dashboard').'#konsultasi-pembimbingan')
-            ->with('success', 'konsultasi dihapus.');
-    }
-
-    public function buktiKonsultasi(Konsultasi $konsultasi)
+    public function dospem()
     {
         $user = Auth::user();
-        abort_unless(
-            $user->hasAnyRole(['admin', 'sekdep_koor_prodi']) || $user->mahasiswa?->id === $konsultasi->mahasiswa_id,
-            403
+        $dosen = $user->dosen;
+
+        $pengajuans = Pengajuan::query()->dapatDilihatOleh($user)
+            ->with(['mahasiswa', 'prodi'])
+            ->orderByRaw("case status when 'diajukan' then 0 when 'perlu_revisi' then 1 when 'disetujui' then 2 else 3 end")
+            ->latest('updated_at')
+            ->get();
+
+        $perluDiperiksa = $pengajuans->filter(
+            fn (Pengajuan $p) => $p->status === StatusPengajuan::Diajukan && $p->status_akademik === StatusAkademik::Menunggu
         );
-        abort_unless($konsultasi->bukti_path && Storage::disk('public')->exists($konsultasi->bukti_path), 404);
 
-        return Storage::disk('public')->response($konsultasi->bukti_path);
-    }
-
-    public function sekdep()
-    {
-        $antrean = Sidang::with('mahasiswa')
-            ->whereIn('status', [
-                SidangStatus::Diajukan->value,
-                SidangStatus::SkDiteruskanSekdep->value,
-                SidangStatus::MenungguPenjadwalanUlang->value,
-            ])
-            ->orderBy('updated_at')
-            ->get();
-
-        $ditunda = Sidang::with('mahasiswa')
-            ->where('status', SidangStatus::Ditunda->value)
-            ->orderBy('tanggal_pengajuan')
-            ->get();
-
-        $eskalasiNilai = Sidang::with(['mahasiswa', 'pengujis'])
-            ->where('status', SidangStatus::PelaksanaanUjian->value)
-            ->get()
-            ->reject(fn (Sidang $s) => $s->semuaNilaiSudahDiinput());
-
-        return view('sekdep.dashboard', compact('antrean', 'ditunda', 'eskalasiNilai'));
-    }
-
-    public function penata()
-    {
-        $antrean = Sidang::with('mahasiswa')
-            ->whereIn('status', [
-                SidangStatus::MenungguVerifikasiPenata->value,
-                SidangStatus::SkTerbit->value,
-            ])
-            ->orderBy('updated_at')
-            ->get();
-
-        $eskalasiNilai = Sidang::with(['mahasiswa', 'pengujis'])
-            ->where('status', SidangStatus::PelaksanaanUjian->value)
-            ->get()
-            ->reject(fn (Sidang $s) => $s->semuaNilaiSudahDiinput());
-
-        return view('penata.dashboard', compact('antrean', 'eskalasiNilai'));
-    }
-
-    public function pengelola()
-    {
-        $antrean = Sidang::with('mahasiswa')
-            ->where('status', SidangStatus::MenungguProsesSk->value)
-            ->orderBy('updated_at')
-            ->get();
-
-        $pemeriksaanNilai = Sidang::with(['mahasiswa', 'pengujis'])
-            ->where('status', SidangStatus::PelaksanaanUjian->value)
-            ->orderBy('tanggal_sidang')
-            ->get();
-
-        return view('pengelola.dashboard', compact('antrean', 'pemeriksaanNilai'));
-    }
-
-    public function administrasi()
-    {
-        $antrean = Sidang::with('mahasiswa')
-            ->whereIn('status', [
-                SidangStatus::MenyiapkanAdministrasi->value,
-                SidangStatus::MenungguInfoJadwal->value,
-                SidangStatus::MenungguPengecekanBerkas->value,
-            ])
-            ->orderBy('updated_at')
-            ->get();
-
-        $siapUjian = Sidang::with('mahasiswa')
-            ->where('status', SidangStatus::SiapUjian->value)
-            ->orderBy('tanggal_sidang')
-            ->get();
-
-        return view('administrasi.dashboard', compact('antrean', 'siapUjian'));
-    }
-
-    public function dosen()
-    {
-        $dosen = Auth::user()->dosen;
-
-        $sidangs = $dosen
-            ? Sidang::whereHas('pengujis', fn ($q) => $q->where('dosen_id', $dosen->id))
-                ->with(['mahasiswa', 'pengujis'])
-                ->orderBy('tanggal_sidang')
+        $bimbinganMenunggu = $dosen
+            ? Bimbingan::query()->with('mahasiswa')
+                ->where('status_validasi', StatusBimbingan::Menunggu->value)
+                ->whereIn('mahasiswa_id', $pengajuans->pluck('mahasiswa_id')->unique())
+                ->orderBy('tanggal')
                 ->get()
+                ->filter(fn (Bimbingan $b) => Gate::forUser($user)->allows('validasi', $b))
+                ->values()
             : collect();
 
-        $perluTindakan = $sidangs->whereIn('status', [SidangStatus::SiapUjian, SidangStatus::PelaksanaanUjian]);
+        return view('dospem.dashboard', compact('dosen', 'pengajuans', 'perluDiperiksa', 'bimbinganMenunggu'));
+    }
 
-        return view('dosen.dashboard', [
-            'dosen' => $dosen,
-            'sidangs' => $sidangs,
-            'perluTindakan' => $perluTindakan,
+    public function operator(Request $request)
+    {
+        $user = Auth::user();
+
+        $filter = $request->validate([
+            'jenis' => ['nullable', 'in:ta,kp'],
+            'prodi_id' => ['nullable', 'integer'],
+            'periode_id' => ['nullable', 'integer'],
+            'status' => ['nullable', 'in:'.implode(',', array_keys(StatusPengajuan::opsi()))],
+            'q' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $dasar = Pengajuan::query()->dapatDilihatOleh($user);
+
+        $daftar = (clone $dasar)->with(['mahasiswa', 'prodi', 'dospem', 'periode'])
+            ->when($filter['jenis'] ?? null, fn ($q, $v) => $q->where('jenis', $v))
+            ->when($filter['prodi_id'] ?? null, fn ($q, $v) => $q->where('prodi_id', $v))
+            ->when($filter['periode_id'] ?? null, fn ($q, $v) => $q->where('periode_akademik_id', $v))
+            // Tanpa filter status: tampilkan yang masih berjalan; arsip = status "selesai".
+            ->when($filter['status'] ?? null,
+                fn ($q, $v) => $q->where('status', $v),
+                fn ($q) => $q->where('status', '!=', StatusPengajuan::Selesai->value))
+            ->when($filter['q'] ?? null, fn ($q, $v) => $q->whereHas('mahasiswa', fn ($m) => $m
+                ->where('nama', 'like', "%{$v}%")->orWhere('nim', 'like', "%{$v}%")))
+            ->orderByRaw("case status when 'diajukan' then 0 when 'disetujui' then 1 when 'perlu_revisi' then 2 else 3 end")
+            ->latest('updated_at')
+            ->paginate(15)
+            ->withQueryString();
+
+        $cakupan = $user->cakupanProdi();
+        $surats = SuratPermohonan::query()
+            ->with(['pengajuan.mahasiswa', 'jenisSurat'])
+            ->whereIn('status', [StatusSurat::Diajukan->value, StatusSurat::Diproses->value])
+            ->when($cakupan !== null, fn ($q) => $q->whereHas('pengajuan', fn ($p) => $p->whereIn('prodi_id', $cakupan)))
+            ->orderBy('created_at')
+            ->get();
+
+        $ringkasan = [
+            'verifikasi' => (clone $dasar)->where('status', StatusPengajuan::Diajukan->value)
+                ->where('status_administrasi', StatusAdministrasi::Menunggu->value)->count(),
+            'siap_proses' => (clone $dasar)->where('status', StatusPengajuan::Disetujui->value)->count(),
+            'perlu_revisi' => (clone $dasar)->where('status', StatusPengajuan::PerluRevisi->value)->count(),
+            'surat' => $surats->count(),
+        ];
+
+        return view('operator.dashboard', [
+            'daftar' => $daftar,
+            'surats' => $surats,
+            'ringkasan' => $ringkasan,
+            'filter' => $filter,
+            'prodis' => $cakupan === null ? Prodi::query()->orderBy('nama')->get() : Prodi::query()->whereIn('id', $cakupan)->orderBy('nama')->get(),
+            'periodes' => PeriodeAkademik::query()->orderByDesc('id')->get(),
+            'statusOpsi' => StatusPengajuan::opsi(),
+            'cakupanKosong' => $cakupan !== null && $cakupan === [],
         ]);
     }
 }

@@ -1,5 +1,5 @@
 {{--
-    Layout induk untuk semua peran selain mahasiswa (SekDep, Penata, Pengelola, dst).
+    Layout induk untuk peran selain mahasiswa (Dospem dan Operator Akademik) dan halaman detail pengajuan.
     Tampilannya disamakan dengan layouts/mahasiswa (palet sand + ink, sidebar krem,
     latar public/images/BackgroundDashboard.png).
 
@@ -88,14 +88,11 @@
         $pengguna = auth()->user();
         $mhsLogin = $pengguna?->mahasiswa;
 
-        // Menu per peran: [peran => [nama route, label]]
+        // Menu per peran: [peran => [nama route, label]]. Hanya empat aktor.
         $navItems = [
             'mahasiswa' => ['mahasiswa.dashboard', 'Dashboard Saya'],
-            'sekdep_koor_prodi' => ['sekdep.dashboard', 'SekDep / Koor. Prodi'],
-            'penata' => ['penata.dashboard', 'Penata'],
-            'pengelola_layanan' => ['pengelola.dashboard', 'Pengelola Layanan'],
-            'pengadministrasi_perkantoran' => ['administrasi.dashboard', 'Pengadministrasi'],
-            'dosen_penguji' => ['dosen.dashboard', 'Dosen Penguji'],
+            'dospem' => ['dospem.dashboard', 'Dosen Pembimbing'],
+            'operator_akademik' => ['operator.dashboard', 'Operator Akademik'],
         ];
 
         // Dihitung sekali, dipakai bersama oleh sidebar desktop dan drawer mobile.

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Dosens\Schemas;
 
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
 
 class DosenForm
@@ -13,7 +14,7 @@ class DosenForm
         return $schema
             ->components([
                 Select::make('user_id')
-                    ->label('Akun Pengguna (opsional)')
+                    ->label('Akun pengguna (wajib berperan Dospem agar dapat membimbing)')
                     ->relationship('user', 'email')
                     ->searchable()
                     ->preload(),
@@ -22,7 +23,14 @@ class DosenForm
                     ->unique(ignoreRecord: true),
                 TextInput::make('nama')
                     ->required(),
-                TextInput::make('prodi'),
+                Select::make('prodi_id')
+                    ->label('Program studi')
+                    ->relationship('prodi', 'nama')
+                    ->searchable()
+                    ->preload(),
+                Toggle::make('aktif')
+                    ->label('Aktif (dapat ditetapkan sebagai pembimbing)')
+                    ->default(true),
             ]);
     }
 }

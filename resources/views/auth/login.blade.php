@@ -216,12 +216,9 @@
                         </p>
                         <ul class="mt-1.5 columns-2 gap-x-6 font-serif text-xs leading-5 text-ink-700">
                             <li class="break-inside-avoid">mahasiswa@ta.test</li>
-                            <li class="break-inside-avoid">penata@ta.test</li>
-                            <li class="break-inside-avoid">administrasi@ta.test</li>
+                            <li class="break-inside-avoid">dospem@ta.test</li>
+                            <li class="break-inside-avoid">operator@ta.test</li>
                             <li class="break-inside-avoid">admin@ta.test</li>
-                            <li class="break-inside-avoid">sekdep@ta.test</li>
-                            <li class="break-inside-avoid">pengelola@ta.test</li>
-                            <li class="break-inside-avoid">dosen@ta.test</li>
                         </ul>
                     </div>
                 </div>

@@ -2,28 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Peran;
+use App\Models\LogAktivitas;
+use App\Models\Mahasiswa;
+use App\Models\Prodi;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Models\Mahasiswa;
-use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class AuthController extends Controller
 {
-    /**
-     * Peta peran -> nama route dashboard masing-masing.
-     *
-     * @var array<string, string>
-     */
-    private const DASHBOARD_ROUTES = [
-        'mahasiswa' => 'mahasiswa.dashboard',
-        'sekdep_koor_prodi' => 'sekdep.dashboard',
-        'penata' => 'penata.dashboard',
-        'pengelola_layanan' => 'pengelola.dashboard',
-        'pengadministrasi_perkantoran' => 'administrasi.dashboard',
-        'dosen_penguji' => 'dosen.dashboard',
-    ];
-
     public function showLogin()
     {
         if (Auth::check()) {
@@ -46,18 +36,32 @@ class AuthController extends Controller
             ])->onlyInput('email');
         }
 
+        // Hanya akun aktif dengan salah satu dari empat role yang boleh masuk.
+        if (! Auth::user()->bolehLogin()) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()->withErrors([
+                'email' => 'Akun tidak aktif atau belum memiliki peran yang valid. Hubungi Admin.',
+            ])->onlyInput('email');
+        }
+
         $request->session()->regenerate();
+        LogAktivitas::catat(Auth::user(), 'login');
 
         return $this->redirectByRole();
     }
 
-        public function showRegister()
+    public function showRegister()
     {
         if (Auth::check()) {
             return $this->redirectByRole();
         }
 
-        return view('auth.register');
+        return view('auth.register', [
+            'prodis' => Prodi::query()->aktif()->orderBy('nama')->get(),
+        ]);
     }
 
     public function register(Request $request)
@@ -67,7 +71,8 @@ class AuthController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'nim' => ['required', 'string', 'max:30', 'unique:mahasiswas,nim'],
-            'prodi' => ['required', 'string', 'max:255'],
+            // Prodi harus berupa data prodi aktif, bukan teks bebas.
+            'prodi_id' => ['required', Rule::exists('prodis', 'id')->where('aktif', true)],
             'angkatan' => ['required', 'digits:4'],
         ]);
 
@@ -78,13 +83,13 @@ class AuthController extends Controller
                 'email' => $data['email'],
                 'password' => $data['password'], // di-hash otomatis oleh cast 'hashed' di model User
             ]);
-            $user->assignRole('mahasiswa');
+            $user->assignRole(Peran::Mahasiswa->value);
 
             Mahasiswa::create([
                 'user_id' => $user->id,
                 'nim' => $data['nim'],
                 'nama' => $data['name'],
-                'prodi' => $data['prodi'],
+                'prodi_id' => $data['prodi_id'],
                 'angkatan' => $data['angkatan'],
             ]);
 
@@ -108,22 +113,16 @@ class AuthController extends Controller
 
     private function redirectByRole()
     {
-        $user = Auth::user();
+        $peran = Auth::user()->peranUtama();
 
-        if ($user->hasRole('admin')) {
-            return redirect('/admin');
+        if ($peran === null) {
+            Auth::logout();
+
+            return redirect()->route('login')->withErrors([
+                'email' => 'Akun belum memiliki peran yang valid. Hubungi Admin.',
+            ]);
         }
 
-        foreach (self::DASHBOARD_ROUTES as $role => $routeName) {
-            if ($user->hasRole($role)) {
-                return redirect()->route($routeName);
-            }
-        }
-
-        Auth::logout();
-
-        return redirect()->route('login')->withErrors([
-            'email' => 'Akun belum memiliki peran yang valid. Hubungi Administrator.',
-        ]);
+        return redirect($peran->halamanAwal());
     }
 }

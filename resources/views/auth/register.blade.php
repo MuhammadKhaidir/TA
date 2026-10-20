@@ -148,7 +148,7 @@
 
                 <div class="rounded-xl border border-sand-200 bg-white px-[clamp(1.5rem,3.5vw,3rem)] py-[clamp(1.25rem,4vh,2.5rem)] shadow-[0_28px_56px_-14px_rgba(70,50,25,0.30),0_10px_22px_-8px_rgba(70,50,25,0.16),0_0_0_1px_rgba(118,87,50,0.06)]">
                     <h2 class="font-serif text-[length:clamp(1.5rem,4vh,2.25rem)] font-bold leading-tight text-ink-900">Daftar</h2>
-                    <p class="mt-1.5 text-pretty text-[length:clamp(0.8125rem,1.9vh,1rem)] text-ink-600">Buat akun mahasiswa untuk mengajukan sidang tugas akhir.</p>
+                    <p class="mt-1.5 text-pretty text-[length:clamp(0.8125rem,1.9vh,1rem)] text-ink-600">Buat akun mahasiswa untuk mengurus administrasi Tugas Akhir dan Kerja Praktik.</p>
 
                     @if ($errors->any())
                         <div class="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm text-rose-700">
@@ -206,9 +206,13 @@
                                         <path d="M4 6.5C6 5.5 9 5.5 12 7c3-1.5 6-1.5 8-.5v11c-2-1-5-1-8 .5-3-1.5-6-1.5-8-.5Z" />
                                         <path d="M12 7v11.5" />
                                     </svg>
-                                    <input id="prodi" type="text" name="prodi" value="{{ old('prodi') }}" required autocomplete="off"
-                                           class="mhs-input rounded-lg bg-sand-50 py-[clamp(0.5rem,1.6vh,0.75rem)] pl-11 pr-4 placeholder:font-mono placeholder:text-xs"
-                                           placeholder="Teknik Informatika">
+                                    <select id="prodi" name="prodi_id" required
+                                            class="mhs-input rounded-lg bg-sand-50 py-[clamp(0.5rem,1.6vh,0.75rem)] pl-11 pr-4">
+                                        <option value="" disabled @selected(! old('prodi_id'))>Pilih program studi</option>
+                                        @foreach ($prodis as $prodi)
+                                            <option value="{{ $prodi->id }}" @selected((string) old('prodi_id') === (string) $prodi->id)>{{ $prodi->nama }}</option>
+                                        @endforeach
+                                    </select>
                                 </div>
                             </div>
                             <div class="sm:col-span-2">

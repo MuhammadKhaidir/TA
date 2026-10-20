@@ -2,292 +2,124 @@
 
 namespace Database\Seeders;
 
-use App\Enums\JenisUjian;
-use App\Enums\PerananPenguji;
+use App\Enums\JenisPengajuan;
+use App\Enums\Peran;
 use App\Models\Dosen;
 use App\Models\Mahasiswa;
+use App\Models\Pengaturan;
+use App\Models\PeriodeAkademik;
+use App\Models\Persyaratan;
+use App\Models\Prodi;
 use App\Models\User;
-use App\Services\SidangWorkflowService;
+use App\Services\PengajuanService;
 use Illuminate\Database\Seeder;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
+/**
+ * Data demo + data awal konfigurasi. Semua akun demo berpassword `password`.
+ * Isi persyaratan, jenis surat, struktur laporan, template SK, dan nilai
+ * pengaturan di sini adalah CONTOH AWAL — pihak kampus perlu menyesuaikannya
+ * lewat panel Admin sebelum dipakai sungguhan.
+ */
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Peran yang terlibat dalam POS "Pendaftaran Ujian Akhir Program".
-     *
-     * @var array<int, string>
-     */
-    private const ROLES = [
-        'admin',
-        'mahasiswa',
-        'dosen_penguji',
-        'sekdep_koor_prodi',
-        'penata',
-        'pengelola_layanan',
-        'pengadministrasi_perkantoran',
-    ];
-
-    public function run(): void
+    public function run(PengajuanService $service): void
     {
-        foreach (self::ROLES as $role) {
-            Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        foreach (Peran::cases() as $peran) {
+            Role::findOrCreate($peran->value, 'web');
         }
 
-        $this->buatUser('admin@ta.test', 'Administrator', 'admin');
-
-        // --- Akun peran demo (satu login per peran, sesuai README) ---
-        $sekdepUser = $this->buatUser('sekdep@ta.test', 'Dr. Hasan (SekDep/Koor. Prodi)', 'sekdep_koor_prodi');
-        $penataUser = $this->buatUser('penata@ta.test', 'Yuni Astuti, S.E. (Penata)', 'penata');
-        $pengelolaUser = $this->buatUser('pengelola@ta.test', 'Joko Prasetyo (Pengelola Layanan)', 'pengelola_layanan');
-        $administrasiUser = $this->buatUser('administrasi@ta.test', 'Rina Wulandari (Pengadministrasi Perkantoran)', 'pengadministrasi_perkantoran');
-
-        // --- Dosen Penguji ---
-        $dosenUser = $this->buatUser('dosen@ta.test', 'Dr. Anwar Ibrahim, M.Kom.', 'dosen_penguji');
-        $dosenAnwar = Dosen::firstOrCreate(
-            ['nip' => '197508012005011001'],
-            ['user_id' => $dosenUser->id, 'nama' => 'Dr. Anwar Ibrahim, M.Kom.', 'prodi' => 'Teknik Informatika']
-        );
-        $dosenSiti = Dosen::firstOrCreate(
-            ['nip' => '198002142006042002'],
-            ['nama' => 'Dr. Siti Nurhaliza, M.T.', 'prodi' => 'Teknik Informatika']
-        );
-        $dosenRahman = Dosen::firstOrCreate(
-            ['nip' => '197911302005011003'],
-            ['nama' => 'Rahman Hakim, S.Kom., M.Sc.', 'prodi' => 'Sistem Informasi']
-        );
-        $dosenMaya = Dosen::firstOrCreate(
-            ['nip' => '198303102008122001'],
-            ['nama' => 'Maya Sari, S.T., M.T.', 'prodi' => 'Teknik Informatika']
-        );
-        $dosenBambang = Dosen::firstOrCreate(
-            ['nip' => '197601202003121001'],
-            ['nama' => 'Prof. Bambang Sutrisno', 'prodi' => 'Sistem Informasi']
-        );
-
-        // --- Mahasiswa demo utama (dipakai untuk login mahasiswa@ta.test) ---
-        $mahasiswaUser = $this->buatUser('mahasiswa@ta.test', 'Budi Santoso', 'mahasiswa');
-        $mhsBudi = Mahasiswa::firstOrCreate(
-            ['nim' => '09021182126001'],
-            [
-                'user_id' => $mahasiswaUser->id, 'nama' => 'Budi Santoso', 'prodi' => 'Teknik Informatika',
-                'angkatan' => '2021', 'no_hp' => '081234567890', 'jumlah_konsultasi' => 12,
-            ]
-        );
-
-        $svc = app(SidangWorkflowService::class);
-
-        // Skenario 1 — baru diajukan, menunggu SekDep (Langkah 2).
-        if ($mhsBudi->sidangs()->doesntExist()) {
-            $svc->ajukanSidang($mhsBudi, [
-                'jenis' => JenisUjian::Skripsi->value,
-                'judul_ta' => 'Sistem Informasi Pendaftaran Ujian Akhir Program Berbasis Web',
-            ], $mahasiswaUser);
+        $prodi = [];
+        foreach (['TI' => 'Teknik Informatika', 'SI' => 'Sistem Informasi', 'SK' => 'Sistem Komputer'] as $kode => $nama) {
+            $prodi[$kode] = Prodi::firstOrCreate(['kode' => $kode], ['nama' => $nama, 'aktif' => true]);
         }
 
-        // --- Mahasiswa tambahan untuk mengisi setiap tahapan alur ---
-        $mhsData = [
-            ['nim' => '09021182126002', 'nama' => 'Siti Aminah', 'angkatan' => '2021', 'konsultasi' => 8],
-            ['nim' => '09021182126003', 'nama' => 'Rian Hidayat', 'angkatan' => '2021', 'konsultasi' => 12],
-            ['nim' => '09021182126004', 'nama' => 'Dewi Lestari', 'angkatan' => '2021', 'konsultasi' => 13],
-            ['nim' => '09021182126005', 'nama' => 'Andi Wijaya', 'angkatan' => '2020', 'konsultasi' => 15],
-            ['nim' => '09021182126006', 'nama' => 'Rina Marlina', 'angkatan' => '2021', 'konsultasi' => 12],
-            ['nim' => '09021182126007', 'nama' => 'Fajar Nugroho', 'angkatan' => '2020', 'konsultasi' => 14],
-            ['nim' => '09021182126008', 'nama' => 'Wulan Sari', 'angkatan' => '2021', 'konsultasi' => 12],
-            ['nim' => '09021182126009', 'nama' => 'Eka Putra', 'angkatan' => '2020', 'konsultasi' => 16],
-        ];
+        PeriodeAkademik::firstOrCreate(['nama' => 'Ganjil 2026/2027'], ['aktif' => true]);
 
-        $mhs = [];
-        foreach ($mhsData as $d) {
-            $u = $this->buatUser(
-                strtolower(str_replace(' ', '.', $d['nama'])).'@student.unsri.ac.id',
-                $d['nama'],
-                'mahasiswa'
-            );
-            $mhs[$d['nim']] = Mahasiswa::firstOrCreate(
-                ['nim' => $d['nim']],
-                [
-                    'user_id' => $u->id, 'nama' => $d['nama'], 'prodi' => 'Teknik Informatika',
-                    'angkatan' => $d['angkatan'], 'jumlah_konsultasi' => $d['konsultasi'],
-                ]
-            );
+        $this->call(KonfigurasiAwalSeeder::class);
+        $this->pengaturanDemo();
+
+        // --- Akun ---
+        $admin = $this->akun('admin@ta.test', 'Administrator Sistem', Peran::Admin);
+
+        $operator = $this->akun('operator@ta.test', 'Operator Akademik', Peran::OperatorAkademik);
+        $operator->update(['semua_prodi' => true]);
+
+        $operatorSi = $this->akun('operator.si@ta.test', 'Operator Prodi SI', Peran::OperatorAkademik);
+        $operatorSi->prodiOperator()->syncWithoutDetaching([$prodi['SI']->id]);
+
+        $dospemUser = $this->akun('dospem@ta.test', 'Dr. Siti Rahmawati, M.Kom.', Peran::Dospem);
+        $dospem = Dosen::firstOrCreate(['nip' => '198001012005012001'], ['user_id' => $dospemUser->id, 'nama' => $dospemUser->name, 'prodi_id' => $prodi['TI']->id, 'aktif' => true]);
+
+        $dospem2User = $this->akun('dospem2@ta.test', 'Dr. Ahmad Anwar, M.T.', Peran::Dospem);
+        $dospem2 = Dosen::firstOrCreate(['nip' => '197905052004011002'], ['user_id' => $dospem2User->id, 'nama' => $dospem2User->name, 'prodi_id' => $prodi['SI']->id, 'aktif' => true]);
+
+        // Mahasiswa kosong, untuk mencoba alur dari awal.
+        $this->mahasiswa('mahasiswa@ta.test', 'Muhammad Khaidir', '09021182126001', $prodi['TI']);
+
+        // Mahasiswa demo lintas prodi dengan pengajuan pada tahap berbeda.
+        $m2 = $this->mahasiswa('mahasiswa2@ta.test', 'Siti Aminah', '09021182126002', $prodi['TI']);
+        $m3 = $this->mahasiswa('mahasiswa3@ta.test', 'Rian Hidayat', '09021182126003', $prodi['SI']);
+
+        if (! $m2->pengajuans()->exists()) {
+            $ta = $service->buat($m2, JenisPengajuan::Ta, ['judul' => 'Klasifikasi Sentimen Ulasan Produk Menggunakan Naive Bayes'], $m2->user);
+            $this->unggahSemua($service, $ta, $m2->user);
+            $service->kirim($ta, $m2->user);
         }
 
-        // Skenario 2 — Siti: konsultasi belum cukup -> Ditunda (Peringatan #1).
-        $this->skenario($svc, $mhs['09021182126002'], 'komprehensif', 'Klasifikasi Sentimen Ulasan Produk Menggunakan Naive Bayes', function ($svc, $sidang) {
-            // berhenti di status Ditunda hasil ajukanSidang
-        });
-
-        // Skenario 3 — Rian: sudah diusulkan jadwal, menunggu Penata (Langkah 3).
-        $this->skenario($svc, $mhs['09021182126003'], 'komprehensif', 'Rancang Bangun Aplikasi Presensi Berbasis QR Code', function ($svc, $sidang) use ($sekdepUser, $dosenSiti, $dosenRahman) {
-            $svc->usulkanJadwal($sidang, [
-                'tanggal_sidang' => now()->addDays(12)->toDateString(),
-                'jam_sidang' => '09:00',
-                'media' => 'luring',
-                'tempat' => 'Ruang Sidang FASILKOM 1',
-                'pengujis' => [
-                    ['dosen_id' => $dosenSiti->id, 'peran' => PerananPenguji::Ketua->value],
-                    ['dosen_id' => $dosenRahman->id, 'peran' => PerananPenguji::Anggota->value],
-                ],
-            ], $sekdepUser);
-        });
-
-        // Skenario 4 — Dewi: sudah diverifikasi Penata, menunggu SK (Langkah 5).
-        $this->skenario($svc, $mhs['09021182126004'], 'skripsi', 'Optimasi Rute Distribusi Menggunakan Algoritma Genetika', function ($svc, $sidang) use ($sekdepUser, $penataUser, $dosenAnwar, $dosenMaya) {
-            $svc->usulkanJadwal($sidang, [
-                'tanggal_sidang' => now()->addDays(10)->toDateString(),
-                'jam_sidang' => '10:00',
-                'media' => 'daring',
-                'tempat' => 'https://meet.unsri.ac.id/sidang-dewi',
-                'pengujis' => [
-                    ['dosen_id' => $dosenAnwar->id, 'peran' => PerananPenguji::Ketua->value],
-                    ['dosen_id' => $dosenMaya->id, 'peran' => PerananPenguji::Anggota->value],
-                ],
-            ], $sekdepUser);
-            $svc->verifikasiDanTeruskanPengelola($sidang, ['nilai_usep' => 82, 'dkn_terverifikasi' => true], $penataUser);
-        });
-
-        // Skenario 5 — Andi: SK terbit, sedang didistribusikan (Langkah 6).
-        $this->skenario($svc, $mhs['09021182126005'], 'skripsi', 'Sistem Pendukung Keputusan Pemilihan Beasiswa dengan Metode SAW', function ($svc, $sidang) use ($sekdepUser, $penataUser, $pengelolaUser, $dosenSiti, $dosenBambang) {
-            $svc->usulkanJadwal($sidang, [
-                'tanggal_sidang' => now()->addDays(9)->toDateString(),
-                'jam_sidang' => '13:00',
-                'media' => 'luring',
-                'tempat' => 'Ruang Sidang FASILKOM 2',
-                'pengujis' => [
-                    ['dosen_id' => $dosenSiti->id, 'peran' => PerananPenguji::Ketua->value],
-                    ['dosen_id' => $dosenBambang->id, 'peran' => PerananPenguji::Anggota->value],
-                ],
-            ], $sekdepUser);
-            $svc->verifikasiDanTeruskanPengelola($sidang, ['nilai_usep' => 88, 'dkn_terverifikasi' => true], $penataUser);
-            $svc->sahkanSkPenguji($sidang, ['nomor_sk' => '021/SK/FASILKOM/2026'], $pengelolaUser);
-            $svc->teruskanSkKeSekdep($sidang, $penataUser);
-        });
-
-        // Skenario 6 — Rina: administrasi sedang menyiapkan info jadwal (Langkah 8).
-        $this->skenario($svc, $mhs['09021182126006'], 'komprehensif', 'Analisis Performa Load Balancing pada Arsitektur Microservices', function ($svc, $sidang) use ($sekdepUser, $penataUser, $pengelolaUser, $administrasiUser, $dosenRahman, $dosenMaya) {
-            $svc->usulkanJadwal($sidang, [
-                'tanggal_sidang' => now()->addDays(8)->toDateString(),
-                'jam_sidang' => '09:00',
-                'media' => 'luring',
-                'tempat' => 'Ruang Sidang FASILKOM 1',
-                'pengujis' => [
-                    ['dosen_id' => $dosenRahman->id, 'peran' => PerananPenguji::Ketua->value],
-                    ['dosen_id' => $dosenMaya->id, 'peran' => PerananPenguji::Anggota->value],
-                ],
-            ], $sekdepUser);
-            $svc->verifikasiDanTeruskanPengelola($sidang, ['nilai_usep' => 79, 'dkn_terverifikasi' => true], $penataUser);
-            $svc->sahkanSkPenguji($sidang, ['nomor_sk' => '022/SK/FASILKOM/2026'], $pengelolaUser);
-            $svc->teruskanSkKeSekdep($sidang, $penataUser);
-            $svc->distribusikanSkKeDosen($sidang, $sekdepUser);
-            $svc->siapkanAdministrasi($sidang, [], $administrasiUser);
-        });
-
-        // Skenario 7 — Fajar: siap ujian, tinggal menunggu hari-H (Langkah 9 selesai).
-        $this->skenario($svc, $mhs['09021182126007'], 'skripsi', 'Deteksi Objek Real-Time Menggunakan YOLOv8 untuk Pemantauan Lalu Lintas', function ($svc, $sidang) use ($sekdepUser, $penataUser, $pengelolaUser, $administrasiUser, $dosenAnwar, $dosenSiti) {
-            $svc->usulkanJadwal($sidang, [
-                'tanggal_sidang' => now()->addDays(3)->toDateString(),
-                'jam_sidang' => '10:00',
-                'media' => 'luring',
-                'tempat' => 'Ruang Sidang FASILKOM 3',
-                'pengujis' => [
-                    ['dosen_id' => $dosenAnwar->id, 'peran' => PerananPenguji::Ketua->value],
-                    ['dosen_id' => $dosenSiti->id, 'peran' => PerananPenguji::Anggota->value],
-                ],
-            ], $sekdepUser);
-            $svc->verifikasiDanTeruskanPengelola($sidang, ['nilai_usep' => 90, 'dkn_terverifikasi' => true], $penataUser);
-            $svc->sahkanSkPenguji($sidang, ['nomor_sk' => '023/SK/FASILKOM/2026'], $pengelolaUser);
-            $svc->teruskanSkKeSekdep($sidang, $penataUser);
-            $svc->distribusikanSkKeDosen($sidang, $sekdepUser);
-            $svc->siapkanAdministrasi($sidang, [], $administrasiUser);
-            $svc->informasikanJadwal($sidang, $administrasiUser);
-            $svc->cekKelengkapanBerkas($sidang, $administrasiUser);
-        });
-
-        // Skenario 8 — Wulan: ujian sudah berlangsung, 1 dari 2 dosen sudah input nilai
-        // (menampilkan tugas aktif untuk dosen@ta.test serta antrean eskalasi Langkah 13-16).
-        $this->skenario($svc, $mhs['09021182126008'], 'skripsi', 'Implementasi Chatbot Layanan Akademik Menggunakan NLP', function ($svc, $sidang) use ($sekdepUser, $penataUser, $pengelolaUser, $administrasiUser, $dosenUser, $dosenAnwar, $dosenMaya) {
-            $svc->usulkanJadwal($sidang, [
-                'tanggal_sidang' => now()->subDay()->toDateString(),
-                'jam_sidang' => '09:00',
-                'media' => 'luring',
-                'tempat' => 'Ruang Sidang FASILKOM 1',
-                'pengujis' => [
-                    ['dosen_id' => $dosenAnwar->id, 'peran' => PerananPenguji::Ketua->value],
-                    ['dosen_id' => $dosenMaya->id, 'peran' => PerananPenguji::Anggota->value],
-                ],
-            ], $sekdepUser);
-            $svc->verifikasiDanTeruskanPengelola($sidang, ['nilai_usep' => 85, 'dkn_terverifikasi' => true], $penataUser);
-            $svc->sahkanSkPenguji($sidang, ['nomor_sk' => '024/SK/FASILKOM/2026'], $pengelolaUser);
-            $svc->teruskanSkKeSekdep($sidang, $penataUser);
-            $svc->distribusikanSkKeDosen($sidang, $sekdepUser);
-            $svc->siapkanAdministrasi($sidang, [], $administrasiUser);
-            $svc->informasikanJadwal($sidang, $administrasiUser);
-            $svc->cekKelengkapanBerkas($sidang, $administrasiUser);
-            $svc->serahkanBerkasUjian($sidang, $administrasiUser);
-            $svc->inputNilai($sidang, $dosenAnwar, $dosenUser);
-        });
-
-        // Skenario 9 — Eka: seluruh proses tuntas (Selesai), contoh riwayat lengkap 16 langkah.
-        $this->skenario($svc, $mhs['09021182126009'], 'komprehensif', 'Pengembangan Sistem Rekomendasi Skripsi Menggunakan Collaborative Filtering', function ($svc, $sidang) use ($sekdepUser, $penataUser, $pengelolaUser, $administrasiUser, $dosenBambang, $dosenRahman) {
-            $svc->usulkanJadwal($sidang, [
-                'tanggal_sidang' => now()->subDays(5)->toDateString(),
-                'jam_sidang' => '13:00',
-                'media' => 'luring',
-                'tempat' => 'Ruang Sidang FASILKOM 2',
-                'pengujis' => [
-                    ['dosen_id' => $dosenBambang->id, 'peran' => PerananPenguji::Ketua->value],
-                    ['dosen_id' => $dosenRahman->id, 'peran' => PerananPenguji::Anggota->value],
-                ],
-            ], $sekdepUser);
-            $svc->verifikasiDanTeruskanPengelola($sidang, ['nilai_usep' => 91, 'dkn_terverifikasi' => true], $penataUser);
-            $svc->sahkanSkPenguji($sidang, ['nomor_sk' => '018/SK/FASILKOM/2026'], $pengelolaUser);
-            $svc->teruskanSkKeSekdep($sidang, $penataUser);
-            $svc->distribusikanSkKeDosen($sidang, $sekdepUser);
-            $svc->siapkanAdministrasi($sidang, [], $administrasiUser);
-            $svc->informasikanJadwal($sidang, $administrasiUser);
-            $svc->cekKelengkapanBerkas($sidang, $administrasiUser);
-            $svc->serahkanBerkasUjian($sidang, $administrasiUser);
-            $svc->inputNilai($sidang, $dosenBambang, $dosenBambang->user ?? $administrasiUser);
-            $svc->inputNilai($sidang, $dosenRahman, $dosenRahman->user ?? $administrasiUser);
-            $svc->cekNilaiSimak($sidang, $pengelolaUser);
-        });
+        if (! $m3->pengajuans()->exists()) {
+            $ta = $service->buat($m3, JenisPengajuan::Ta, ['judul' => 'Rancang Bangun Aplikasi Presensi Berbasis QR Code'], $m3->user);
+            $this->unggahSemua($service, $ta, $m3->user);
+            $service->kirim($ta, $m3->user);
+            $service->verifikasiAdministrasi($ta, $operator);
+            $service->tetapkanDospem($ta, $dospem2, $operator);
+            $service->setujuiAkademik($ta, $dospem2User);
+            // Status: Disetujui — siap diterbitkan SK-nya oleh Operator Akademik.
+        }
     }
 
-    private function buatUser(string $email, string $nama, string $role): User
+    /** Nilai demo agar alur penerbitan SK dapat dicoba. TIDAK dipakai di data sungguhan. */
+    private function pengaturanDemo(): void
     {
-        $user = User::firstOrCreate(
-            ['email' => $email],
-            ['name' => $nama, 'password' => Hash::make('password')]
-        );
-        $user->syncRoles([$role]);
+        // Nilai demo supaya alur penerbitan SK dapat dicoba. Ganti dengan data resmi kampus.
+        foreach ([
+            'sk.format_nomor' => '{urut}/SK/{kode_prodi}/{tahun}',
+            'sk.kota' => 'Contoh Kota',
+            'sk.penandatangan_nama' => 'Nama Pejabat Penandatangan (contoh)',
+            'sk.penandatangan_jabatan' => 'Jabatan Penandatangan (contoh)',
+        ] as $kunci => $nilai) {
+            if (Pengaturan::ambil($kunci) === null) {
+                Pengaturan::simpan($kunci, $nilai);
+            }
+        }
+    }
+
+    private function akun(string $email, string $nama, Peran $peran): User
+    {
+        $user = User::firstOrCreate(['email' => $email], ['name' => $nama, 'password' => Hash::make('password'), 'aktif' => true]);
+        $user->syncRoles([$peran->value]);
 
         return $user;
     }
 
-    /**
-     * Helper untuk membuat satu sidang demo lalu menjalankannya melalui
-     * beberapa langkah workflow nyata (bukan insert manual), agar data
-     * seeding sekaligus berfungsi sebagai uji integrasi ringan.
-     */
-    private function skenario(
-        SidangWorkflowService $svc,
-        Mahasiswa $mahasiswa,
-        string $jenis,
-        string $judul,
-        callable $lanjutkan,
-    ): void {
-        if ($mahasiswa->sidangs()->exists()) {
-            return;
+    private function mahasiswa(string $email, string $nama, string $nim, Prodi $prodi): Mahasiswa
+    {
+        $user = $this->akun($email, $nama, Peran::Mahasiswa);
+
+        return Mahasiswa::firstOrCreate(
+            ['nim' => $nim],
+            ['user_id' => $user->id, 'nama' => $nama, 'prodi_id' => $prodi->id, 'angkatan' => '2021'],
+        );
+    }
+
+    private function unggahSemua(PengajuanService $service, $pengajuan, User $actor): void
+    {
+        foreach ($pengajuan->persyaratanPengajuan() as $syarat) {
+            $service->unggahDokumen($pengajuan, $syarat, UploadedFile::fake()->createWithContent('dokumen.pdf', "%PDF-1.4\n%demo\n"), $actor);
         }
-
-        $aktor = $mahasiswa->user;
-        $sidang = $svc->ajukanSidang($mahasiswa, [
-            'jenis' => $jenis,
-            'judul_ta' => $judul,
-        ], $aktor);
-
-        $lanjutkan($svc, $sidang);
     }
 }

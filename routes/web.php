@@ -1,8 +1,14 @@
 <?php
 
+use App\Enums\Peran;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BimbinganController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\SidangController;
+use App\Http\Controllers\DospemController;
+use App\Http\Controllers\OperatorController;
+use App\Http\Controllers\PengajuanController;
+use App\Http\Controllers\SkController;
+use App\Http\Controllers\SuratController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('login'));
@@ -13,76 +19,57 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
 Route::post('/register', [AuthController::class, 'register'])->name('register.process');
 
-Route::middleware(['auth'])->group(function () {
+// Empat aktor saja: mahasiswa, dospem, operator_akademik (halaman web) dan admin (panel Filament di /admin).
+Route::middleware(['auth', 'akun.aktif'])->group(function () {
 
-    // Halaman detail sidang & unduh dokumen dapat diakses lintas peran,
-    // dengan otorisasi granular ditangani di dalam SidangController.
-    Route::get('/sidang/{sidang}', [SidangController::class, 'show'])->name('sidang.show');
-    Route::get('/sidang/{sidang}/dokumen/{dokumen}/unduh', [SidangController::class, 'unduhDokumen'])->name('sidang.dokumen.unduh');
-    // Foto bukti konsultasi: pemilik, SekDep/Koor. Prodi, atau admin (dicek di controller).
-    Route::get('/konsultasi/{konsultasi}/bukti', [DashboardController::class, 'buktiKonsultasi'])->name('konsultasi.bukti');
+    // Halaman bersama: otorisasi tiap berkas/pengajuan ditangani policy (bukan sekadar role).
+    Route::get('/pengajuan/{pengajuan}', [PengajuanController::class, 'show'])->name('pengajuan.show');
+    Route::get('/pengajuan/dokumen/{dokumen}', [PengajuanController::class, 'unduhDokumen'])->name('pengajuan.dokumen.unduh');
+    Route::get('/pengajuan/{pengajuan}/sk', [SkController::class, 'unduhSk'])->name('pengajuan.sk.unduh');
+    Route::get('/surat/{surat}/unduh', [SkController::class, 'unduhSurat'])->name('surat.unduh');
+    Route::get('/surat-template/{jenis}', [SkController::class, 'unduhTemplateSurat'])->name('surat.template');
+    Route::get('/bimbingan/{bimbingan}/bukti', [BimbinganController::class, 'bukti'])->name('bimbingan.bukti');
 
     // ------------------------------------------------------------
-    // Mahasiswa — Langkah 1
+    // Mahasiswa
     // ------------------------------------------------------------
-    Route::middleware('role:mahasiswa')->prefix('mahasiswa')->name('mahasiswa.')->group(function () {
+    Route::middleware('role:'.Peran::Mahasiswa->value)->prefix('mahasiswa')->name('mahasiswa.')->group(function () {
         Route::get('/', [DashboardController::class, 'mahasiswa'])->name('dashboard');
-        Route::post('/konsultasi', [DashboardController::class, 'catatKonsultasi'])->name('konsultasi.catat');
-        Route::delete('/konsultasi/{konsultasi}', [DashboardController::class, 'hapusKonsultasi'])->name('konsultasi.hapus');
-        Route::post('/sidang', [SidangController::class, 'ajukan'])->name('sidang.ajukan');
-Route::delete('/sidang/{sidang}', [SidangController::class, 'batalkan'])->name('sidang.batalkan');
-        Route::post('/sidang/{sidang}/dokumen', [SidangController::class, 'unggahDokumen'])->name('sidang.dokumen.unggah');
+
+        Route::post('/pengajuan/{jenis}', [PengajuanController::class, 'store'])->name('pengajuan.store');
+        Route::put('/pengajuan/{pengajuan}', [PengajuanController::class, 'update'])->name('pengajuan.update');
+        Route::post('/pengajuan/{pengajuan}/kirim', [PengajuanController::class, 'kirim'])->name('pengajuan.kirim');
+        Route::delete('/pengajuan/{pengajuan}', [PengajuanController::class, 'destroy'])->name('pengajuan.destroy');
+        Route::post('/pengajuan/{pengajuan}/dokumen/{persyaratan}', [PengajuanController::class, 'unggah'])->name('pengajuan.dokumen.unggah');
+        Route::delete('/dokumen/{dokumen}', [PengajuanController::class, 'hapusDokumen'])->name('pengajuan.dokumen.hapus');
+
+        Route::post('/pengajuan/{pengajuan}/surat', [SuratController::class, 'store'])->name('surat.store');
+
+        Route::post('/bimbingan/{jenis}', [BimbinganController::class, 'store'])->name('bimbingan.store');
+        Route::delete('/bimbingan/{bimbingan}', [BimbinganController::class, 'destroy'])->name('bimbingan.destroy');
     });
 
     // ------------------------------------------------------------
-    // SekDep / Koor. Prodi — Langkah 2, 6 (bagian kedua), 10 (bagian kedua), 16
+    // Dosen Pembimbing
     // ------------------------------------------------------------
-    Route::middleware('role:sekdep_koor_prodi')->prefix('sekdep')->name('sekdep.')->group(function () {
-        Route::get('/', [DashboardController::class, 'sekdep'])->name('dashboard');
-        Route::post('/sidang/{sidang}/konsultasi', [SidangController::class, 'perbaruiKonsultasi'])->name('sidang.konsultasi');
-        Route::post('/sidang/{sidang}/usulkan-jadwal', [SidangController::class, 'usulkanJadwal'])->name('sidang.usulkan-jadwal');
-        Route::post('/sidang/{sidang}/distribusi-sk', [SidangController::class, 'distribusikanSkKeDosen'])->name('sidang.distribusi-sk');
-        Route::post('/sidang/{sidang}/jadwal-ulang', [SidangController::class, 'jadwalkanUlang'])->name('sidang.jadwal-ulang');
-        Route::post('/sidang/{sidang}/hubungi-dosen', [SidangController::class, 'hubungiDosen'])->name('sidang.hubungi-dosen');
+    Route::middleware('role:'.Peran::Dospem->value)->prefix('dospem')->name('dospem.')->group(function () {
+        Route::get('/', [DashboardController::class, 'dospem'])->name('dashboard');
+        Route::post('/pengajuan/{pengajuan}/setujui', [DospemController::class, 'setujui'])->name('pengajuan.setujui');
+        Route::post('/pengajuan/{pengajuan}/revisi', [DospemController::class, 'revisi'])->name('pengajuan.revisi');
+        Route::post('/bimbingan/{bimbingan}/validasi', [DospemController::class, 'validasiBimbingan'])->name('bimbingan.validasi');
     });
 
     // ------------------------------------------------------------
-    // Penata — Langkah 3, 4, 6 (bagian pertama), 15
+    // Operator Akademik
     // ------------------------------------------------------------
-    Route::middleware('role:penata')->prefix('penata')->name('penata.')->group(function () {
-        Route::get('/', [DashboardController::class, 'penata'])->name('dashboard');
-        Route::post('/sidang/{sidang}/verifikasi', [SidangController::class, 'verifikasi'])->name('sidang.verifikasi');
-        Route::post('/sidang/{sidang}/teruskan-sk', [SidangController::class, 'teruskanSkKeSekdep'])->name('sidang.teruskan-sk');
-        Route::post('/sidang/{sidang}/lapor-sekdep', [SidangController::class, 'laporKeSekdep'])->name('sidang.lapor-sekdep');
-    });
-
-    // ------------------------------------------------------------
-    // Pengelola Layanan — Langkah 5, 13, 14
-    // ------------------------------------------------------------
-    Route::middleware('role:pengelola_layanan')->prefix('pengelola')->name('pengelola.')->group(function () {
-        Route::get('/', [DashboardController::class, 'pengelola'])->name('dashboard');
-        Route::post('/sidang/{sidang}/sahkan-sk', [SidangController::class, 'sahkanSk'])->name('sidang.sahkan-sk');
-        Route::post('/sidang/{sidang}/cek-nilai', [SidangController::class, 'cekNilai'])->name('sidang.cek-nilai');
-        Route::post('/sidang/{sidang}/lapor-penata', [SidangController::class, 'laporKePenata'])->name('sidang.lapor-penata');
-    });
-
-    // ------------------------------------------------------------
-    // Pengadministrasi Perkantoran — Langkah 7, 8, 9, 11
-    // ------------------------------------------------------------
-    Route::middleware('role:pengadministrasi_perkantoran')->prefix('administrasi')->name('administrasi.')->group(function () {
-        Route::get('/', [DashboardController::class, 'administrasi'])->name('dashboard');
-        Route::post('/sidang/{sidang}/siapkan', [SidangController::class, 'siapkanAdministrasi'])->name('sidang.siapkan');
-        Route::post('/sidang/{sidang}/info-jadwal', [SidangController::class, 'informasikanJadwal'])->name('sidang.info-jadwal');
-        Route::post('/sidang/{sidang}/cek-berkas', [SidangController::class, 'cekKelengkapanBerkas'])->name('sidang.cek-berkas');
-        Route::post('/sidang/{sidang}/serahkan-berkas', [SidangController::class, 'serahkanBerkasUjian'])->name('sidang.serahkan-berkas');
-    });
-
-    // ------------------------------------------------------------
-    // Dosen Penguji — Langkah 10 (bagian pertama), 12
-    // ------------------------------------------------------------
-    Route::middleware('role:dosen_penguji')->prefix('dosen')->name('dosen.')->group(function () {
-        Route::get('/', [DashboardController::class, 'dosen'])->name('dashboard');
-        Route::post('/sidang/{sidang}/konfirmasi-berhalangan', [SidangController::class, 'konfirmasiBerhalangan'])->name('sidang.konfirmasi-berhalangan');
-        Route::post('/sidang/{sidang}/input-nilai', [SidangController::class, 'inputNilai'])->name('sidang.input-nilai');
+    Route::middleware('role:'.Peran::OperatorAkademik->value)->prefix('operator')->name('operator.')->group(function () {
+        Route::get('/', [DashboardController::class, 'operator'])->name('dashboard');
+        Route::post('/pengajuan/{pengajuan}/verifikasi', [OperatorController::class, 'verifikasi'])->name('pengajuan.verifikasi');
+        Route::post('/pengajuan/{pengajuan}/kembalikan', [OperatorController::class, 'kembalikan'])->name('pengajuan.kembalikan');
+        Route::post('/pengajuan/{pengajuan}/dospem', [OperatorController::class, 'tetapkanDospem'])->name('pengajuan.dospem');
+        Route::post('/pengajuan/{pengajuan}/selesaikan-kp', [OperatorController::class, 'selesaikanKp'])->name('pengajuan.selesaikan-kp');
+        Route::get('/pengajuan/{pengajuan}/sk/pratinjau', [OperatorController::class, 'pratinjauSk'])->name('sk.pratinjau');
+        Route::post('/pengajuan/{pengajuan}/sk', [OperatorController::class, 'terbitkanSk'])->name('sk.terbitkan');
+        Route::post('/surat/{surat}/proses', [OperatorController::class, 'prosesSurat'])->name('surat.proses');
     });
 });
