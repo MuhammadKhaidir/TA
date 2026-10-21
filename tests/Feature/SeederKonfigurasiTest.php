@@ -23,6 +23,11 @@ class SeederKonfigurasiTest extends TestCase
         $this->assertSame(6, Persyaratan::where('jenis', 'kp_lampiran')->count());
         $this->assertSame(1, TemplateSk::count());
 
+        // Revisi: 8 dokumen Kumpulan A (surat pengantar) dan 4 dokumen sidang, dua di antaranya tautan otomatis.
+        $this->assertSame(8, Persyaratan::where('jenis', 'ta_surat_pengantar')->count());
+        $this->assertSame(4, Persyaratan::where('jenis', 'ta_sidang')->count());
+        $this->assertSame(['kartu_konsultasi', 'sk_ta'], Persyaratan::where('jenis', 'ta_sidang')->whereNotNull('tautan_otomatis')->pluck('tautan_otomatis')->sort()->values()->all());
+
         // Nomor, kota, dan penandatangan tetap harus diisi Admin; SK belum boleh terbit.
         $kurang = app(SkService::class)->kekuranganKonfigurasi();
         $this->assertContains('Format nomor SK', $kurang);

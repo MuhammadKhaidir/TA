@@ -7,6 +7,10 @@ enum JenisPersyaratan: string
     case TaPengajuan = 'ta_pengajuan';
     case KpPengajuan = 'kp_pengajuan';
     case KpLampiran = 'kp_lampiran';
+    /** Dokumen Kumpulan A pada surat pengantar TA. */
+    case TaSuratPengantar = 'ta_surat_pengantar';
+    /** Dokumen pendaftaran sidang TA. */
+    case TaSidang = 'ta_sidang';
 
     public function label(): string
     {
@@ -14,6 +18,8 @@ enum JenisPersyaratan: string
             self::TaPengajuan => 'Dokumen pengajuan TA',
             self::KpPengajuan => 'Dokumen pengajuan KP',
             self::KpLampiran => 'Lampiran laporan KP',
+            self::TaSuratPengantar => 'Dokumen surat pengantar TA',
+            self::TaSidang => 'Dokumen pendaftaran sidang TA',
         };
     }
 

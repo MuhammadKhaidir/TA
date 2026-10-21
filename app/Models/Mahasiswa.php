@@ -40,12 +40,17 @@ class Mahasiswa extends Model
         return $this->hasMany(Bimbingan::class);
     }
 
-    /** Pengajuan TA/KP yang masih berjalan (belum selesai) untuk satu jenis. */
+    public function sidangTas(): HasMany
+    {
+        return $this->hasMany(SidangTa::class);
+    }
+
+    /** Pengajuan TA/KP yang masih berjalan (belum selesai, dibatalkan, atau digantikan) untuk satu jenis. */
     public function pengajuanBerjalan(JenisPengajuan $jenis): ?Pengajuan
     {
         return $this->pengajuans()
             ->where('jenis', $jenis->value)
-            ->where('status', '!=', StatusPengajuan::Selesai->value)
+            ->whereNotIn('status', StatusPengajuan::nilaiBerhenti())
             ->latest('id')
             ->first();
     }

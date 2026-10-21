@@ -71,8 +71,22 @@
                         <div class="rounded-xl border border-sand-200 bg-white/60 px-4 py-3 text-sm text-ink-800">
                             <p class="font-medium">{{ $ta->judul }}</p>
                             <p class="mt-1 text-xs text-ink-600">Administrasi: {{ $ta->status_administrasi->label() }} &middot; Akademik: {{ $ta->status_akademik->label() }}</p>
+                            @if ($ta->suratPengantar || $ta->suratBalasan)
+                                <p class="mt-1 text-xs text-ink-600">
+                                    Surat pengantar: {{ $ta->suratPengantar?->status->label() ?? '-' }} &middot; Surat balasan: {{ $ta->suratBalasan?->status->label() ?? '-' }}
+                                </p>
+                            @endif
+                            @if ($ta->dospem)
+                                <p class="mt-1 text-xs text-ink-600">Pembimbing: {{ $ta->dospem->nama }}@if ($ta->dospem2), {{ $ta->dospem2->nama }}@endif</p>
+                            @endif
+                            @if ($sidangTa)
+                                <p class="mt-1 text-xs text-ink-600">Sidang: {{ $sidangTa->status->label() }}@if ($sidangTa->jadwal_mulai) &middot; {{ $sidangTa->jadwal_mulai->translatedFormat('d M Y H:i') }}@endif</p>
+                            @endif
                             <div class="mt-3 flex flex-wrap gap-3">
                                 <a href="{{ route('pengajuan.show', $ta) }}" class="mhs-btn-secondary">Buka detail pengajuan</a>
+                                @if ($sidangTa)
+                                    <a href="{{ route('sidang.show', $sidangTa) }}" class="mhs-btn-secondary">Buka sidang</a>
+                                @endif
                                 @if ($ta->suratKeputusan)
                                     <a href="{{ route('pengajuan.sk.unduh', $ta) }}" class="mhs-btn-primary">Unduh SK TA ({{ $ta->suratKeputusan->nomor }})</a>
                                 @endif

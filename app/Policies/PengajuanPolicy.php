@@ -3,8 +3,10 @@
 namespace App\Policies;
 
 use App\Enums\Peran;
+use App\Enums\TugasAdministrasi;
 use App\Models\Pengajuan;
 use App\Models\User;
+use App\Support\HakAkses;
 
 /**
  * Aturan akses pengajuan. Admin sengaja TIDAK punya akses ke isi pengajuan:
@@ -44,11 +46,33 @@ class PengajuanPolicy
         return $user->bolehMengelolaProdi($pengajuan->prodi_id);
     }
 
-    /** Hanya Dospem yang ditetapkan pada pengajuan ini. */
+    /** Pembimbing 1 atau 2 yang ditetapkan pada pengajuan ini (persetujuan akademik, validasi). */
     public function periksa(User $user, Pengajuan $pengajuan): bool
     {
         return $user->hasRole(Peran::Dospem->value)
-            && $pengajuan->dospem_id !== null
-            && $user->dosen?->id === $pengajuan->dospem_id;
+            && $pengajuan->posisiPembimbing($user->dosen) !== null;
+    }
+
+    /** Pemeriksa kelengkapan (bawaan Operator Akademik, bisa dialihkan lewat Pengaturan) pada prodi terkait. */
+    public function periksaKelengkapan(User $user, Pengajuan $pengajuan): bool
+    {
+        return HakAkses::bolehPadaProdi($user, TugasAdministrasi::PeriksaKelengkapan, $pengajuan->prodi_id);
+    }
+
+    public function validasiSuratBalasan(User $user, Pengajuan $pengajuan): bool
+    {
+        return HakAkses::bolehPadaProdi($user, TugasAdministrasi::ValidasiSuratBalasan, $pengajuan->prodi_id);
+    }
+
+    /** Mencatat SK resmi (jalur offline). */
+    public function catatSk(User $user, Pengajuan $pengajuan): bool
+    {
+        return HakAkses::bolehPadaProdi($user, TugasAdministrasi::CatatSk, $pengajuan->prodi_id);
+    }
+
+    /** Pembatalan pengajuan: pemilik (mahasiswa) atau pemeriksa kelengkapan. */
+    public function batalkan(User $user, Pengajuan $pengajuan): bool
+    {
+        return $this->milik($user, $pengajuan) || $this->periksaKelengkapan($user, $pengajuan);
     }
 }

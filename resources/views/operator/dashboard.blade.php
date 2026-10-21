@@ -2,7 +2,7 @@
 
 @section('title', 'Operator Akademik')
 @section('page-title', 'Operator Akademik')
-@section('page-subtitle', 'Verifikasi pengajuan, penerbitan SK TA, dan pemrosesan surat KP')
+@section('page-subtitle', 'Verifikasi pengajuan, surat pengantar/balasan, SK TA, sidang, dan surat KP')
 
 @section('content')
 <div class="space-y-6">
@@ -12,14 +12,17 @@
         </div>
     @endif
 
-    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-7">
         @foreach ([
             ['Menunggu verifikasi', $ringkasan['verifikasi'], ['status' => 'diajukan']],
             ['Siap diproses / SK', $ringkasan['siap_proses'], ['status' => 'disetujui']],
             ['Perlu revisi mahasiswa', $ringkasan['perlu_revisi'], ['status' => 'perlu_revisi']],
             ['Surat KP berjalan', $ringkasan['surat'], null],
+            ['Surat pengantar menunggu diperiksa', $ringkasan['pengantar'], ['jenis' => 'ta']],
+            ['Surat balasan menunggu validasi', $ringkasan['balasan'], ['jenis' => 'ta']],
+            ['Pengajuan sidang menunggu verifikasi', $ringkasan['sidang'], 'sidang'],
         ] as [$label, $jumlah, $tautan])
-            <a @if ($tautan) href="{{ route('operator.dashboard', $tautan) }}" @else href="#surat-kp" @endif class="mhs-card p-5 transition hover:bg-white/90">
+            <a @if ($tautan === 'sidang') href="{{ route('sidang.index', ['status' => 'diajukan']) }}" @elseif ($tautan) href="{{ route('operator.dashboard', $tautan) }}" @else href="#surat-kp" @endif class="mhs-card p-5 transition hover:bg-white/90">
                 <p class="mhs-eyebrow">{{ $label }}</p>
                 <p class="mt-2 text-3xl font-semibold text-ink-900">{{ $jumlah }}</p>
             </a>
@@ -72,8 +75,16 @@
                             <td class="px-4 py-3"><p class="font-medium text-ink-900">{{ $p->mahasiswa->nama }}</p><p class="text-xs text-ink-500">{{ $p->mahasiswa->nim }} &middot; {{ $p->prodi->kode }}</p></td>
                             <td class="px-4 py-3 text-ink-800">{{ $p->jenis->singkat() }}</td>
                             <td class="max-w-xs truncate px-4 py-3 text-ink-800" title="{{ $p->judulTampil() }}">{{ $p->judulTampil() }}</td>
-                            <td class="px-4 py-3 text-ink-800">{{ $p->dospem?->nama ?? '-' }}</td>
-                            <td class="px-4 py-3">@include('partials.status-badge', ['status' => $p->status])</td>
+                            <td class="px-4 py-3 text-ink-800">{{ $p->dospem?->nama ?? '-' }}@if ($p->dospem2)<span class="block text-xs text-ink-500">{{ $p->dospem2->nama }}</span>@endif</td>
+                            <td class="px-4 py-3">
+                                @include('partials.status-badge', ['status' => $p->status])
+                                @if ($p->suratPengantar)
+                                    <p class="mt-1 text-xs text-ink-600">Surat pengantar: {{ $p->suratPengantar->status->label() }}</p>
+                                @endif
+                                @if ($p->suratBalasan)
+                                    <p class="text-xs text-ink-600">Surat balasan: {{ $p->suratBalasan->status->label() }}</p>
+                                @endif
+                            </td>
                             <td class="px-4 py-3 text-right"><a href="{{ route('pengajuan.show', $p) }}" class="text-sm font-medium text-ink-900 underline">Buka</a></td>
                         </tr>
                     @empty

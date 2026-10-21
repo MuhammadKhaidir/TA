@@ -5,11 +5,15 @@ namespace App\Http\Controllers;
 use App\Enums\JenisPengajuan;
 use App\Enums\JenisPersyaratan;
 use App\Exceptions\WorkflowException;
+use App\Enums\StatusSidangTa;
 use App\Models\Dosen;
 use App\Models\Pengajuan;
 use App\Models\PengajuanDokumen;
 use App\Models\Pengaturan;
 use App\Models\Persyaratan;
+use App\Models\SuratBalasan;
+use App\Models\SuratPengantar;
+use App\Services\KartuKonsultasiService;
 use App\Services\PengajuanService;
 use App\Services\SkService;
 use Illuminate\Http\RedirectResponse;
@@ -25,13 +29,19 @@ class PengajuanController extends Controller
     public function __construct(private readonly PengajuanService $service) {}
 
     /** Detail pengajuan, dipakai semua peran yang berwenang; panel aksi menyesuaikan peran. */
-    public function show(Pengajuan $pengajuan, SkService $sk)
+    public function show(Pengajuan $pengajuan, SkService $sk, KartuKonsultasiService $kartu)
     {
         Gate::authorize('view', $pengajuan);
 
-        $pengajuan->load(['mahasiswa.prodi', 'prodi', 'periode', 'dospem', 'dokumens.persyaratan', 'suratKeputusan', 'riwayats.user']);
+        $pengajuan->load(['mahasiswa.prodi', 'prodi', 'periode', 'dospem', 'dospem2', 'dokumens.persyaratan', 'suratKeputusan', 'riwayats.user', 'digantikanOleh']);
 
+        $ta = $pengajuan->jenis === JenisPengajuan::Ta;
         $bisaKelola = Gate::allows('kelola', $pengajuan);
+        $surat = $ta ? $pengajuan->suratPengantar : null;
+        $balasan = $ta ? $pengajuan->suratBalasan : null;
+        $sidang = $ta ? $pengajuan->sidangs()->latest('id')->first() : null;
+        $milik = Gate::allows('milik', $pengajuan);
+        $hidup = ! $pengajuan->status->berhenti();
 
         return view('pengajuan.show', [
             'pengajuan' => $pengajuan,
@@ -41,11 +51,32 @@ class PengajuanController extends Controller
                 : collect(),
             'lampiranAktif' => Pengaturan::lampiranKpAktif(),
             'bisaUbah' => Gate::allows('ubah', $pengajuan),
-            'milik' => Gate::allows('milik', $pengajuan),
+            'milik' => $milik,
             'bisaKelola' => $bisaKelola,
             'bisaPeriksa' => Gate::allows('periksa', $pengajuan),
             'dosens' => $bisaKelola ? Dosen::query()->layakMembimbing()->with('prodi')->orderBy('nama')->get() : collect(),
-            'skKurang' => $bisaKelola && $pengajuan->siapTerbitSk() ? $sk->kekuranganKonfigurasi() : [],
+            'skKurang' => $bisaKelola && $pengajuan->siapTerbitSk() && Pengaturan::skMode() === Pengaturan::SK_WEBSITE ? $sk->kekuranganKonfigurasi() : [],
+
+            // Revisi: surat pengantar -> surat balasan -> gerbang SK
+            'skMode' => Pengaturan::skMode(),
+            'sp' => $surat,
+            'sb' => $balasan,
+            'persyaratanPengantar' => $ta ? $pengajuan->persyaratanPengantar() : collect(),
+            'isianSp' => SuratPengantar::daftarIsian(),
+            'checklistSb' => SuratBalasan::daftarChecklist(),
+            'bisaMulaiSp' => $ta && $milik && $hidup && $surat === null,
+            'bisaUbahSp' => $surat && Gate::allows('ubah', $surat),
+            'bisaPeriksaSp' => $surat && Gate::allows('periksa', $surat),
+            'bisaProsesSp' => $surat && Gate::allows('proses', $surat),
+            'bisaValidasiSb' => $balasan && Gate::allows('validasiSuratBalasan', $pengajuan) && Gate::allows('validasi', $balasan),
+            'bisaPeriksaKelengkapan' => Gate::allows('periksaKelengkapan', $pengajuan),
+            'bisaCatatSk' => $ta && Gate::allows('catatSk', $pengajuan),
+            'bisaBatalkan' => Gate::allows('batalkan', $pengajuan),
+            'gerbangTerpenuhi' => ! $ta || ! $pengajuan->gerbangSuratBalasan() || $pengajuan->suratBalasanValid(),
+            'kartuAlasanKunci' => $ta ? $kartu->alasanTerkunci($pengajuan) : null,
+            'sidang' => $sidang,
+            'bisaAjukanSidang' => $ta && $milik && $pengajuan->suratKeputusan !== null
+                && ! $pengajuan->sidangs()->whereIn('status', StatusSidangTa::nilaiAktif())->exists(),
         ]);
     }
 
@@ -98,6 +129,32 @@ class PengajuanController extends Controller
         );
     }
 
+    /** Pembatalan pengajuan yang sudah dikirim: mahasiswa pemilik atau pemeriksa kelengkapan. Alasan wajib. */
+    public function batalkanPengajuan(Request $request, Pengajuan $pengajuan): RedirectResponse
+    {
+        Gate::authorize('batalkan', $pengajuan);
+        $data = $request->validate(['alasan' => ['required', 'string', 'max:2000']], ['alasan.required' => 'Alasan pembatalan wajib diisi.']);
+
+        return $this->jalankan(
+            fn () => $this->service->batalkanPengajuan($pengajuan, Auth::user(), $data['alasan']),
+            'Pengajuan dibatalkan.',
+        );
+    }
+
+    /** Pengajuan ulang setelah dibatalkan: dibuat draft baru, yang lama menjadi "Digantikan". */
+    public function ajukanUlang(Pengajuan $pengajuan): RedirectResponse
+    {
+        Gate::authorize('milik', $pengajuan);
+
+        try {
+            $baru = $this->service->ajukanUlang($pengajuan, Auth::user());
+        } catch (WorkflowException $e) {
+            return back()->withErrors(['workflow' => $e->getMessage()]);
+        }
+
+        return redirect()->route('pengajuan.show', $baru)->with('success', 'Draft pengajuan baru dibuat dari pengajuan sebelumnya. Periksa datanya lalu lanjutkan prosesnya.');
+    }
+
     public function unggah(Request $request, Pengajuan $pengajuan, Persyaratan $persyaratan): RedirectResponse
     {
         Gate::authorize('milik', $pengajuan);
@@ -116,10 +173,21 @@ class PengajuanController extends Controller
         return $this->jalankan(fn () => $this->service->hapusDokumen($dokumen, Auth::user()), 'Dokumen dihapus.');
     }
 
-    /** Unduh dokumen: hanya pihak yang boleh melihat pengajuan (berkas disimpan di disk privat). */
+    /**
+     * Unduh dokumen: pihak yang boleh melihat pengajuan (berkas disimpan di disk privat). Dokumen surat
+     * pengantar juga boleh diunduh pelaku tugas pemeriksaan/pemrosesannya, yang belum tentu dapat membuka
+     * seluruh pengajuan (mis. Admin yang memproses surat pengantar offline).
+     */
     public function unduhDokumen(PengajuanDokumen $dokumen)
     {
-        Gate::authorize('view', $dokumen->pengajuan);
+        $pengajuan = $dokumen->pengajuan;
+        $surat = $dokumen->persyaratan?->jenis === JenisPersyaratan::TaSuratPengantar ? $pengajuan->suratPengantar : null;
+
+        abort_unless(
+            Gate::allows('view', $pengajuan)
+                || ($surat && (Gate::allows('proses', $surat) || Gate::allows('periksa', $surat))),
+            403,
+        );
         abort_unless(Storage::disk(PengajuanService::DISK)->exists($dokumen->file_path), 404, 'Berkas tidak ditemukan.');
 
         return Storage::disk(PengajuanService::DISK)->download($dokumen->file_path, $dokumen->nama_file_asli ?? basename($dokumen->file_path));

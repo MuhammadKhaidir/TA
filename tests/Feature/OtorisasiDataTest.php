@@ -70,7 +70,7 @@ class OtorisasiDataTest extends TestCase
         $dospemA = $this->buatDospem();
         $dospemB = $this->buatDospem();
         $pengajuan = $this->pengajuanTa($this->buatMahasiswa(), 'terverifikasi', null, $operator);
-        app(PengajuanService::class)->tetapkanDospem($pengajuan, $dospemA, $operator);
+        app(PengajuanService::class)->tetapkanDospem($pengajuan, $dospemA, $operator, $this->buatDospem());
 
         $this->actingAs($dospemA->user)->get(route('pengajuan.show', $pengajuan))->assertOk();
         $this->actingAs($dospemB->user)->get(route('pengajuan.show', $pengajuan))->assertForbidden();
@@ -134,7 +134,7 @@ class OtorisasiDataTest extends TestCase
         $b = $this->buatMahasiswa();
         $this->pengajuanTa($a, 'terverifikasi', null, $operator);
         $pengajuan = Pengajuan::where('mahasiswa_id', $a->id)->first();
-        app(PengajuanService::class)->tetapkanDospem($pengajuan, $dospemA, $operator);
+        app(PengajuanService::class)->tetapkanDospem($pengajuan, $dospemA, $operator, $this->buatDospem());
 
         $bimbingan = app(BimbinganService::class)->catat($a, JenisPengajuan::Ta, ['tanggal' => now()->toDateString(), 'topik' => 'Bab 1'], $this->berkasGambar(), $a->user);
 

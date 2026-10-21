@@ -230,6 +230,7 @@
                 </svg>
 
                 @auth
+                    @include('partials.lonceng-notifikasi')
                     <details class="relative shrink-0" data-dropdown>
                         <summary class="flex cursor-pointer list-none items-center gap-3 rounded-full bg-white/80 py-1.5 pl-1.5 pr-4 shadow-[0_4px_20px_rgba(152,116,63,0.12)] ring-1 ring-sand-200/80 transition hover:bg-white [&::-webkit-details-marker]:hidden">
                             <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-b from-sand-100 to-sand-200 text-sand-600 ring-1 ring-sand-300/60">

@@ -16,7 +16,7 @@ class BimbinganPolicy
         return $user->hasRole(Peran::Mahasiswa->value) && $user->mahasiswa?->id === $bimbingan->mahasiswa_id;
     }
 
-    /** Dospem yang ditetapkan pada pengajuan (jenis yang sama) milik mahasiswa tersebut. */
+    /** Pembimbing 1 atau 2 yang ditetapkan pada pengajuan (jenis yang sama) milik mahasiswa tersebut. */
     public function validasi(User $user, Bimbingan $bimbingan): bool
     {
         if (! $user->hasRole(Peran::Dospem->value) || ! $user->dosen) {
@@ -25,7 +25,7 @@ class BimbinganPolicy
 
         $pengajuan = $this->service->pengajuanTerkait($bimbingan->mahasiswa_id, $bimbingan->jenis);
 
-        return $pengajuan !== null && $pengajuan->dospem_id === $user->dosen->id;
+        return $pengajuan !== null && $pengajuan->posisiPembimbing($user->dosen) !== null;
     }
 
     /** Bukti bimbingan: pemilik atau Dospem yang berwenang. */

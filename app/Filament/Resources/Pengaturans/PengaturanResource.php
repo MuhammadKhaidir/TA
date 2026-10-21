@@ -8,6 +8,7 @@ use App\Filament\Resources\Pengaturans\Pages\ListPengaturans;
 use App\Models\Pengaturan;
 use BackedEnum;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -44,8 +45,12 @@ class PengaturanResource extends Resource
     {
         return [
             static::itemTerfilter('Penomoran dan Penandatangan SK', 'Tugas Akhir (TA)', 'kelompok', 'sk', 3),
+            static::itemTerfilter('Pengaturan Pembimbing TA', 'Tugas Akhir (TA)', 'kelompok', 'ta', 6),
+            static::itemTerfilter('Pengaturan Kartu Konsultasi', 'Tugas Akhir (TA)', 'kelompok', 'kartu', 7),
+            static::itemTerfilter('Pengaturan Sidang TA', 'Tugas Akhir (TA)', 'kelompok', 'sidang', 8),
             static::itemTerfilter('Pengumpulan Lampiran KP', 'Kerja Praktik (KP)', 'kelompok', 'kp', 5),
             static::itemTerfilter('Minimum Bimbingan', 'Sistem', 'kelompok', 'bimbingan', 1),
+            static::itemTerfilter('Hak Akses Tugas', 'Sistem', 'kelompok', 'akses', 3),
         ];
     }
 
@@ -53,8 +58,15 @@ class PengaturanResource extends Resource
     {
         return $schema->components([
             TextInput::make('kunci')->label('Kunci')->disabled()->dehydrated(false),
+            // Pengaturan dengan pilihan tetap (mis. jalur SK, pelaku tugas) memakai pilihan agar tidak bisa salah ketik.
+            Select::make('nilai')->label('Nilai')
+                ->options(fn ($record) => Pengaturan::keterangan((string) $record?->kunci)[2] ?? [])
+                ->visible(fn ($record) => isset(Pengaturan::keterangan((string) $record?->kunci)[2]))
+                ->required(fn ($record) => isset(Pengaturan::keterangan((string) $record?->kunci)[2]))
+                ->helperText(fn ($record) => Pengaturan::keterangan((string) $record?->kunci)[1] ?: null),
             TextInput::make('nilai')->label('Nilai')->maxLength(1000)
-                ->helperText(fn ($record) => Pengaturan::DAFTAR[$record?->kunci][1] ?? null),
+                ->visible(fn ($record) => ! isset(Pengaturan::keterangan((string) $record?->kunci)[2]))
+                ->helperText(fn ($record) => Pengaturan::keterangan((string) $record?->kunci)[1] ?: null),
         ]);
     }
 
@@ -62,12 +74,12 @@ class PengaturanResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('kunci')->label('Pengaturan')->formatStateUsing(fn ($state) => Pengaturan::DAFTAR[$state][0] ?? $state)->description(fn ($record) => $record->kunci),
+                TextColumn::make('kunci')->label('Pengaturan')->formatStateUsing(fn ($state) => Pengaturan::keterangan((string) $state)[0])->description(fn ($record) => $record->kunci),
                 TextColumn::make('nilai')->placeholder('Belum diisi')->limit(60),
             ])
             ->filters([
                 SelectFilter::make('kelompok')->label('Kelompok')
-                    ->options(['sk' => 'SK TA', 'bimbingan' => 'Bimbingan', 'kp' => 'KP'])
+                    ->options(Pengaturan::KELOMPOK)
                     ->query(fn ($query, array $data) => filled($data['value'] ?? null) ? $query->where('kunci', 'like', $data['value'].'.%') : $query),
 
             ])

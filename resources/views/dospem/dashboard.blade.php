@@ -12,11 +12,26 @@
         </div>
     @endif
 
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div class="mhs-card p-5"><p class="mhs-eyebrow">Mahasiswa bimbingan</p><p class="mt-2 text-3xl font-semibold text-ink-900">{{ $pengajuans->pluck('mahasiswa_id')->unique()->count() }}</p></div>
         <div class="mhs-card p-5"><p class="mhs-eyebrow">Perlu diperiksa</p><p class="mt-2 text-3xl font-semibold text-ink-900">{{ $perluDiperiksa->count() }}</p></div>
         <div class="mhs-card p-5"><p class="mhs-eyebrow">Bimbingan menunggu validasi</p><p class="mt-2 text-3xl font-semibold text-ink-900">{{ $bimbinganMenunggu->count() }}</p></div>
+        <div class="mhs-card p-5"><p class="mhs-eyebrow">Sidang menunggu persetujuan</p><p class="mt-2 text-3xl font-semibold text-ink-900">{{ $sidangMenunggu->count() }}</p></div>
     </div>
+
+    @if ($sidangMenunggu->isNotEmpty())
+        <section class="mhs-card p-6">
+            <h3 class="text-base font-semibold text-ink-900">Pengajuan sidang menunggu persetujuan Anda</h3>
+            <ul class="mt-3 divide-y divide-sand-200/80">
+                @foreach ($sidangMenunggu as $sd)
+                    <li class="flex flex-wrap items-center justify-between gap-2 py-3">
+                        <p class="text-sm text-ink-900">{{ $sd->pengajuan->mahasiswa->nama }} ({{ $sd->pengajuan->mahasiswa->nim }}) &middot; <span class="text-ink-600">{{ $sd->pengajuan->judulTampil() }}</span></p>
+                        <a href="{{ route('sidang.show', $sd) }}" class="mhs-btn-secondary">Buka</a>
+                    </li>
+                @endforeach
+            </ul>
+        </section>
+    @endif
 
     <section class="mhs-card overflow-hidden">
         <div class="border-b border-sand-200 px-5 py-4"><h3 class="text-base font-semibold text-ink-900">Pengajuan mahasiswa bimbingan</h3></div>
@@ -31,7 +46,7 @@
                             <td class="px-4 py-3"><p class="font-medium text-ink-900">{{ $p->mahasiswa->nama }}</p><p class="text-xs text-ink-500">{{ $p->mahasiswa->nim }} &middot; {{ $p->prodi->kode }}</p></td>
                             <td class="px-4 py-3">{{ $p->jenis->singkat() }}</td>
                             <td class="max-w-xs truncate px-4 py-3" title="{{ $p->judulTampil() }}">{{ $p->judulTampil() }}</td>
-                            <td class="px-4 py-3">{{ $p->status_akademik->label() }}</td>
+                            <td class="px-4 py-3">{{ $p->status_akademik->label() }}@if ($p->dospem2_id)<span class="block text-xs text-ink-500">Pembimbing {{ $p->posisiPembimbing($dosen) }} dari 2</span>@endif</td>
                             <td class="px-4 py-3">@include('partials.status-badge', ['status' => $p->status])</td>
                             <td class="px-4 py-3 text-right"><a href="{{ route('pengajuan.show', $p) }}" class="text-sm font-medium text-ink-900 underline">Buka</a></td>
                         </tr>

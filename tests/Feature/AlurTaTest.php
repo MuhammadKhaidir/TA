@@ -31,15 +31,38 @@ class AlurTaTest extends TestCase
     {
         $mhs = $this->buatMahasiswa('TI');
         $operator = $this->buatOperator();
+        $admin = $this->buatAdmin();
         $dospem = $this->buatDospem('TI');
+        $dospem2 = $this->buatDospem('TI');
 
-        // 1. Mahasiswa membuat draft, mengunggah dokumen, lalu mengirim.
+        // 1. Mahasiswa membuat draft.
         $this->actingAs($mhs->user)->post(route('mahasiswa.pengajuan.store', 'ta'), ['judul' => 'Sistem Rekomendasi Skripsi'])
             ->assertRedirect();
         $pengajuan = Pengajuan::firstOrFail();
         $this->assertSame(StatusPengajuan::Draft, $pengajuan->status);
         $this->assertSame($mhs->prodi_id, $pengajuan->prodi_id);
 
+        // 1a. Gerbang: pengajuan SK belum boleh dikirim sebelum surat pengantar selesai dan surat balasan valid.
+        $this->actingAs($mhs->user)->post(route('mahasiswa.pengajuan.kirim', $pengajuan))->assertSessionHasErrors('workflow');
+
+        // 1b. Surat pengantar: isi data, kirim; Operator memeriksa; Admin memproses offline lalu menyelesaikan.
+        $this->actingAs($mhs->user)->post(route('mahasiswa.pengantar.simpan', $pengajuan), $this->isianSuratPengantar())->assertSessionHasNoErrors();
+        $this->actingAs($mhs->user)->post(route('mahasiswa.pengantar.kirim', $pengajuan))->assertSessionHasNoErrors();
+        $surat = $pengajuan->fresh()->suratPengantar;
+        $this->actingAs($operator)->post(route('operator.pengantar.periksa', $surat))->assertSessionHasNoErrors();
+        $this->actingAs($operator)->post(route('operator.pengantar.proses', $surat))->assertForbidden(); // tugas Admin
+        $this->actingAs($admin)->post(route('operator.pengantar.proses', $surat), ['nomor_surat' => 'SP/001'])->assertSessionHasNoErrors();
+        $this->actingAs($admin)->post(route('operator.pengantar.selesai', $surat))->assertSessionHasNoErrors();
+
+        // 1c. Surat balasan: diunggah mahasiswa, divalidasi Operator dengan checklist lengkap.
+        $this->actingAs($mhs->user)->post(route('mahasiswa.balasan.unggah', $pengajuan), ['berkas' => $this->berkas('balasan.pdf')])->assertSessionHasNoErrors();
+        $balasan = $pengajuan->fresh()->suratBalasan;
+        $this->actingAs($operator)->post(route('operator.balasan.validasi', $balasan), [
+            'checklist' => array_fill_keys(array_keys(\App\Models\SuratBalasan::daftarChecklist()), 1),
+        ])->assertSessionHasNoErrors();
+        $this->assertTrue($pengajuan->fresh()->suratBalasanValid());
+
+        // 1d. Sekarang dokumen diunggah dan pengajuan SK dikirim.
         // Draft tanpa dokumen wajib tidak dapat dikirim.
         $this->actingAs($mhs->user)->post(route('mahasiswa.pengajuan.kirim', $pengajuan))->assertSessionHasErrors('workflow');
 
@@ -55,13 +78,16 @@ class AlurTaTest extends TestCase
 
         // 3. Operator verifikasi administrasi dan menetapkan dospem.
         $this->actingAs($operator)->post(route('operator.pengajuan.verifikasi', $pengajuan))->assertSessionHasNoErrors();
-        $this->actingAs($operator)->post(route('operator.pengajuan.dospem', $pengajuan), ['dosen_id' => $dospem->id])->assertSessionHasNoErrors();
+        $this->actingAs($operator)->post(route('operator.pengajuan.dospem', $pengajuan), ['dosen_id' => $dospem->id])->assertSessionHasErrors('workflow'); // Pembimbing 2 wajib
+        $this->actingAs($operator)->post(route('operator.pengajuan.dospem', $pengajuan), ['dosen_id' => $dospem->id, 'dosen2_id' => $dospem2->id])->assertSessionHasNoErrors();
         $pengajuan->refresh();
         $this->assertSame(StatusAdministrasi::Terverifikasi, $pengajuan->status_administrasi);
         $this->assertSame(StatusPengajuan::Diajukan, $pengajuan->status, 'Belum disetujui akademik, jadi belum Disetujui.');
 
-        // 4. Dospem menyetujui secara akademik -> status gabungan Disetujui.
+        // 4. Pembimbing 1 dan 2 sama-sama menyetujui -> status gabungan Disetujui.
         $this->actingAs($dospem->user)->post(route('dospem.pengajuan.setujui', $pengajuan))->assertSessionHasNoErrors();
+        $this->assertSame(StatusPengajuan::Diajukan, $pengajuan->fresh()->status, 'Baru satu pembimbing yang setuju.');
+        $this->actingAs($dospem2->user)->post(route('dospem.pengajuan.setujui', $pengajuan))->assertSessionHasNoErrors();
         $pengajuan->refresh();
         $this->assertSame(StatusAkademik::Disetujui, $pengajuan->status_akademik);
         $this->assertSame(StatusPengajuan::Disetujui, $pengajuan->status);
@@ -128,7 +154,7 @@ class AlurTaTest extends TestCase
         $dospem = $this->buatDospem();
         $operator = $this->buatOperator();
         $pengajuan = $this->pengajuanTa($mhs, 'terverifikasi', $dospem, $operator);
-        app(PengajuanService::class)->tetapkanDospem($pengajuan, $dospem, $operator);
+        app(PengajuanService::class)->tetapkanDospem($pengajuan, $dospem, $operator, $this->buatDospem());
 
         $this->actingAs($dospem->user)->post(route('dospem.pengajuan.revisi', $pengajuan), ['catatan' => 'Latar belakang perlu diperdalam.'])
             ->assertSessionHasNoErrors();
@@ -192,10 +218,14 @@ class AlurTaTest extends TestCase
         $nonaktif->update(['aktif' => false]);
         $tanpaAkun = Dosen::create(['nip' => '19700101', 'nama' => 'Dosen Tanpa Akun', 'prodi_id' => $this->prodi()->id, 'aktif' => true]);
 
+        $sah = $this->buatDospem();
         foreach ([$nonaktif, $tanpaAkun] as $dosen) {
-            $this->actingAs($operator)->post(route('operator.pengajuan.dospem', $pengajuan), ['dosen_id' => $dosen->id])->assertSessionHasErrors('workflow');
+            // Tidak sah sebagai Pembimbing 1 maupun Pembimbing 2.
+            $this->actingAs($operator)->post(route('operator.pengajuan.dospem', $pengajuan), ['dosen_id' => $dosen->id, 'dosen2_id' => $sah->id])->assertSessionHasErrors('workflow');
+            $this->actingAs($operator)->post(route('operator.pengajuan.dospem', $pengajuan), ['dosen_id' => $sah->id, 'dosen2_id' => $dosen->id])->assertSessionHasErrors('workflow');
         }
         $this->assertNull($pengajuan->fresh()->dospem_id);
+        $this->assertNull($pengajuan->fresh()->dospem2_id);
     }
 
     public function test_pergantian_dospem_mengulang_persetujuan_akademik(): void
@@ -206,10 +236,12 @@ class AlurTaTest extends TestCase
         $this->assertSame(StatusPengajuan::Disetujui, $pengajuan->status);
 
         $baru = $this->buatDospem();
-        $this->actingAs($operator)->post(route('operator.pengajuan.dospem', $pengajuan), ['dosen_id' => $baru->id])->assertSessionHasNoErrors();
+        $this->actingAs($operator)->post(route('operator.pengajuan.dospem', $pengajuan), ['dosen_id' => $baru->id, 'dosen2_id' => $pengajuan->dospem2_id])->assertSessionHasNoErrors();
 
         $pengajuan->refresh();
         $this->assertSame($baru->id, $pengajuan->dospem_id);
+        $this->assertNull($pengajuan->setuju_dospem1_pada);
+        $this->assertNull($pengajuan->setuju_dospem2_pada);
         $this->assertSame(StatusAkademik::Menunggu, $pengajuan->status_akademik);
         $this->assertSame(StatusPengajuan::Diajukan, $pengajuan->status);
     }

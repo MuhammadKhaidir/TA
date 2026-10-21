@@ -10,8 +10,13 @@ class SuratKeputusan extends Model
     protected $table = 'surat_keputusans';
 
     protected $fillable = [
-        'pengajuan_id', 'template_sk_id', 'nomor', 'tanggal', 'file_path', 'isi_html', 'diterbitkan_oleh',
+        'pengajuan_id', 'template_sk_id', 'nomor', 'sumber', 'tanggal', 'file_path', 'isi_html', 'diterbitkan_oleh',
     ];
+
+    public function dicatatOffline(): bool
+    {
+        return $this->sumber === 'offline';
+    }
 
     protected function casts(): array
     {

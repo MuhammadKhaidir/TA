@@ -31,6 +31,32 @@ class KonfigurasiAwalSeeder extends Seeder
             ['deskripsi' => 'Contoh awal. Prosedur KP masih akan ditetapkan kampus.', 'wajib' => false, 'urutan' => 1],
         );
 
+        // Revisi PDF: dokumen Kumpulan A pada surat pengantar TA (8 dokumen). NAMA DI BAWAH HANYA PENGISI TEMPAT:
+        // ganti dengan nama dokumen sesuai PDF lewat menu "Dokumen Surat Pengantar TA" di panel Admin.
+        foreach (range(1, 8) as $i) {
+            Persyaratan::firstOrCreate(
+                ['jenis' => 'ta_surat_pengantar', 'nama' => "Dokumen Kumpulan A nomor {$i} (ganti dengan nama dokumen sesuai ketentuan)"],
+                ['deskripsi' => 'Contoh awal. Nama dan keterangan dokumen belum ditetapkan di sini; Admin menyesuaikannya.', 'wajib' => true, 'urutan' => $i],
+            );
+        }
+
+        // Dokumen pengajuan sidang TA (4 dokumen). Dua dokumen pertama ditautkan otomatis oleh sistem; dua lainnya
+        // diunggah mahasiswa (nama pengisi tempat, sesuaikan dengan ketentuan).
+        Persyaratan::firstOrCreate(
+            ['jenis' => 'ta_sidang', 'nama' => 'SK TA yang sudah terbit'],
+            ['deskripsi' => 'Ditautkan otomatis dari SK TA mahasiswa.', 'wajib' => true, 'urutan' => 1, 'tautan_otomatis' => Persyaratan::TAUTAN_SK_TA],
+        );
+        Persyaratan::firstOrCreate(
+            ['jenis' => 'ta_sidang', 'nama' => 'Kartu konsultasi'],
+            ['deskripsi' => 'Ditautkan otomatis: PDF disusun dari catatan bimbingan.', 'wajib' => true, 'urutan' => 2, 'tautan_otomatis' => Persyaratan::TAUTAN_KARTU_KONSULTASI],
+        );
+        foreach ([3, 4] as $i) {
+            Persyaratan::firstOrCreate(
+                ['jenis' => 'ta_sidang', 'nama' => "Dokumen sidang nomor {$i} (ganti dengan nama dokumen sesuai ketentuan)"],
+                ['deskripsi' => 'Contoh awal. Dokumen yang diunggah mahasiswa; Admin menyesuaikan namanya.', 'wajib' => true, 'urutan' => $i],
+            );
+        }
+
         foreach ([
             ['Surat pengantar atau persetujuan tempat KP', 'Saat laporan diserahkan'],
             ['Surat keterangan selesai KP', 'Setelah KP selesai (jika diwajibkan)'],

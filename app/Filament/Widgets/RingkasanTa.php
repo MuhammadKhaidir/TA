@@ -5,7 +5,11 @@ namespace App\Filament\Widgets;
 use App\Enums\JenisPengajuan;
 use App\Enums\StatusAdministrasi;
 use App\Enums\StatusPengajuan;
+use App\Enums\StatusSidangTa;
+use App\Enums\StatusSuratPengantar;
 use App\Models\Pengajuan;
+use App\Models\SidangTa;
+use App\Models\SuratPengantar;
 use App\Models\SuratKeputusan;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -30,6 +34,10 @@ class RingkasanTa extends StatsOverviewWidget
             Stat::make('Siap terbit SK', $ta()->where('status', StatusPengajuan::Disetujui->value)->count())
                 ->description('Sudah diverifikasi dan disetujui')->color('info'),
             Stat::make('SK TA terbit', SuratKeputusan::query()->count())->color('success'),
+            Stat::make('Surat pengantar siap diproses', SuratPengantar::query()->where('status', StatusSuratPengantar::Lengkap->value)->count())
+                ->description('Sudah dinyatakan lengkap Operator')->color('warning'),
+            Stat::make('Sidang menunggu jadwal', SidangTa::query()->where('status', StatusSidangTa::Disetujui->value)->count())
+                ->description('Disetujui seluruh pembimbing')->color('info'),
         ];
     }
 }

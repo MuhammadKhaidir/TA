@@ -33,9 +33,16 @@ class Dosen extends Model
         return $this->belongsTo(Prodi::class);
     }
 
+    /** Pengajuan yang dibimbingnya sebagai Pembimbing 1. */
     public function pengajuans(): HasMany
     {
         return $this->hasMany(Pengajuan::class, 'dospem_id');
+    }
+
+    /** Pengajuan yang dibimbingnya sebagai Pembimbing 2. */
+    public function pengajuansKedua(): HasMany
+    {
+        return $this->hasMany(Pengajuan::class, 'dospem2_id');
     }
 
     /**

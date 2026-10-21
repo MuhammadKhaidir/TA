@@ -8,6 +8,9 @@ use App\Enums\StatusAdministrasi;
 use App\Enums\StatusAkademik;
 use App\Enums\StatusBimbingan;
 use App\Enums\StatusPengajuan;
+use App\Enums\StatusSidangTa;
+use App\Enums\StatusSuratBalasan;
+use App\Enums\StatusSuratPengantar;
 use App\Enums\StatusSurat;
 use App\Models\Bimbingan;
 use App\Models\JenisSurat;
@@ -16,7 +19,10 @@ use App\Models\Pengaturan;
 use App\Models\PeriodeAkademik;
 use App\Models\Persyaratan;
 use App\Models\Prodi;
+use App\Models\SidangTa;
 use App\Models\StrukturLaporan;
+use App\Models\SuratBalasan;
+use App\Models\SuratPengantar;
 use App\Models\SuratPermohonan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -34,7 +40,7 @@ class DashboardController extends Controller
 
         $terbaru = fn (JenisPengajuan $jenis) => $mahasiswa->pengajuans()
             ->where('jenis', $jenis->value)
-            ->with(['dospem', 'dokumens.persyaratan', 'suratKeputusan', 'suratPermohonans.jenisSurat'])
+            ->with(['dospem', 'dospem2', 'dokumens.persyaratan', 'suratKeputusan', 'suratPermohonans.jenisSurat', 'suratPengantar', 'suratBalasan'])
             ->latest('id')
             ->first();
 
@@ -45,6 +51,7 @@ class DashboardController extends Controller
             'mahasiswa' => $mahasiswa,
             'ta' => $ta,
             'kp' => $kp,
+            'sidangTa' => $ta ? $ta->sidangs()->latest('id')->first() : null,
             'persyaratanTa' => Persyaratan::berlakuUntuk(JenisPersyaratan::TaPengajuan, $mahasiswa->prodi_id)->get(),
             'persyaratanKp' => Persyaratan::berlakuUntuk(JenisPersyaratan::KpPengajuan, $mahasiswa->prodi_id)->get(),
             'lampiranKp' => Persyaratan::berlakuUntuk(JenisPersyaratan::KpLampiran, $mahasiswa->prodi_id)->get(),
@@ -73,9 +80,19 @@ class DashboardController extends Controller
             ->latest('updated_at')
             ->get();
 
-        $perluDiperiksa = $pengajuans->filter(
-            fn (Pengajuan $p) => $p->status === StatusPengajuan::Diajukan && $p->status_akademik === StatusAkademik::Menunggu
-        );
+        // Pembimbing 1 dan 2 menyetujui sendiri-sendiri: hanya yang masih ditunggu darinya yang tampil di sini.
+        $perluDiperiksa = $pengajuans->filter(fn (Pengajuan $p) => $dosen && $p->menungguPersetujuan($dosen));
+
+        $sidangMenunggu = SidangTa::query()->dapatDilihatOleh($user)
+            ->where('status', StatusSidangTa::Terverifikasi->value)
+            ->with(['pengajuan.mahasiswa'])
+            ->get()
+            ->filter(function (SidangTa $s) use ($dosen) {
+                $posisi = $s->pengajuan->posisiPembimbing($dosen);
+
+                return $posisi !== null && ($posisi === 1 ? $s->setuju_dospem1_pada : $s->setuju_dospem2_pada) === null;
+            })
+            ->values();
 
         $bimbinganMenunggu = $dosen
             ? Bimbingan::query()->with('mahasiswa')
@@ -87,7 +104,7 @@ class DashboardController extends Controller
                 ->values()
             : collect();
 
-        return view('dospem.dashboard', compact('dosen', 'pengajuans', 'perluDiperiksa', 'bimbinganMenunggu'));
+        return view('dospem.dashboard', compact('dosen', 'pengajuans', 'perluDiperiksa', 'bimbinganMenunggu', 'sidangMenunggu'));
     }
 
     public function operator(Request $request)
@@ -104,14 +121,14 @@ class DashboardController extends Controller
 
         $dasar = Pengajuan::query()->dapatDilihatOleh($user);
 
-        $daftar = (clone $dasar)->with(['mahasiswa', 'prodi', 'dospem', 'periode'])
+        $daftar = (clone $dasar)->with(['mahasiswa', 'prodi', 'dospem', 'dospem2', 'periode', 'suratPengantar', 'suratBalasan'])
             ->when($filter['jenis'] ?? null, fn ($q, $v) => $q->where('jenis', $v))
             ->when($filter['prodi_id'] ?? null, fn ($q, $v) => $q->where('prodi_id', $v))
             ->when($filter['periode_id'] ?? null, fn ($q, $v) => $q->where('periode_akademik_id', $v))
             // Tanpa filter status: tampilkan yang masih berjalan; arsip = status "selesai".
             ->when($filter['status'] ?? null,
                 fn ($q, $v) => $q->where('status', $v),
-                fn ($q) => $q->where('status', '!=', StatusPengajuan::Selesai->value))
+                fn ($q) => $q->whereNotIn('status', [StatusPengajuan::Selesai->value, ...StatusPengajuan::nilaiBerhenti()]))
             ->when($filter['q'] ?? null, fn ($q, $v) => $q->whereHas('mahasiswa', fn ($m) => $m
                 ->where('nama', 'like', "%{$v}%")->orWhere('nim', 'like', "%{$v}%")))
             ->orderByRaw("case status when 'diajukan' then 0 when 'disetujui' then 1 when 'perlu_revisi' then 2 else 3 end")
@@ -127,12 +144,18 @@ class DashboardController extends Controller
             ->orderBy('created_at')
             ->get();
 
+        $cakupanProdi = fn ($q) => $q->when($cakupan !== null, fn ($x) => $x->whereHas('pengajuan', fn ($p) => $p->whereIn('prodi_id', $cakupan)));
+        $sidangMenunggu = $cakupanProdi(SidangTa::query()->where('status', StatusSidangTa::Diajukan->value))->count();
+
         $ringkasan = [
             'verifikasi' => (clone $dasar)->where('status', StatusPengajuan::Diajukan->value)
                 ->where('status_administrasi', StatusAdministrasi::Menunggu->value)->count(),
             'siap_proses' => (clone $dasar)->where('status', StatusPengajuan::Disetujui->value)->count(),
             'perlu_revisi' => (clone $dasar)->where('status', StatusPengajuan::PerluRevisi->value)->count(),
             'surat' => $surats->count(),
+            'pengantar' => $cakupanProdi(SuratPengantar::query()->where('status', StatusSuratPengantar::Diajukan->value))->count(),
+            'balasan' => $cakupanProdi(SuratBalasan::query()->where('status', StatusSuratBalasan::Menunggu->value))->count(),
+            'sidang' => $sidangMenunggu,
         ];
 
         return view('operator.dashboard', [

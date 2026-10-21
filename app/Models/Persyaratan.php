@@ -11,7 +11,21 @@ class Persyaratan extends Model
 {
     protected $table = 'persyaratans';
 
-    protected $fillable = ['jenis', 'nama', 'deskripsi', 'wajib', 'waktu_penyerahan', 'urutan', 'aktif', 'prodi_id'];
+    /** Dokumen sidang yang ditautkan otomatis dari data sistem (tidak diunggah mahasiswa). */
+    public const TAUTAN_SK_TA = 'sk_ta';
+
+    public const TAUTAN_KARTU_KONSULTASI = 'kartu_konsultasi';
+
+    protected $fillable = ['jenis', 'nama', 'deskripsi', 'wajib', 'waktu_penyerahan', 'tautan_otomatis', 'urutan', 'aktif', 'prodi_id'];
+
+    /** @return array<string, string> */
+    public static function opsiTautan(): array
+    {
+        return [
+            self::TAUTAN_SK_TA => 'SK TA yang sudah terbit',
+            self::TAUTAN_KARTU_KONSULTASI => 'Kartu konsultasi (PDF dibuat otomatis)',
+        ];
+    }
 
     protected function casts(): array
     {

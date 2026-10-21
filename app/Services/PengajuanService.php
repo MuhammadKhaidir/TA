@@ -7,6 +7,7 @@ use App\Enums\JenisPersyaratan;
 use App\Enums\StatusAdministrasi;
 use App\Enums\StatusAkademik;
 use App\Enums\StatusPengajuan;
+use App\Enums\TugasAdministrasi;
 use App\Exceptions\WorkflowException;
 use App\Models\Dosen;
 use App\Models\LogAktivitas;
@@ -17,6 +18,7 @@ use App\Models\Pengaturan;
 use App\Models\PeriodeAkademik;
 use App\Models\Persyaratan;
 use App\Models\User;
+use App\Support\HakAkses;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -29,10 +31,16 @@ use Illuminate\Support\Facades\Storage;
  * dipisah: status_administrasi (Operator Akademik) dan status_akademik (Dospem).
  * Service ini hanya memeriksa kondisi data/status; pemeriksaan "siapa boleh"
  * dilakukan oleh PengajuanPolicy di controller.
+ *
+ * Revisi PDF: pengajuan TA kini punya Pembimbing 1 dan 2 yang masing-masing harus
+ * menyetujui [K-07], dikirim hanya setelah surat balasan valid, dan dapat dibatalkan
+ * lalu diajukan ulang (status Dibatalkan / Digantikan).
  */
 class PengajuanService
 {
     public const DISK = 'local'; // disk privat: berkas hanya terbuka lewat route terotorisasi
+
+    public function __construct(private readonly NotifikasiService $notifikasi) {}
 
     public function buat(Mahasiswa $mahasiswa, JenisPengajuan $jenis, array $data, User $actor): Pengajuan
     {
@@ -47,6 +55,11 @@ class PengajuanService
 
             if ($mahasiswa->pengajuanBerjalan($jenis)) {
                 throw new WorkflowException("Anda masih memiliki pengajuan {$jenis->singkat()} yang sedang berjalan.");
+            }
+            // Cegah duplikasi: SK TA yang sudah terbit tidak diganti dengan pengajuan TA baru.
+            if ($jenis === JenisPengajuan::Ta
+                && $mahasiswa->pengajuans()->where('jenis', JenisPengajuan::Ta->value)->whereHas('suratKeputusan')->exists()) {
+                throw new WorkflowException('SK TA Anda sudah terbit, pengajuan TA baru tidak dapat dibuat.');
             }
 
             $pengajuan = new Pengajuan(Arr::only($data, (new Pengajuan)->getFillable()));
@@ -110,9 +123,16 @@ class PengajuanService
     public function hapusDokumen(PengajuanDokumen $dokumen, User $actor): void
     {
         $pengajuan = $dokumen->pengajuan;
-        $lampiran = $dokumen->persyaratan?->jenis === JenisPersyaratan::KpLampiran;
+        $jenisDokumen = $dokumen->persyaratan?->jenis;
 
-        if (! $lampiran && ! $pengajuan->bolehDiubahMahasiswa()) {
+        if ($jenisDokumen === JenisPersyaratan::KpLampiran) {
+            // Lampiran laporan KP boleh dihapus pemiliknya kapan pun (aturan lama KP, tidak diubah).
+        } elseif ($jenisDokumen === JenisPersyaratan::TaSuratPengantar) {
+            $surat = $pengajuan->suratPengantar;
+            if (! $surat || ! $surat->status->bolehDiubahMahasiswa()) {
+                throw new WorkflowException('Dokumen surat pengantar tidak dapat dihapus karena surat sedang diproses.');
+            }
+        } elseif (! $pengajuan->bolehDiubahMahasiswa()) {
             throw new WorkflowException('Dokumen tidak dapat dihapus karena pengajuan sedang diproses.');
         }
 
@@ -131,6 +151,11 @@ class PengajuanService
                 throw new WorkflowException("Pengajuan tidak dapat dikirim karena berstatus \"{$p->status->label()}\".");
             }
 
+            // Gerbang: pengajuan SK TA baru boleh dikirim setelah surat balasan dinyatakan valid.
+            if ($p->jenis === JenisPengajuan::Ta && $p->gerbangSuratBalasan() && ! $p->suratBalasanValid()) {
+                throw new WorkflowException('Pengajuan SK dapat dikirim setelah surat balasan Anda dinyatakan valid oleh Operator.');
+            }
+
             $this->pastikanDataLengkap($p);
 
             $ulang = $p->diajukan_pada !== null;
@@ -141,6 +166,9 @@ class PengajuanService
             }
             if ($p->status_akademik === StatusAkademik::Revisi) {
                 $p->status_akademik = StatusAkademik::Menunggu;
+                // Pemeriksaan akademik diulang dari awal: persetujuan sebelumnya tidak berlaku lagi.
+                $p->setuju_dospem1_pada = null;
+                $p->setuju_dospem2_pada = null;
             }
             $p->diajukan_pada ??= now();
 
@@ -152,6 +180,14 @@ class PengajuanService
                 $ulang ? 'pengajuan_diajukan_ulang' : 'pengajuan_diajukan',
                 $ulang ? 'Pengajuan diperbaiki dan diajukan ulang.' : 'Pengajuan dikirim untuk diverifikasi.',
                 $p,
+            );
+
+            $this->beri(
+                HakAkses::pelaku(TugasAdministrasi::PeriksaKelengkapan, $p->prodi_id),
+                "Pengajuan {$p->jenis->singkat()} menunggu verifikasi",
+                "{$p->mahasiswa->nama} ({$p->mahasiswa->nim}) mengirim pengajuan {$p->jenis->singkat()}.",
+                $p,
+                $actor,
             );
         });
     }
@@ -176,6 +212,64 @@ class PengajuanService
     }
 
     // ------------------------------------------------------------------
+    // Pembatalan dan pengajuan ulang (pengajuan yang sudah pernah dikirim)
+    // ------------------------------------------------------------------
+
+    /**
+     * Membatalkan pengajuan yang sudah dikirim tetapi belum selesai (SK belum terbit).
+     * Dilakukan mahasiswa pemilik atau Operator; alasan wajib dan tercatat di riwayat.
+     */
+    public function batalkanPengajuan(Pengajuan $pengajuan, User $actor, string $alasan): Pengajuan
+    {
+        return $this->dalamTransaksi($pengajuan, function (Pengajuan $p) use ($actor, $alasan) {
+            if (! in_array($p->status, [StatusPengajuan::Diajukan, StatusPengajuan::PerluRevisi, StatusPengajuan::Disetujui], true)) {
+                throw new WorkflowException("Pengajuan berstatus \"{$p->status->label()}\" tidak dapat dibatalkan.");
+            }
+            if (blank($alasan)) {
+                throw new WorkflowException('Alasan pembatalan wajib diisi.');
+            }
+
+            $p->forceFill([
+                'status' => StatusPengajuan::Dibatalkan,
+                'dibatalkan_pada' => now(),
+                'alasan_batal' => trim($alasan),
+            ])->save();
+
+            LogAktivitas::catat($actor, 'pengajuan_dibatalkan', trim($alasan), $p);
+
+            $penerima = $actor->id === $p->mahasiswa->user_id
+                ? HakAkses::pelaku(TugasAdministrasi::PeriksaKelengkapan, $p->prodi_id)
+                : [$p->mahasiswa->user];
+            $this->beri($penerima, "Pengajuan {$p->jenis->singkat()} dibatalkan", trim($alasan), $p, $actor);
+        });
+    }
+
+    /**
+     * Mengajukan ulang pengajuan yang dibatalkan: dibuat draft baru (judul/data dibawa), pengajuan lama
+     * menjadi Digantikan dan menunjuk yang baru. Tidak bisa dua kali dan tidak bisa bila masih ada
+     * pengajuan berjalan, sehingga tidak ada pengajuan ganda.
+     */
+    public function ajukanUlang(Pengajuan $lama, User $actor): Pengajuan
+    {
+        return DB::transaction(function () use ($lama, $actor) {
+            $mahasiswa = Mahasiswa::query()->whereKey($lama->mahasiswa_id)->lockForUpdate()->firstOrFail();
+            $p = Pengajuan::query()->whereKey($lama->id)->lockForUpdate()->firstOrFail();
+
+            if ($p->status !== StatusPengajuan::Dibatalkan || $p->digantikan_oleh_id !== null) {
+                throw new WorkflowException('Hanya pengajuan yang dibatalkan dan belum digantikan yang dapat diajukan ulang.');
+            }
+
+            $baru = $this->buat($mahasiswa, $p->jenis, $p->only($p->getFillable()), $actor);
+
+            $p->forceFill(['status' => StatusPengajuan::Digantikan, 'digantikan_oleh_id' => $baru->id])->save();
+            LogAktivitas::catat($actor, 'pengajuan_digantikan', 'Pengajuan diganti dengan pengajuan ulang yang baru.', $p);
+            LogAktivitas::catat($actor, 'pengajuan_ulang_dibuat', "Draft ini adalah pengajuan ulang dari pengajuan #{$p->id}.", $baru);
+
+            return $baru;
+        });
+    }
+
+    // ------------------------------------------------------------------
     // Operator Akademik — verifikasi administrasi, penetapan dospem, arsip
     // ------------------------------------------------------------------
 
@@ -196,6 +290,7 @@ class PengajuanService
             $p->save();
 
             LogAktivitas::catat($actor, 'verifikasi_administrasi', 'Kelengkapan administrasi diverifikasi.', $p);
+            $this->beri([$p->mahasiswa->user], "Administrasi {$p->jenis->singkat()} diverifikasi", 'Kelengkapan administrasi pengajuan Anda sudah diverifikasi.', $p, $actor);
         });
     }
 
@@ -213,12 +308,18 @@ class PengajuanService
             $p->save();
 
             LogAktivitas::catat($actor, 'revisi_administrasi', $catatan, $p);
+            $this->beri([$p->mahasiswa->user], "Pengajuan {$p->jenis->singkat()} perlu diperbaiki", $catatan, $p, $actor);
         });
     }
 
-    public function tetapkanDospem(Pengajuan $pengajuan, Dosen $dosen, User $actor): Pengajuan
+    /**
+     * Menetapkan pembimbing. Untuk TA: Pembimbing 1 dan Pembimbing 2 dipilih dari master dosen dan harus
+     * dosen yang berbeda; Pembimbing 2 wajib selama pengaturan `ta.pembimbing_kedua_wajib` menyatakannya.
+     * KP tetap memakai satu pembimbing. Pergantian pembimbing mengulang persetujuan akademik dari awal.
+     */
+    public function tetapkanDospem(Pengajuan $pengajuan, Dosen $dosen, User $actor, ?Dosen $dosen2 = null): Pengajuan
     {
-        return $this->dalamTransaksi($pengajuan, function (Pengajuan $p) use ($dosen, $actor) {
+        return $this->dalamTransaksi($pengajuan, function (Pengajuan $p) use ($dosen, $dosen2, $actor) {
             $boleh = [StatusPengajuan::Diajukan, StatusPengajuan::PerluRevisi, StatusPengajuan::Disetujui];
             if (! in_array($p->status, $boleh, true)) {
                 throw new WorkflowException("Dosen pembimbing tidak dapat ditetapkan pada status \"{$p->status->label()}\".");
@@ -226,19 +327,49 @@ class PengajuanService
             if (! $dosen->layakMembimbing()) {
                 throw new WorkflowException('Dosen tersebut tidak valid sebagai pembimbing (tidak aktif atau belum memiliki akun Dospem).');
             }
-            if ($p->dospem_id === $dosen->id) {
+
+            if ($p->jenis === JenisPengajuan::Ta) {
+                if ($dosen2 === null && Pengaturan::pembimbingKeduaWajib()) {
+                    throw new WorkflowException('Pembimbing 2 wajib ditetapkan.');
+                }
+                if ($dosen2 !== null) {
+                    if ($dosen2->id === $dosen->id) {
+                        throw new WorkflowException('Pembimbing 1 dan Pembimbing 2 harus dosen yang berbeda.');
+                    }
+                    if (! $dosen2->layakMembimbing()) {
+                        throw new WorkflowException('Pembimbing 2 tidak valid sebagai pembimbing (tidak aktif atau belum memiliki akun Dospem).');
+                    }
+                }
+            } elseif ($dosen2 !== null) {
+                throw new WorkflowException('Pembimbing 2 hanya berlaku untuk pengajuan Tugas Akhir.');
+            }
+
+            if ($p->dospem_id === $dosen->id && $p->dospem2_id === $dosen2?->id) {
                 return;
             }
 
             $p->dospem_id = $dosen->id;
+            $p->dospem2_id = $dosen2?->id;
             // Pembimbing baru memeriksa dari awal.
+            $p->setuju_dospem1_pada = null;
+            $p->setuju_dospem2_pada = null;
             if ($p->status_akademik !== StatusAkademik::Menunggu) {
                 $p->status_akademik = StatusAkademik::Menunggu;
             }
             $this->sinkronkan($p);
             $p->save();
 
-            LogAktivitas::catat($actor, 'tetapkan_dospem', "Dosen pembimbing ditetapkan: {$dosen->nama} (NIP {$dosen->nip}).", $p);
+            $keterangan = "Pembimbing 1: {$dosen->nama} (NIP {$dosen->nip})".($dosen2 ? "; Pembimbing 2: {$dosen2->nama} (NIP {$dosen2->nip})" : '').'.';
+            LogAktivitas::catat($actor, 'tetapkan_dospem', "Dosen pembimbing ditetapkan. {$keterangan}", $p);
+
+            $this->beri(
+                collect([$dosen->user, $dosen2?->user])->filter()->all(),
+                "Anda ditetapkan sebagai pembimbing {$p->jenis->singkat()}",
+                "{$p->mahasiswa->nama} ({$p->mahasiswa->nim}) menunggu pemeriksaan akademik Anda.",
+                $p,
+                $actor,
+            );
+            $this->beri([$p->mahasiswa->user], 'Dosen pembimbing ditetapkan', $keterangan, $p, $actor);
         });
     }
 
@@ -262,6 +393,10 @@ class PengajuanService
     // Dosen Pembimbing — pemeriksaan akademik
     // ------------------------------------------------------------------
 
+    /**
+     * Persetujuan akademik dicatat per pembimbing. Status akademik baru Disetujui setelah SEMUA
+     * pembimbing yang ditetapkan (1 dan 2) menyetujui [K-07].
+     */
     public function setujuiAkademik(Pengajuan $pengajuan, User $actor): Pengajuan
     {
         return $this->dalamTransaksi($pengajuan, function (Pengajuan $p) use ($actor) {
@@ -272,11 +407,31 @@ class PengajuanService
                 throw new WorkflowException("Persetujuan akademik tidak dapat diberikan pada status \"{$p->status->label()}\".");
             }
 
-            $p->status_akademik = StatusAkademik::Disetujui;
-            $this->sinkronkan($p);
+            $posisi = $p->posisiPembimbing($actor->dosen?->id);
+            if ($posisi === null) {
+                throw new WorkflowException('Anda bukan pembimbing pada pengajuan ini.');
+            }
+            $kolom = $posisi === 1 ? 'setuju_dospem1_pada' : 'setuju_dospem2_pada';
+            if ($p->{$kolom} !== null) {
+                throw new WorkflowException('Anda sudah menyetujui pengajuan ini.');
+            }
+
+            $p->{$kolom} = now();
+            $semua = $p->semuaPembimbingSetuju();
+            if ($semua) {
+                $p->status_akademik = StatusAkademik::Disetujui;
+                $this->sinkronkan($p);
+            }
             $p->save();
 
-            LogAktivitas::catat($actor, 'setujui_akademik', 'Pengajuan disetujui secara akademik.', $p);
+            LogAktivitas::catat($actor, 'setujui_akademik', $semua
+                ? "Pembimbing {$posisi} menyetujui; seluruh pembimbing telah menyetujui."
+                : "Pembimbing {$posisi} menyetujui; menunggu pembimbing lainnya.", $p);
+
+            if ($semua) {
+                $this->beri([$p->mahasiswa->user], "Pengajuan {$p->jenis->singkat()} disetujui secara akademik", 'Seluruh pembimbing telah menyetujui pengajuan Anda.', $p, $actor);
+                $this->beri(HakAkses::pelaku(TugasAdministrasi::PeriksaKelengkapan, $p->prodi_id), "Pengajuan {$p->jenis->singkat()} siap diproses", "{$p->mahasiswa->nama} ({$p->mahasiswa->nim}) telah disetujui seluruh pembimbing.", $p, $actor);
+            }
         });
     }
 
@@ -288,21 +443,27 @@ class PengajuanService
             if (! $p->dospem_id || ! $statusBoleh || ! $akdBoleh) {
                 throw new WorkflowException("Revisi tidak dapat diminta pada status \"{$p->status->label()}\".");
             }
+            if ($p->posisiPembimbing($actor->dosen?->id) === null) {
+                throw new WorkflowException('Anda bukan pembimbing pada pengajuan ini.');
+            }
 
             $p->status_akademik = StatusAkademik::Revisi;
+            $p->setuju_dospem1_pada = null;
+            $p->setuju_dospem2_pada = null;
             $this->sinkronkan($p);
             $p->save();
 
             LogAktivitas::catat($actor, 'revisi_akademik', $catatan, $p);
+            $this->beri([$p->mahasiswa->user], "Pengajuan {$p->jenis->singkat()} perlu direvisi", $catatan, $p, $actor);
         });
     }
 
     // ------------------------------------------------------------------
 
-    /** Turunkan status gabungan dari dua dimensi persetujuan. SK/arsip menetapkan Selesai sendiri. */
+    /** Turunkan status gabungan dari dua dimensi persetujuan. SK/arsip/pembatalan menetapkan statusnya sendiri. */
     public function sinkronkan(Pengajuan $p): void
     {
-        if ($p->status === StatusPengajuan::Selesai) {
+        if ($p->status->berhenti()) {
             return;
         }
 
@@ -320,11 +481,17 @@ class PengajuanService
     private function dalamTransaksi(Pengajuan $pengajuan, callable $aksi): Pengajuan
     {
         return DB::transaction(function () use ($pengajuan, $aksi) {
-            $segar = Pengajuan::query()->whereKey($pengajuan->id)->lockForUpdate()->firstOrFail();
+            $segar = Pengajuan::query()->whereKey($pengajuan->id)->lockForUpdate()->with(['mahasiswa.user'])->firstOrFail();
             $aksi($segar);
 
             return $segar->fresh();
         });
+    }
+
+    /** @param  iterable<User>  $penerima */
+    private function beri(iterable $penerima, string $judul, ?string $isi, Pengajuan $p, ?User $actor): void
+    {
+        $this->notifikasi->kirim($penerima, $judul, $isi, route('pengajuan.show', $p, false), $p, $actor);
     }
 
     private function pastikanDataLengkap(Pengajuan $p): void
@@ -362,6 +529,24 @@ class PengajuanService
             }
             if (! in_array($pengajuan->status, [StatusPengajuan::Disetujui, StatusPengajuan::Selesai], true)) {
                 throw new WorkflowException('Lampiran dapat diunggah setelah pengajuan KP disetujui.');
+            }
+
+            return;
+        }
+
+        if ($persyaratan->jenis === JenisPersyaratan::TaSuratPengantar) {
+            if ($pengajuan->jenis !== JenisPengajuan::Ta) {
+                throw new WorkflowException('Dokumen surat pengantar hanya untuk pengajuan Tugas Akhir.');
+            }
+            if ($pengajuan->status->berhenti()) {
+                throw new WorkflowException("Pengajuan berstatus \"{$pengajuan->status->label()}\", dokumen tidak dapat diubah.");
+            }
+            $surat = $pengajuan->suratPengantar;
+            if (! $surat) {
+                throw new WorkflowException('Simpan data surat pengantar terlebih dulu sebelum mengunggah dokumen.');
+            }
+            if (! $surat->status->bolehDiubahMahasiswa()) {
+                throw new WorkflowException("Dokumen tidak dapat diubah karena surat pengantar berstatus \"{$surat->status->label()}\".");
             }
 
             return;

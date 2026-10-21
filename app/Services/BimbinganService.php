@@ -30,7 +30,9 @@ class BimbinganService
         return Pengajuan::query()
             ->where('mahasiswa_id', $id)
             ->where('jenis', $jenis->value)
-            ->where('status', '!=', StatusPengajuan::Draft->value)
+            // Selesai (SK sudah terbit) tetap dihitung: bimbingan TA berjalan terus setelah SK. Yang dikecualikan
+            // hanya draft serta pengajuan yang dibatalkan/digantikan.
+            ->whereNotIn('status', [StatusPengajuan::Draft->value, StatusPengajuan::Dibatalkan->value, StatusPengajuan::Digantikan->value])
             ->whereNotNull('dospem_id')
             ->latest('id')
             ->first();

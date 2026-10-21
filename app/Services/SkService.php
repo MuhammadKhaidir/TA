@@ -14,6 +14,9 @@ use App\Models\SuratKeputusan;
 use App\Models\TemplateSk;
 use App\Models\User;
 use Carbon\CarbonInterface;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -28,7 +31,10 @@ use Illuminate\Support\Str;
  */
 class SkService
 {
-    public function __construct(private readonly SkPdfRenderer $renderer) {}
+    public function __construct(
+        private readonly SkPdfRenderer $renderer,
+        private readonly NotifikasiService $notifikasi,
+    ) {}
 
     /** Bagian konfigurasi yang masih harus diisi pihak kampus sebelum SK boleh terbit. */
     public function kekuranganKonfigurasi(): array
@@ -54,7 +60,7 @@ class SkService
     /** @return array<string, string> */
     public function data(Pengajuan $p, ?string $nomor = null, ?CarbonInterface $tanggal = null): array
     {
-        $p->loadMissing(['mahasiswa', 'prodi', 'dospem', 'periode']);
+        $p->loadMissing(['mahasiswa', 'prodi', 'dospem', 'dospem2', 'periode']);
         $tanggal ??= now();
         $belum = fn (string $label) => "[{$label} belum diatur]";
 
@@ -72,6 +78,8 @@ class SkService
             'judul' => (string) $p->judul,
             'dosen_pembimbing' => $p->dospem?->nama ?? $belum('dosen pembimbing'),
             'nip_pembimbing' => $p->dospem?->nip ?? '-',
+            'dosen_pembimbing_2' => $p->dospem2?->nama ?? '-',
+            'nip_pembimbing_2' => $p->dospem2?->nip ?? '-',
             'periode_akademik' => $p->periode?->nama ?? '-',
         ];
     }
@@ -99,6 +107,10 @@ class SkService
 
     public function terbitkan(Pengajuan $pengajuan, User $operator): SuratKeputusan
     {
+        if (Pengaturan::skMode() === Pengaturan::SK_OFFLINE) {
+            throw new WorkflowException('Jalur SK saat ini adalah offline: SK resmi diterbitkan di luar sistem dan dicatat nomor serta tanggalnya oleh pelaku tugas pencatatan SK.');
+        }
+
         $kurang = $this->kekuranganKonfigurasi();
         if ($kurang) {
             throw new WorkflowException('SK belum dapat diterbitkan. Lengkapi dulu pengaturan: '.implode(', ', $kurang).'.');
@@ -108,18 +120,8 @@ class SkService
 
         try {
             return DB::transaction(function () use ($pengajuan, $operator, &$jalur) {
-                $p = Pengajuan::query()->whereKey($pengajuan->id)->lockForUpdate()->firstOrFail();
-
-                if (SuratKeputusan::query()->where('pengajuan_id', $p->id)->exists()) {
-                    throw new WorkflowException('SK untuk pengajuan ini sudah pernah diterbitkan.');
-                }
-                if ($p->jenis !== JenisPengajuan::Ta
-                    || $p->status !== StatusPengajuan::Disetujui
-                    || $p->status_administrasi !== StatusAdministrasi::Terverifikasi
-                    || $p->status_akademik !== StatusAkademik::Disetujui
-                    || ! $p->dospem_id) {
-                    throw new WorkflowException('SK hanya dapat diterbitkan setelah verifikasi administrasi, persetujuan akademik, dan penetapan dosen pembimbing terpenuhi.');
-                }
+                $p = Pengajuan::query()->whereKey($pengajuan->id)->lockForUpdate()->with(['mahasiswa.user'])->firstOrFail();
+                $this->pastikanSiapTerbit($p);
 
                 $template = TemplateSk::aktif();
                 $tanggal = now();
@@ -134,6 +136,7 @@ class SkService
                     'pengajuan_id' => $p->id,
                     'template_sk_id' => $template->id,
                     'nomor' => $nomor,
+                    'sumber' => Pengaturan::SK_WEBSITE,
                     'tanggal' => $tanggal->toDateString(),
                     'file_path' => $jalur,
                     'isi_html' => $html,
@@ -144,11 +147,10 @@ class SkService
                     throw new WorkflowException('Berkas SK gagal disimpan. Tidak ada SK yang diterbitkan.');
                 }
 
-                $p->status = StatusPengajuan::Selesai;
-                $p->selesai_pada = $tanggal;
-                $p->save();
+                $this->selesaikan($p, $tanggal);
 
                 LogAktivitas::catat($operator, 'sk_diterbitkan', "SK TA nomor {$nomor} diterbitkan.", $p);
+                $this->beritahuMahasiswa($p, $nomor, $operator);
 
                 return $sk;
             });
@@ -159,6 +161,109 @@ class SkService
             }
             throw $e;
         }
+    }
+
+    /**
+     * Jalur offline [K-14]: SK resmi terbit di luar sistem; pelaku tugas CatatSk hanya mencatat nomor,
+     * tanggal, dan salinan berkasnya. Syaratnya sama dengan penerbitan dari website, termasuk gerbang
+     * surat balasan, sehingga "SK Terbit" berarti hal yang sama di kedua jalur.
+     */
+    public function catatOffline(Pengajuan $pengajuan, User $pelaku, string $nomor, CarbonInterface|string $tanggal, UploadedFile $salinan): SuratKeputusan
+    {
+        if (Pengaturan::skMode() !== Pengaturan::SK_OFFLINE) {
+            throw new WorkflowException('Jalur SK saat ini adalah penerbitan dari website. Ubah pengaturan jalur SK ke offline untuk mencatat SK resmi.');
+        }
+
+        $nomor = trim($nomor);
+        if ($nomor === '') {
+            throw new WorkflowException('Nomor SK wajib diisi.');
+        }
+
+        try {
+            $tanggal = $tanggal instanceof CarbonInterface ? Carbon::instance($tanggal) : Carbon::parse($tanggal);
+        } catch (\Throwable) {
+            throw new WorkflowException('Tanggal SK tidak valid.');
+        }
+
+        $ekstensi = strtolower($salinan->getClientOriginalExtension() ?: ($salinan->guessExtension() ?: 'pdf'));
+        $jalur = 'sk/'.$pengajuan->id.'/SK-offline-'.Str::slug(str_replace('/', '-', $nomor)).'.'.$ekstensi;
+
+        if (! Storage::disk(PengajuanService::DISK)->putFileAs('sk/'.$pengajuan->id, $salinan, basename($jalur))) {
+            throw new WorkflowException('Salinan SK gagal disimpan. SK belum dicatat.');
+        }
+
+        try {
+            return DB::transaction(function () use ($pengajuan, $pelaku, $nomor, $tanggal, $jalur) {
+                $p = Pengajuan::query()->whereKey($pengajuan->id)->lockForUpdate()->with(['mahasiswa.user'])->firstOrFail();
+                $this->pastikanSiapTerbit($p);
+
+                if (SuratKeputusan::query()->where('nomor', $nomor)->exists()) {
+                    throw new WorkflowException("Nomor SK \"{$nomor}\" sudah dipakai SK lain.");
+                }
+
+                try {
+                    $sk = SuratKeputusan::create([
+                        'pengajuan_id' => $p->id,
+                        'template_sk_id' => null,
+                        'nomor' => $nomor,
+                        'sumber' => Pengaturan::SK_OFFLINE,
+                        'tanggal' => $tanggal->toDateString(),
+                        'file_path' => $jalur,
+                        'isi_html' => '', // tidak ada isi dari template: SK resmi hanya berupa salinan berkas
+                        'diterbitkan_oleh' => $pelaku->id,
+                    ]);
+                } catch (UniqueConstraintViolationException) {
+                    throw new WorkflowException("Nomor SK \"{$nomor}\" sudah dipakai SK lain.");
+                }
+
+                $this->selesaikan($p, now());
+
+                LogAktivitas::catat($pelaku, 'sk_dicatat_offline', "SK TA nomor {$nomor} tanggal {$tanggal->format('d/m/Y')} dicatat dari SK resmi offline.", $p);
+                $this->beritahuMahasiswa($p, $nomor, $pelaku);
+
+                return $sk;
+            });
+        } catch (\Throwable $e) {
+            Storage::disk(PengajuanService::DISK)->delete($jalur);
+            throw $e;
+        }
+    }
+
+    /** Syarat yang sama untuk kedua jalur: belum ada SK, persetujuan lengkap, dan surat balasan valid. */
+    private function pastikanSiapTerbit(Pengajuan $p): void
+    {
+        if (SuratKeputusan::query()->where('pengajuan_id', $p->id)->exists()) {
+            throw new WorkflowException('SK untuk pengajuan ini sudah pernah diterbitkan.');
+        }
+        if ($p->jenis !== JenisPengajuan::Ta
+            || $p->status !== StatusPengajuan::Disetujui
+            || $p->status_administrasi !== StatusAdministrasi::Terverifikasi
+            || $p->status_akademik !== StatusAkademik::Disetujui
+            || ! $p->dospem_id) {
+            throw new WorkflowException('SK hanya dapat diterbitkan setelah verifikasi administrasi, persetujuan akademik, dan penetapan dosen pembimbing terpenuhi.');
+        }
+        if ($p->gerbangSuratBalasan() && ! $p->suratBalasanValid()) {
+            throw new WorkflowException('SK hanya dapat diterbitkan setelah surat balasan dinyatakan valid oleh Operator.');
+        }
+    }
+
+    private function selesaikan(Pengajuan $p, CarbonInterface $waktu): void
+    {
+        $p->status = StatusPengajuan::Selesai;
+        $p->selesai_pada = $waktu;
+        $p->save();
+    }
+
+    private function beritahuMahasiswa(Pengajuan $p, string $nomor, User $pelaku): void
+    {
+        $this->notifikasi->kirim(
+            [$p->mahasiswa->user],
+            'SK TA terbit',
+            "SK TA nomor {$nomor} sudah terbit. Kartu konsultasi dan pengajuan sidang kini dapat diakses.",
+            route('pengajuan.show', $p, false),
+            $p,
+            $pelaku,
+        );
     }
 
     /** Nomor urut per tahun, dikunci di dalam transaksi agar tidak ada nomor ganda atau loncat. */
