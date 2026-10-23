@@ -2,63 +2,69 @@
 
 namespace App\Enums;
 
-/**
- * Status gabungan yang dilihat semua pihak. Nilainya DITURUNKAN dari
- * status_administrasi dan status_akademik oleh PengajuanService, bukan diisi
- * langsung dari request, sehingga tidak bisa dimanipulasi dari luar.
- */
 enum StatusPengajuan: string
 {
     case Draft = 'draft';
     case Diajukan = 'diajukan';
-    case PerluRevisi = 'perlu_revisi';
+    case RevisiAdministrasi = 'revisi_administrasi';
+    case MenungguDosen = 'menunggu_dosen';
+    case RevisiAkademik = 'revisi_akademik';
     case Disetujui = 'disetujui';
-    case Selesai = 'selesai';
-    /** Dibatalkan sebelum selesai (oleh mahasiswa atau Operator); dapat diajukan ulang. */
-    case Dibatalkan = 'dibatalkan';
-    /** Sudah diganti pengajuan baru hasil "ajukan ulang". Hanya arsip. */
-    case Digantikan = 'digantikan';
+    case Diarsipkan = 'diarsipkan';
 
     public function label(): string
     {
         return match ($this) {
             self::Draft => 'Draft',
-            self::Diajukan => 'Menunggu Verifikasi',
-            self::PerluRevisi => 'Perlu Revisi',
-            self::Disetujui => 'Disetujui',
-            self::Selesai => 'Selesai',
-            self::Dibatalkan => 'Dibatalkan',
-            self::Digantikan => 'Digantikan',
+            self::Diajukan => 'Menunggu Verifikasi Administrasi',
+            self::RevisiAdministrasi => 'Revisi Administrasi',
+            self::MenungguDosen => 'Menunggu Pemeriksaan Dosen',
+            self::RevisiAkademik => 'Revisi Akademik',
+            self::Disetujui => 'Disetujui, Menunggu Dokumen Resmi',
+            self::Diarsipkan => 'Selesai dan Diarsipkan',
         };
     }
 
-    public function badgeClasses(): string
+    /** Penjelasan singkat untuk mahasiswa tentang langkah berikutnya. */
+    public function keterangan(): string
     {
         return match ($this) {
-            self::Draft => 'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-500/15',
-            self::Diajukan => 'bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-600/20',
-            self::PerluRevisi => 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-600/20',
-            self::Disetujui => 'bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-600/30',
-            self::Selesai => 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20',
-            self::Dibatalkan, self::Digantikan => 'bg-slate-100 text-slate-500 ring-1 ring-inset ring-slate-500/15',
+            self::Draft => 'Lengkapi data dan unggah semua dokumen wajib, lalu kirim pengajuan.',
+            self::Diajukan => 'Operator akademik sedang memeriksa kelengkapan administrasi.',
+            self::RevisiAdministrasi => 'Perbaiki dokumen yang ditandai revisi, lalu kirim ulang.',
+            self::MenungguDosen => 'Dosen pembimbing sedang memeriksa berkas akademik.',
+            self::RevisiAkademik => 'Perbaiki dokumen yang ditandai revisi oleh dosen, lalu kirim ulang.',
+            self::Disetujui => 'Persyaratan terpenuhi. Operator akademik sedang memproses dokumen resmi.',
+            self::Diarsipkan => 'Proses selesai. Dokumen final tersimpan di arsip digital.',
         };
     }
 
-    /** Pengajuan yang sudah berhenti (selesai, dibatalkan, atau digantikan): tidak lagi dihitung "berjalan". */
-    public function berhenti(): bool
+    public function badge(): string
     {
-        return in_array($this, [self::Selesai, self::Dibatalkan, self::Digantikan], true);
+        return match ($this) {
+            self::Draft => 'bg-slate-100 text-slate-700 ring-slate-300',
+            self::Diajukan => 'bg-blue-50 text-blue-700 ring-blue-200',
+            self::RevisiAdministrasi, self::RevisiAkademik => 'bg-amber-50 text-amber-800 ring-amber-200',
+            self::MenungguDosen => 'bg-indigo-50 text-indigo-700 ring-indigo-200',
+            self::Disetujui => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+            self::Diarsipkan => 'bg-navy-50 text-navy-800 ring-navy-200',
+        };
     }
 
-    /** @return array<int, string> */
-    public static function nilaiBerhenti(): array
+    /** Status di mana mahasiswa masih boleh mengubah data dan mengunggah dokumen. */
+    public function bisaDiubahMahasiswa(): bool
     {
-        return array_map(fn (self $s) => $s->value, array_filter(self::cases(), fn (self $s) => $s->berhenti()));
+        return in_array($this, [self::Draft, self::RevisiAdministrasi, self::RevisiAkademik], true);
     }
 
     /** @return array<string, string> */
-    public static function opsi(): array
+    public static function pilihan(): array
     {
-        return collect(self::cases())->mapWithKeys(fn (self $s) => [$s->value => $s->label()])->all();
+        $hasil = [];
+        foreach (self::cases() as $status) {
+            $hasil[$status->value] = $status->label();
+        }
+
+        return $hasil;
     }
 }

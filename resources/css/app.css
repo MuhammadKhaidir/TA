@@ -4,143 +4,126 @@
 @source '../../storage/framework/views/*.php';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 
-    /* Navy — warna utama identitas sistem (header, sidebar, elemen struktural) */
-    --color-brand-50: #f4f6fb;
-    --color-brand-100: #e7ebf6;
-    --color-brand-200: #c9d3ea;
-    --color-brand-300: #9caed8;
-    --color-brand-400: #6a83c0;
-    --color-brand-500: #4761a8;
-    --color-brand-600: #35488c;
-    --color-brand-700: #2b3a71;
-    --color-brand-800: #232f5e;
-    --color-brand-900: #1c2547;
-    --color-brand-950: #11162d;
+    /* Aksen navy untuk seluruh antarmuka. Latar tetap putih / abu-abu muda. */
+    --color-navy-50: #eef3fb;
+    --color-navy-100: #d9e4f6;
+    --color-navy-200: #b6caec;
+    --color-navy-300: #88a8de;
+    --color-navy-400: #5a82cc;
+    --color-navy-500: #3a63b5;
+    --color-navy-600: #2a4d98;
+    --color-navy-700: #223e7a;
+    --color-navy-800: #1b3160;
+    --color-navy-900: #14244a;
+    --color-navy-950: #0d1830;
+}
 
-    /* Emas — aksen, mengikuti identitas warna Universitas Sriwijaya */
-    --color-gold-50: #fdf9ec;
-    --color-gold-100: #faf0cd;
-    --color-gold-200: #f4e096;
-    --color-gold-300: #edcb5c;
-    --color-gold-400: #e6b632;
-    --color-gold-500: #d79f1e;
-    --color-gold-600: #b87d17;
-    --color-gold-700: #955c17;
-    --color-gold-800: #7a4a19;
-    --color-gold-900: #673e1a;
+@layer base {
+    body {
+        @apply bg-slate-50 text-slate-800 antialiased;
+    }
 }
 
 @layer components {
-    .btn-primary {
-        @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 bg-brand-800 text-white hover:bg-brand-900 focus:outline-none focus:ring-2 focus:ring-brand-700 focus:ring-offset-2;
-    }
-    .btn-gold {
-        @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 bg-gold-500 text-brand-950 hover:bg-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-600 focus:ring-offset-2;
-    }
-    .btn-secondary {
-        @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2;
-    }
-    .btn-danger {
-        @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 bg-rose-600 text-white hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-600 focus:ring-offset-2;
-    }
+    /* Kartu dan tata letak */
     .card {
         @apply rounded-xl border border-slate-200 bg-white shadow-sm;
     }
-    .field-label {
-        @apply mb-1 block text-sm font-medium text-slate-700;
+    .card-header {
+        @apply flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4;
     }
-    .field-input {
-        @apply block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600;
-    }
-    .field-error {
-        @apply mt-1 text-xs text-rose-600;
-    }
-    .nav-link {
-        @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-brand-100/80 transition hover:bg-white/10 hover:text-white;
-    }
-    .nav-link-active {
-        @apply bg-white/10 text-white;
-    }
-}
-@theme {
-    /* Pasir hangat & tinta navy — palet khusus tampilan dashboard mahasiswa */
-    --color-sand-50: #fdfbf7;
-    --color-sand-100: #f8f2e8;
-    --color-sand-200: #f0e6d6;
-    --color-sand-300: #e6d6bd;
-    --color-sand-400: #d2b88f;
-    --color-sand-500: #b8955f;
-    --color-sand-600: #98743f;
-    --color-sand-700: #765732;
-
-    --color-ink-400: #9aa1b2;
-    --color-ink-500: #747c91;
-    --color-ink-600: #565e75;
-    --color-ink-700: #3a4460;
-    --color-ink-800: #263153;
-    --color-ink-900: #19223f;
-}
-
-@layer components {
-    /* ---- Dashboard mahasiswa (prefix mhs-) ---- */
-    .mhs-card {
-        @apply rounded-2xl border border-sand-200 bg-white/70 shadow-[0_1px_3px_rgba(118,87,50,0.06)];
-    }
-    .mhs-eyebrow {
-        @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500;
-    }
-    .mhs-icon-bubble {
-        @apply flex shrink-0 items-center justify-center rounded-full bg-sand-200 text-sand-600;
-    }
-    .mhs-nav-link {
-        @apply flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-medium text-ink-800 transition hover:bg-sand-200/70;
-    }
-    .mhs-nav-link-active {
-        @apply bg-sand-300/60 font-semibold;
-    }
-    .mhs-label {
-        @apply mb-1.5 block text-sm font-medium text-ink-700;
-    }
-    .mhs-input {
-        @apply block w-full rounded-xl border border-sand-300 bg-white/80 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:border-sand-500 focus:outline-none focus:ring-2 focus:ring-sand-300;
-    }
-    .mhs-btn-primary {
-        @apply inline-flex items-center justify-center gap-1.5 rounded-xl bg-ink-800 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-ink-900 focus:outline-none focus:ring-2 focus:ring-ink-700 focus:ring-offset-2 focus:ring-offset-sand-50 disabled:cursor-not-allowed disabled:opacity-50;
-    }
-    .mhs-btn-secondary {
-        @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-sand-300 bg-white/80 px-4 py-2 text-sm font-medium text-ink-800 transition hover:bg-sand-100 focus:outline-none focus:ring-2 focus:ring-sand-400;
-    }
-}
-
-/*
- * TARUH PALING BAWAH resources/css/app.css (setelah blok mhs-).
- *
- * Halaman non-mahasiswa (mis. partials.antrean-card) masih memakai kelas lama:
- * card, btn-primary, btn-secondary, field-label, field-input.
- * Blok ini menimpa tampilannya ke gaya sand/ink supaya halaman-halaman itu
- * ikut seragam tanpa perlu diedit satu per satu.
- */
-@layer components {
-    .card {
-        @apply rounded-2xl border border-sand-200 bg-white/70 shadow-[0_1px_3px_rgba(118,87,50,0.06)];
+    .card-body {
+        @apply p-5;
     }
 
+    /* Formulir */
+    .label {
+        @apply mb-1.5 block text-sm font-medium text-slate-700;
+    }
+    .input {
+        @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200 disabled:bg-slate-100 disabled:text-slate-500;
+    }
+    .hint {
+        @apply mt-1 text-xs text-slate-500;
+    }
+    .galat {
+        @apply mt-1 text-xs text-red-600;
+    }
+
+    /* Tombol */
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 rounded-lg border border-transparent px-4 py-2 text-sm font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50;
+    }
     .btn-primary {
-        @apply inline-flex items-center justify-center gap-1.5 rounded-xl bg-ink-800 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-ink-900 focus:outline-none focus:ring-2 focus:ring-ink-700 focus:ring-offset-2 focus:ring-offset-sand-50 disabled:cursor-not-allowed disabled:opacity-50;
+        @apply bg-navy-700 text-white hover:bg-navy-800 focus:ring-navy-400;
     }
-
     .btn-secondary {
-        @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-sand-300 bg-white/80 px-4 py-2 text-sm font-medium text-ink-800 transition hover:bg-sand-100 focus:outline-none focus:ring-2 focus:ring-sand-400 disabled:cursor-not-allowed disabled:opacity-50;
+        @apply border-slate-300 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-300;
+    }
+    .btn-danger {
+        @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-400;
+    }
+    .btn-sm {
+        @apply px-3 py-1.5 text-xs;
+    }
+    .tautan {
+        @apply font-medium text-navy-700 hover:text-navy-900 hover:underline;
     }
 
-    .field-label {
-        @apply mb-1.5 block text-sm font-medium text-ink-700;
+    /* Tabel */
+    .tabel {
+        @apply w-full text-left text-sm;
+    }
+    .tabel thead th {
+        @apply border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500;
+    }
+    .tabel tbody td {
+        @apply border-b border-slate-100 px-4 py-3 align-top text-slate-700;
+    }
+    .tabel tbody tr:last-child td {
+        @apply border-b-0;
     }
 
-    .field-input {
-        @apply block w-full rounded-xl border border-sand-300 bg-white/80 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:border-sand-500 focus:outline-none focus:ring-2 focus:ring-sand-300;
+    /* Lencana status */
+    .badge {
+        @apply inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset;
+    }
+
+    /* Pemberitahuan */
+    .alert {
+        @apply mb-4 rounded-lg border px-4 py-3 text-sm;
+    }
+    .alert-sukses {
+        @apply border-emerald-200 bg-emerald-50 text-emerald-800;
+    }
+    .alert-galat {
+        @apply border-red-200 bg-red-50 text-red-800;
+    }
+    .alert-peringatan {
+        @apply border-amber-200 bg-amber-50 text-amber-900;
+    }
+    .alert-info {
+        @apply border-blue-200 bg-blue-50 text-blue-900;
+    }
+
+    /* Menu sidebar */
+    .menu-link {
+        @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900;
+    }
+    .menu-link-aktif {
+        @apply bg-navy-50 text-navy-800 hover:bg-navy-50 hover:text-navy-800;
+    }
+
+    /* Daftar deskripsi (label dan nilai) */
+    .dl-baris {
+        @apply grid gap-1 py-2.5 sm:grid-cols-3 sm:gap-4;
+    }
+    .dl-baris dt {
+        @apply text-sm text-slate-500;
+    }
+    .dl-baris dd {
+        @apply text-sm text-slate-900 sm:col-span-2;
     }
 }

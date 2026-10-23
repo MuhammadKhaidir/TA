@@ -1,58 +1,168 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Sistem Pengumpulan dan Arsip Digital Berkas KP dan TA
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Aplikasi web untuk mengelola pengajuan, pemeriksaan, dan pengarsipan berkas Kerja Praktik (KP) dan Tugas Akhir (TA) di Fakultas Ilmu Komputer, Universitas Sriwijaya.
 
-## About Laravel
+Dibangun dengan Laravel 13, Blade, Tailwind CSS v4 (lewat Vite), dan MySQL.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Peran pengguna
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| Peran | Menu |
+|---|---|
+| Mahasiswa | Dashboard, Pengajuan KP, Pengajuan TA, Status Pengajuan, Berkas Saya |
+| Dosen | Dashboard, Pemeriksaan Berkas, Mahasiswa Bimbingan, Riwayat Pemeriksaan |
+| Operator Akademik | Dashboard, Verifikasi Administrasi, Pengelolaan KP/TA, Dokumen Resmi, Arsip Berkas |
+| Admin | Dashboard, Manajemen Pengguna, Data Master, Pengaturan Persyaratan, Log Aktivitas |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Semua peran juga punya Profil dan Logout. Hak akses dijaga di backend (middleware peran + Policy), bukan hanya dengan menyembunyikan menu.
 
-## Learning Laravel
+## Kebutuhan
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- PHP 8.3 atau lebih baru, dengan ekstensi `pdo_mysql`, `mbstring`, `fileinfo`, `openssl`, `ctype`, `tokenizer`, `xml`
+- Composer 2
+- Node.js 20.19+ atau 22.12+ (untuk Vite 8) dan npm
+- MySQL 8 atau MariaDB 10.6+
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Cara menjalankan
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+Jalankan dari folder proyek (terminal VS Code).
 
 ```bash
-composer require laravel/boost --dev
+# 1. Pasang dependensi PHP
+composer install
 
-php artisan boost:install
+# 2. Salin konfigurasi (Windows: copy .env.example .env)
+cp .env.example .env
+php artisan key:generate
+
+# 3. Buat database kosong di MySQL, mis. lewat phpMyAdmin atau:
+#    CREATE DATABASE arsip_kp_ta CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+#    lalu sesuaikan DB_USERNAME dan DB_PASSWORD di file .env
+
+# 4. Buat tabel dan isi data awal
+php artisan migrate --seed
+
+# 5. Pasang dan bangun aset Tailwind
+npm install
+npm run build        # atau: npm run dev (sambil mengembangkan)
+
+# 6. Jalankan
+php artisan serve
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Buka http://localhost:8000.
 
-## Contributing
+Jika muncul error `Vite manifest not found`, langkah 5 belum dijalankan (`npm run build`).
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### Batas ukuran unggahan
 
-## Code of Conduct
+Batas ukuran per dokumen diatur admin di menu Pengaturan Persyaratan (contoh seeder: 5 MB). PHP juga punya batas sendiri. Jika dokumen berukuran besar gagal diunggah, naikkan di `php.ini`:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```ini
+upload_max_filesize = 20M
+post_max_size = 25M
+```
 
-## Security Vulnerabilities
+Lalu restart server PHP.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Akun contoh
 
-## License
+Dibuat oleh `php artisan migrate --seed`. Kata sandi semuanya `password`.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+| Peran | Email | 
+|---|---|
+| Admin | admin@fasilkom.test |
+| Operator | operator@fasilkom.test |
+| Dosen | dosen1@fasilkom.test, dosen2@fasilkom.test |
+| Mahasiswa | mahasiswa1@fasilkom.test, mahasiswa2@fasilkom.test |
+
+Login juga bisa memakai nomor induk (NIM/NIP). **Ganti kata sandi atau hapus akun ini sebelum aplikasi dipakai sungguhan.**
+
+Seeder memakai `firstOrCreate`, jadi aman dijalankan ulang dan tidak menimpa data yang sudah diubah admin. Program studi dan persyaratan contoh di seeder dapat diubah dari menu Admin.
+
+## Alur sistem
+
+1. Mahasiswa membuat pengajuan KP/TA (judul, instansi, dosen pembimbing) dan mengunggah dokumen persyaratan. Pengajuan masih berstatus Draft.
+2. Setelah semua dokumen wajib lengkap, mahasiswa mengirim pengajuan (Diajukan).
+3. Operator memeriksa dokumen yang menjadi tugas operator. Dokumen bisa Diterima atau Perlu Revisi (catatan wajib). Ada revisi: status Revisi Administrasi, mahasiswa memperbaiki hanya dokumen yang diminta, lalu mengirim ulang.
+4. Jika semua diterima, pengajuan Menunggu Dosen. Dosen pembimbing memeriksa dokumen akademik dengan cara yang sama (Revisi Akademik atau Disetujui).
+5. Setelah Disetujui, operator mengunggah dokumen resmi (surat pengantar KP, SK KP, SK TA, dan lain-lain) lalu mengarsipkan pengajuan (Diarsipkan).
+6. Berkas final tersimpan di Arsip Berkas dan dapat dibuka oleh pihak yang berwenang.
+
+```
+draft -> diajukan -> menunggu_dosen -> disetujui -> diarsipkan
+              |  ^        |  ^
+              v  |        v  |
+     revisi_administrasi   revisi_akademik
+```
+
+Setiap perubahan status disimpan di tabel `riwayat_status` (siapa, kapan, catatan) dan tampil sebagai riwayat di halaman detail. Tindakan penting juga masuk ke Log Aktivitas.
+
+Dokumen yang diunggah ulang disimpan sebagai versi baru; versi lama tetap ada sebagai jejak audit.
+
+## Keamanan berkas
+
+- Berkas disimpan di `storage/app/private`, tidak punya URL publik.
+- Berkas hanya bisa dibuka lewat `/berkas/...` setelah dicek Policy: pemilik pengajuan, dosen pembimbing, dan operator. Admin tidak dapat membuka isi berkas pengajuan.
+- Format dan ukuran berkas divalidasi dari pengaturan persyaratan (whitelist pdf, doc, docx, jpg, jpeg, png), nama file di disk diacak, dan respons membawa header `X-Content-Type-Options: nosniff`.
+- Pengguna yang dinonaktifkan admin langsung dikeluarkan dari sesi berjalan.
+
+## Satu sumber data
+
+Tidak ada data statis atau salinan. Halaman profil mahasiswa, daftar bimbingan dosen, antrean operator, dan halaman admin membaca tabel yang sama lewat relasi Eloquent. Contoh: admin mengubah nama, NIM, program studi, atau angkatan mahasiswa, atau mengganti nama program studi, maka halaman lain langsung menampilkan nilai baru setelah dimuat ulang. Persyaratan dokumen yang diubah admin langsung dipakai pada form dan validasi unggahan mahasiswa.
+
+Pembatasan integritas: pengguna, program studi, dan persyaratan yang sudah dipakai data lain tidak bisa dihapus (nonaktifkan saja). Admin tidak dapat menurunkan peran atau menonaktifkan akunnya sendiri.
+
+## Struktur kode
+
+```
+app/Enums            Role, JenisPengajuan, StatusPengajuan, StatusDokumen
+app/Models           Model dan relasi Eloquent
+app/Services         PengajuanWorkflow: seluruh perpindahan status ada di sini
+app/Policies         Hak akses per pengajuan, dokumen, dan dokumen resmi
+app/Http/Middleware  EnsureRole, EnsureUserActive
+app/Http/Controllers Dipisah per peran: Mahasiswa, Dosen, Operator, Admin
+app/Support          Menu per peran, pencatat log aktivitas
+database/migrations  Skema (migrasi tambahan, tidak mengubah migrasi bawaan Laravel)
+database/seeders     Program studi, persyaratan, dan akun contoh
+resources/views      Blade: layouts, partials, components, halaman per peran
+lang/id              Terjemahan validasi dan teks antarmuka
+tests/Feature        Uji otomatis
+```
+
+## Menjalankan uji otomatis
+
+```bash
+php artisan test
+```
+
+Uji memakai SQLite in-memory (butuh ekstensi `pdo_sqlite`), jadi tidak menyentuh database MySQL Anda.
+
+Hasil terakhir di lingkungan pengembangan: **39 uji, 876 assertion, semuanya lulus.** Cakupannya:
+
+- Login (email atau nomor induk), logout, akun nonaktif, pengalihan dashboard per peran, pencatatan log login.
+- Matriks akses: setiap peran hanya dapat membuka halamannya sendiri (200) dan ditolak (403) di halaman peran lain, termasuk aksi tulis lintas peran dan ID yang tidak ada.
+- Alur KP lengkap dari draft sampai arsip, termasuk validasi unggahan (format dan ukuran), revisi administrasi dan akademik, versi dokumen, urutan riwayat status, dan penguncian setelah diarsipkan.
+- Akses berkas privat: pemilik, pembimbing, dan operator dapat membuka; mahasiswa lain, dosen lain, admin, dan tamu ditolak; tidak ada URL publik.
+- Sinkronisasi data setelah admin mengubah mahasiswa, dosen, program studi, dan persyaratan.
+- CRUD admin (pengguna, program studi, persyaratan), validasi, perlindungan data yang dipakai, log aktivitas, profil, dan ganti kata sandi.
+- Render semua halaman untuk setiap peran pada setiap status pengajuan.
+- Migrasi (naik dan rollback) serta seeder, termasuk aman dijalankan ulang.
+
+## Yang belum diuji
+
+Hal berikut belum bisa diuji di lingkungan pengembangan dan sebaiknya Anda cek sendiri saat pertama menjalankan:
+
+- **MySQL.** Seluruh pengujian memakai SQLite. Migrasi sudah ditinjau terhadap batasan MySQL (panjang indeks, urutan kunci asing, `down()`), tetapi belum dijalankan di MySQL.
+- **Build Tailwind (`npm install && npm run build`).** Registry npm tidak terjangkau di lingkungan pengembangan, jadi build dan tampilan visual di browser belum dilihat langsung. Uji otomatis hanya memeriksa HTML yang dihasilkan, bukan hasil CSS.
+- **Unggahan berkas nyata dari browser** (uji memakai berkas palsu), dan tampilan di perangkat seluler sungguhan.
+
+## Keterbatasan saat ini
+
+- Dokumen resmi (surat pengantar, SK) diunggah operator sebagai berkas. Aplikasi belum membuat dokumen dari templat.
+- Data Master baru berisi Program Studi.
+- Belum ada notifikasi email, pencarian lintas arsip tingkat lanjut, atau ekspor laporan.
+- Pembimbing dipilih saat pengajuan dan dapat diganti operator.
+
+## Menempelkan ke proyek Laravel yang sudah ada
+
+Kode ini ditulis untuk Laravel 13 dan Tailwind v4. Jika Anda sudah punya proyek Laravel 13 dengan skeleton standar, salin folder `app`, `database`, `lang`, `resources`, `routes`, `tests`, serta file `bootstrap/app.php`, `config/app.php`, `config/filesystems.php`, `vite.config.js`, `phpunit.xml`, dan `.env.example` (cocokkan isinya dengan milik Anda, jangan menimpa begitu saja jika sudah ada perubahan). Migrasi bersifat tambahan: tabel `users` ditambah kolom, bukan dibuat ulang. Setelah itu jalankan `php artisan migrate --seed`.

@@ -1,11 +1,12 @@
 <?php
 
-use App\Http\Middleware\PastikanAkunAktif;
+use App\Http\Middleware\EnsureRole;
+use App\Http\Middleware\EnsureUserActive;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
-use Spatie\Permission\Middleware\RoleMiddleware;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -15,9 +16,22 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'role' => RoleMiddleware::class,
-            'akun.aktif' => PastikanAkunAktif::class,
+            'role' => EnsureRole::class,
         ]);
+
+        $middleware->web(append: [
+            EnsureUserActive::class,
+        ]);
+
+        // Periksa role sebelum route model binding, agar pengguna role lain mendapat 403
+        // (bukan 404) dan tidak dapat menebak keberadaan data lewat ID.
+        $middleware->prependToPriorityList(
+            before: SubstituteBindings::class,
+            prepend: EnsureRole::class,
+        );
+
+        $middleware->redirectGuestsTo(fn () => route('login'));
+        $middleware->redirectUsersTo(fn () => route('dashboard'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

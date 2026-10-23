@@ -1,272 +1,37 @@
-{{--
-    Halaman login.
-    - Desktop (lg ke atas): tinggi persis 1 layar, tanpa scroll halaman. Ukuran teks, jarak, dan input
-      ikut mengecil/membesar mengikuti tinggi layar (clamp + vh).
-    - Layar kecil: panel foto disembunyikan, halaman boleh scroll biasa.
-    Latar panel kiri: slideshow public/images/UnsriBG.png + FasilkomUnsri.png (ganti tiap 5 detik, transisi opacity),
-    tampil UTUH (tanpa crop); hanya tepi atas dan kanannya dilembutkan.
-    Panel kiri = setengah layar, tanpa warna sendiri dan tanpa garis pembatas: gradasi krem dipasang di
-    pembungkus halaman sehingga kiri dan kanan satu warna.
-    Logo kiri atas: public/images/UnsriLogo.png.
-    Pojok kiri bawah: motif gelombang + garis emas + bunga line-art (SVG inline), sama dengan halaman registrasi.
-    Kartu form: putih dengan shadow berlapis supaya tampak mengambang di atas latar.
-    Butuh palet sand/ink dan kelas mhs-* dari patch dashboard mahasiswa.
---}}
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Masuk &mdash; Sistem Pendaftaran Ujian Akhir Program</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-</head>
-<body class="bg-sand-50 font-sans text-ink-900 antialiased">
-    @php
-        // Foto latar panel kiri, bergantian tiap 5 detik. Tambah nama berkas di sini kalau mau lebih banyak.
-        $fotoLatar = collect(['UnsriBG.png', 'FasilkomUnsri.png'])
-            ->filter(fn ($berkas) => file_exists(public_path('images/' . $berkas)))
-            ->map(fn ($berkas) => asset('images/' . $berkas))
-            ->values()
-            ->all();
-    @endphp
+@extends('layouts.guest')
 
-    <div class="flex min-h-screen bg-gradient-to-br from-sand-50 to-sand-100/60 lg:h-screen lg:overflow-hidden">
-        {{-- Panel informasi (kiri) --}}
-        <div class="relative hidden w-1/2 shrink-0 flex-col overflow-hidden px-[clamp(2rem,5vw,4rem)] py-[clamp(1.25rem,4.5vh,3rem)] lg:flex">
-            {{-- Foto latar (slideshow): tiap foto tampil utuh, tidak di-crop. Tepi atas (12%) dan kanan (15%)
-                 dilembutkan supaya menyatu dengan latar. Pergantian foto: lihat skrip di bawah. --}}
-            @if (count($fotoLatar) > 0)
-                <div class="pointer-events-none absolute inset-x-0 bottom-0 grid">
-                    @foreach ($fotoLatar as $i => $url)
-                        <div data-slide
-                             class="col-start-1 row-start-1 self-end transition-opacity duration-1000 ease-in-out motion-reduce:transition-none {{ $i === 0 ? 'opacity-100' : 'opacity-0' }}"
-                             style="-webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%); mask-image: linear-gradient(to bottom, transparent 0%, #000 12%);">
-                            <img src="{{ $url }}" alt="" class="block h-auto max-h-screen w-full object-contain object-bottom"
-                                 style="-webkit-mask-image: linear-gradient(to left, transparent 0%, #000 15%); mask-image: linear-gradient(to left, transparent 0%, #000 15%);">
-                        </div>
-                    @endforeach
-                </div>
-            @endif
+@section('judul', 'Masuk')
 
-            {{-- Ornamen sudut kanan atas --}}
-            <svg class="pointer-events-none absolute right-0 top-0 hidden h-[36vh] w-auto text-gold-400 xl:block" viewBox="0 0 100 340" aria-hidden="true">
-                <polygon points="50,0 100,0 100,42 50,95" fill="currentColor" opacity=".4" />
-                <path d="M8 340V186L100 82" fill="none" stroke="currentColor" stroke-width="16" opacity=".4" />
-            </svg>
+@section('konten')
+    <div class="card p-8">
+        <h1 class="text-xl font-semibold text-navy-900">Masuk ke akun Anda</h1>
+        <p class="mt-1 text-sm text-slate-500">Gunakan email atau NIM/NIP beserta kata sandi yang terdaftar.</p>
 
-            {{-- Motif pojok kiri bawah: gelombang + garis emas + bunga line-art --}}
-            <svg class="pointer-events-none absolute bottom-0 left-0 z-[3] h-[clamp(7rem,22vh,13rem)] w-auto max-w-full" viewBox="0 0 640 260" preserveAspectRatio="xMinYMax meet" aria-hidden="true">
-                <defs>
-                    <linearGradient id="motifFadeGrad" gradientUnits="userSpaceOnUse" x1="360" y1="0" x2="640" y2="0">
-                        <stop offset="0" stop-color="#fff" />
-                        <stop offset="1" stop-color="#000" />
-                    </linearGradient>
-                    <mask id="motifFade" maskUnits="userSpaceOnUse" x="0" y="0" width="640" height="260">
-                        <rect width="640" height="260" fill="url(#motifFadeGrad)" />
-                    </mask>
-                    <path id="motifPetal" d="M0 -8C-9 -20 -9 -34 0 -44C9 -34 9 -20 0 -8Z" />
-                    <path id="motifPetalSm" d="M0 -8C-5 -14 -5 -20 0 -27C5 -20 5 -14 0 -8Z" />
-                </defs>
+        <form method="POST" action="{{ route('login.store') }}" class="mt-6 space-y-4">
+            @csrf
 
-                {{-- Gelombang --}}
-                <path class="text-ink-900" fill="currentColor" opacity=".94"
-                      d="M0 260V90C70 66 150 74 235 118C320 162 410 214 520 238C570 249 610 256 640 260Z" />
-
-                {{-- Garis emas di atas gelombang, memudar ke kanan --}}
-                <g class="text-gold-400" mask="url(#motifFade)" fill="none" stroke="currentColor" stroke-linecap="round">
-                    <path stroke-width="6" d="M0 76C70 52 150 60 235 104C320 148 410 200 520 224C570 235 610 242 640 246" />
-                    <path stroke-width="1.5" opacity=".7" d="M0 64C70 40 150 48 235 92C320 136 410 188 520 212C570 223 610 230 640 234" />
-                </g>
-
-                {{-- Bunga + sulur, gaya gambar garis --}}
-                <g class="text-gold-400" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" opacity=".85">
-                    <g transform="translate(96 188)">
-                        <circle r="5" />
-                        <circle r="50" stroke-dasharray="1 6" opacity=".7" />
-                        <use href="#motifPetal" />
-                        <use href="#motifPetal" transform="rotate(45)" />
-                        <use href="#motifPetal" transform="rotate(90)" />
-                        <use href="#motifPetal" transform="rotate(135)" />
-                        <use href="#motifPetal" transform="rotate(180)" />
-                        <use href="#motifPetal" transform="rotate(225)" />
-                        <use href="#motifPetal" transform="rotate(270)" />
-                        <use href="#motifPetal" transform="rotate(315)" />
-                        <use href="#motifPetalSm" transform="rotate(22.5)" />
-                        <use href="#motifPetalSm" transform="rotate(67.5)" />
-                        <use href="#motifPetalSm" transform="rotate(112.5)" />
-                        <use href="#motifPetalSm" transform="rotate(157.5)" />
-                        <use href="#motifPetalSm" transform="rotate(202.5)" />
-                        <use href="#motifPetalSm" transform="rotate(247.5)" />
-                        <use href="#motifPetalSm" transform="rotate(292.5)" />
-                        <use href="#motifPetalSm" transform="rotate(337.5)" />
-                    </g>
-                    <path d="M148 188C176 176 202 188 216 206C228 221 248 222 256 210C263 199 254 190 245 193" />
-                    <path d="M178 183C183 171 193 168 202 170C200 180 192 187 178 183Z" />
-                    <path d="M214 205C224 198 234 199 240 205C233 212 223 213 214 205Z" />
-                    <circle cx="272" cy="197" r="1.6" fill="currentColor" />
-                    <circle cx="288" cy="206" r="1.2" fill="currentColor" />
-                </g>
-            </svg>
-
-            {{-- Merek --}}
-            <div class="relative z-10 flex items-center gap-4">
-                <img src="{{ asset('images/UnsriLogo.png') }}" alt="Logo Universitas Sriwijaya" class="h-[clamp(2.75rem,6.5vh,3.75rem)] w-auto shrink-0 object-contain">
-                <div class="h-10 w-px bg-ink-800/50"></div>
-                <div class="leading-tight">
-                    <p class="font-serif text-lg font-bold text-ink-900">Sistem Pendaftaran</p>
-                    <p class="text-base text-ink-700">Ujian Akhir Program</p>
-                </div>
+            <div>
+                <label for="login" class="label">Email / NIM / NIP</label>
+                <input id="login" name="login" type="text" value="{{ old('login') }}" required autofocus autocomplete="username" class="input">
+                @error('login')
+                    <p class="galat">{{ $message }}</p>
+                @enderror
             </div>
 
-            {{-- Judul (tengah) --}}
-            <div class="relative z-10 flex flex-1 flex-col items-center justify-center pb-[clamp(0rem,8vh,5rem)] text-center">
-                <div class="flex items-center justify-center gap-4">
-                    <span class="h-px w-10 bg-sand-400"></span>
-                    <p class="text-[13px] font-semibold tracking-[0.12em] text-sand-500">POS 020/POS/FASILKOM/2026</p>
-                    <span class="h-px w-10 bg-sand-400"></span>
-                </div>
-                <h1 class="mt-[clamp(0.5rem,2vh,1.25rem)] max-w-[30rem] text-balance font-serif text-[length:clamp(1.75rem,min(5vh,3vw),3rem)] font-bold leading-[1.25] text-ink-900">
-                    PENDAFTARAN TUGAS AKHIR MAHASISWA.
-                </h1>
+            <div>
+                <label for="password" class="label">Kata sandi</label>
+                <input id="password" name="password" type="password" required autocomplete="current-password" class="input">
+                @error('password')
+                    <p class="galat">{{ $message }}</p>
+                @enderror
             </div>
 
-            <div class="relative z-10 flex items-center gap-4">
-                <span class="h-px w-10 bg-sand-400"></span>
-                <p class="text-xs text-ink-700"></p>
-            </div>
-        </div>
+            <label class="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" name="ingat" value="1" class="rounded border-slate-300 text-navy-700 focus:ring-navy-300">
+                Ingat saya di perangkat ini
+            </label>
 
-        {{-- Form login (kanan). Kalau layar sangat pendek, hanya panel ini yang scroll, bukan seluruh halaman.
-             Padding vertikal dilonggarkan supaya shadow kartu tidak terpotong oleh overflow-y-auto. --}}
-        <div class="flex w-full flex-1 flex-col px-6 py-8 lg:overflow-y-auto lg:px-10 lg:py-[clamp(1.5rem,4vh,3rem)]">
-            <div class="m-auto w-full max-w-[34rem]">
-                {{-- Merek ringkas untuk layar kecil --}}
-                <div class="mb-5 flex items-center gap-3 lg:hidden">
-                    <img src="{{ asset('images/UnsriLogo.png') }}" alt="Logo Universitas Sriwijaya" class="h-10 w-auto shrink-0 object-contain">
-                    <p class="font-serif text-lg font-bold text-ink-900">Sistem Pendaftaran UAP</p>
-                </div>
-
-                <div class="rounded-xl border border-sand-200 bg-white px-[clamp(1.5rem,3.5vw,3rem)] py-[clamp(1.25rem,4vh,2.5rem)] shadow-[0_28px_56px_-14px_rgba(70,50,25,0.30),0_10px_22px_-8px_rgba(70,50,25,0.16),0_0_0_1px_rgba(118,87,50,0.06)]">
-                    <h2 class="font-serif text-[length:clamp(1.5rem,4vh,2.25rem)] font-bold leading-tight text-ink-900">Masuk</h2>
-                    <p class="mt-1.5 text-pretty text-[length:clamp(0.8125rem,1.9vh,1rem)] text-ink-600">Gunakan akun yang diberikan sesuai peran Anda pada alur POS.</p>
-
-                    @if ($errors->any())
-                        <div class="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm text-rose-700">
-                            {{ $errors->first() }}
-                        </div>
-                    @endif
-
-                    <form method="POST" action="{{ route('login.process') }}" class="mt-[clamp(1rem,3vh,1.5rem)] flex flex-col gap-[clamp(0.75rem,2vh,1.25rem)]">
-                        @csrf
-
-                        <div>
-                            <label for="email" class="mhs-label font-serif font-semibold text-ink-900">Email</label>
-                            <div class="relative">
-                                <svg class="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
-                                    <path d="m4.5 7.5 7.5 5.5 7.5-5.5" />
-                                </svg>
-                                <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="email"
-                                       class="mhs-input rounded-lg bg-sand-50 py-[clamp(0.5rem,1.6vh,0.75rem)] pl-11 pr-4 placeholder:font-mono placeholder:text-xs"
-                                       placeholder="nama@ta.test">
-                            </div>
-                        </div>
-
-                        <div>
-                            <label for="password" class="mhs-label font-serif font-semibold text-ink-900">Kata Sandi</label>
-                            <div class="relative">
-                                <svg class="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <rect x="5" y="10.5" width="14" height="10" rx="2.5" />
-                                    <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
-                                </svg>
-                                <input id="password" type="password" name="password" required autocomplete="current-password"
-                                       class="mhs-input rounded-lg bg-sand-50 py-[clamp(0.5rem,1.6vh,0.75rem)] pl-11 pr-11 placeholder:font-mono placeholder:text-xs"
-                                       placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;">
-                                <button type="button" id="toggle-password" aria-label="Tampilkan kata sandi" aria-pressed="false"
-                                        class="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-ink-500 transition hover:text-ink-800 focus:outline-none focus:ring-2 focus:ring-sand-400">
-                                    <svg data-eye="show" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
-                                        <circle cx="12" cy="12" r="2.8" />
-                                    </svg>
-                                    <svg data-eye="hide" class="hidden h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <path d="M4 4l16 16" />
-                                        <path d="M10.6 6.1A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a16 16 0 0 1-3 3.8M6.5 7.6A16 16 0 0 0 2.5 12S6 18.5 12 18.5a9.4 9.4 0 0 0 4-.9" />
-                                        <path d="M9.9 9.9a2.8 2.8 0 0 0 4 4" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-
-                        <label class="flex items-center gap-2.5 font-serif text-sm text-ink-700">
-                            <input type="checkbox" name="remember" value="1" class="h-4 w-4 rounded border-sand-300 bg-sand-50 text-ink-800 focus:ring-sand-400">
-                            Ingat saya
-                        </label>
-
-                        <button type="submit" class="mhs-btn-primary w-full rounded-lg py-[clamp(0.5rem,1.6vh,0.75rem)] font-serif">Masuk</button>
-                    </form>
-
-                    <a href="{{ route('register') }}" class="mhs-btn-secondary mt-[clamp(0.5rem,1.5vh,0.75rem)] w-full rounded-lg py-[clamp(0.5rem,1.6vh,0.75rem)] font-serif">
-                        Belum punya akun? Registrasi
-                    </a>
-
-                    <div class="mt-[clamp(0.75rem,2.5vh,1.5rem)] rounded-lg border border-sand-200 bg-sand-50 px-4 py-3">
-                        <p class="font-serif text-xs font-semibold text-ink-900">
-                            Akun demo (prototipe) &mdash; kata sandi:
-                            <code class="ml-1 rounded bg-sand-200/60 px-1.5 py-0.5 font-mono text-[11px] font-normal text-ink-700">password</code>
-                        </p>
-                        <ul class="mt-1.5 columns-2 gap-x-6 font-serif text-xs leading-5 text-ink-700">
-                            <li class="break-inside-avoid">mahasiswa@ta.test</li>
-                            <li class="break-inside-avoid">dospem@ta.test</li>
-                            <li class="break-inside-avoid">operator@ta.test</li>
-                            <li class="break-inside-avoid">admin@ta.test</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
+            <button type="submit" class="btn btn-primary w-full">Masuk</button>
+        </form>
     </div>
-
-    <script>
-        // Ganti foto latar tiap 5 detik dengan transisi opacity.
-        // Foto baru memudar masuk DI ATAS foto lama, baru foto lama disembunyikan (tidak ada kedipan).
-        (function () {
-            var slides = document.querySelectorAll('[data-slide]');
-            if (slides.length < 2) return;
-            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-            var i = 0;
-            slides[0].style.zIndex = 2;
-            setInterval(function () {
-                var lama = slides[i];
-                i = (i + 1) % slides.length;
-                var baru = slides[i];
-
-                baru.style.zIndex = 2;
-                lama.style.zIndex = 1;
-                baru.classList.replace('opacity-0', 'opacity-100');
-
-                setTimeout(function () {
-                    lama.classList.replace('opacity-100', 'opacity-0');
-                }, 1000);
-            }, 5000);
-        })();
-    </script>
-
-    <script>
-        // Tampilkan / sembunyikan kata sandi.
-        (function () {
-            var tombol = document.getElementById('toggle-password');
-            var input = document.getElementById('password');
-            if (! tombol || ! input) return;
-            tombol.addEventListener('click', function () {
-                var tampil = input.type === 'password';
-                input.type = tampil ? 'text' : 'password';
-                tombol.setAttribute('aria-pressed', tampil ? 'true' : 'false');
-                tombol.setAttribute('aria-label', tampil ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi');
-                tombol.querySelector('[data-eye="show"]').classList.toggle('hidden', tampil);
-                tombol.querySelector('[data-eye="hide"]').classList.toggle('hidden', ! tampil);
-            });
-        })();
-    </script>
-</body>
-</html>
+@endsection

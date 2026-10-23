@@ -2,95 +2,72 @@
 
 namespace App\Models;
 
-use App\Enums\Peran;
-use Filament\Models\Contracts\FilamentUser;
-use Filament\Panel;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
+use App\Enums\Role;
+use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'password', 'aktif', 'semua_prodi'])]
-#[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable implements FilamentUser
+class User extends Authenticatable
 {
-    use HasFactory, HasRoles, Notifiable;
+    /** @use HasFactory<UserFactory> */
+    use HasFactory, Notifiable;
 
-    public function mahasiswa()
-    {
-        return $this->hasOne(Mahasiswa::class);
-    }
+    protected $fillable = [
+        'name', 'email', 'password', 'role', 'nomor_induk',
+        'program_studi_id', 'angkatan', 'no_hp', 'aktif',
+    ];
 
-    public function dosen()
-    {
-        return $this->hasOne(Dosen::class);
-    }
-
-    /** Prodi yang menjadi cakupan kerja Operator Akademik. */
-    public function prodiOperator(): BelongsToMany
-    {
-        return $this->belongsToMany(Prodi::class, 'operator_prodi');
-    }
-
-    /** Role valid pertama milik pengguna; null bila tidak punya satu pun dari empat aktor. */
-    public function peranUtama(): ?Peran
-    {
-        foreach (Peran::cases() as $peran) {
-            if ($this->hasRole($peran->value)) {
-                return $peran;
-            }
-        }
-
-        return null;
-    }
-
-    /** Boleh masuk sistem: akun aktif dan memiliki salah satu dari empat role. */
-    public function bolehLogin(): bool
-    {
-        return $this->aktif && $this->peranUtama() !== null;
-    }
-
-    /**
-     * Cakupan prodi untuk Operator Akademik. null = seluruh prodi (assignment
-     * eksplisit lewat flag semua_prodi); array kosong = tidak ada akses.
-     *
-     * @return array<int, int>|null
-     */
-    public function cakupanProdi(): ?array
-    {
-        if ($this->semua_prodi) {
-            return null;
-        }
-
-        return $this->prodiOperator()->pluck('prodis.id')->map(fn ($id) => (int) $id)->all();
-    }
-
-    public function bolehMengelolaProdi(int $prodiId): bool
-    {
-        if (! $this->hasRole(Peran::OperatorAkademik->value)) {
-            return false;
-        }
-
-        $cakupan = $this->cakupanProdi();
-
-        return $cakupan === null || in_array($prodiId, $cakupan, true);
-    }
-
-    public function canAccessPanel(Panel $panel): bool
-    {
-        return $this->aktif && $this->hasRole(Peran::Admin->value);
-    }
+    protected $hidden = ['password', 'remember_token'];
 
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'role' => Role::class,
             'aktif' => 'boolean',
-            'semua_prodi' => 'boolean',
+            'angkatan' => 'integer',
         ];
+    }
+
+    public function programStudi(): BelongsTo
+    {
+        return $this->belongsTo(ProgramStudi::class, 'program_studi_id');
+    }
+
+    /** Pengajuan KP/TA milik mahasiswa ini. */
+    public function pengajuan(): HasMany
+    {
+        return $this->hasMany(Pengajuan::class, 'mahasiswa_id');
+    }
+
+    /** Pengajuan yang dibimbing dosen ini. */
+    public function bimbingan(): HasMany
+    {
+        return $this->hasMany(Pengajuan::class, 'pembimbing_id');
+    }
+
+    public function pemeriksaan(): HasMany
+    {
+        return $this->hasMany(Pemeriksaan::class, 'pemeriksa_id');
+    }
+
+    public function punyaRole(Role ...$roles): bool
+    {
+        return in_array($this->role, $roles, true);
+    }
+
+    public function scopePeran(Builder $query, Role $role): Builder
+    {
+        return $query->where('role', $role->value);
+    }
+
+    public function scopeAktif(Builder $query): Builder
+    {
+        return $query->where('aktif', true);
     }
 }
