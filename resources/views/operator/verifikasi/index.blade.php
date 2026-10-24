@@ -22,7 +22,7 @@
                                 <td>{{ $p->mahasiswa->programStudi?->namaLengkap() ?? '-' }}</td>
                                 <td>{{ $p->jenis->singkat() }}</td>
                                 <td>{{ $p->judul }}</td>
-                                <td>{{ $p->pembimbing?->name ?? '-' }}</td>
+                                <td>{{ $p->ringkasanPembimbing() }}</td>
                                 <td class="whitespace-nowrap">{{ $p->diajukan_at?->translatedFormat('d M Y') ?? '-' }}</td>
                                 <td class="text-right"><a href="{{ route('operator.verifikasi.show', $p) }}" class="btn btn-primary btn-sm">Verifikasi</a></td>
                             </tr>

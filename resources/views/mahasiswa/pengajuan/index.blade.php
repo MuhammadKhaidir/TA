@@ -26,7 +26,7 @@
                         @foreach ($daftar as $p)
                             <tr>
                                 <td class="font-medium text-slate-900">{{ $p->judul }}</td>
-                                <td>{{ $p->pembimbing?->name ?? '-' }}</td>
+                                <td>{{ $p->ringkasanPembimbing() }}</td>
                                 <td><x-status-badge :status="$p->status" /></td>
                                 <td class="whitespace-nowrap">{{ $p->updated_at->translatedFormat('d M Y') }}</td>
                                 <td class="text-right"><a href="{{ route('mahasiswa.pengajuan.show', $p) }}" class="btn btn-secondary btn-sm">Detail</a></td>

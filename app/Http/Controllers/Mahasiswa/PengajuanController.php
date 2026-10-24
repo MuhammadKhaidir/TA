@@ -9,25 +9,31 @@ use App\Http\Controllers\Controller;
 use App\Models\Pengajuan;
 use App\Models\Persyaratan;
 use App\Models\User;
+use App\Services\PembimbingService;
 use App\Services\PengajuanWorkflow;
 use App\Support\Aktivitas;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class PengajuanController extends Controller
 {
-    public function __construct(private PengajuanWorkflow $workflow) {}
+    public function __construct(
+        private PengajuanWorkflow $workflow,
+        private PembimbingService $pembimbing,
+    ) {}
 
     public function index(Request $request, string $jenis): View
     {
         $jenis = JenisPengajuan::from($jenis);
         $user = $request->user();
 
-        $daftar = Pengajuan::with('pembimbing')
+        $daftar = Pengajuan::with(['pembimbing', 'pembimbingPilihan'])
             ->where('mahasiswa_id', $user->id)
             ->jenis($jenis)
             ->orderByDesc('updated_at')
@@ -51,6 +57,7 @@ class PengajuanController extends Controller
         return view('mahasiswa.pengajuan.form', [
             'jenis' => $jenis,
             'pengajuan' => null,
+            'bisaPilihPembimbing' => $jenis === JenisPengajuan::Ta,
             'dosen' => $this->daftarDosen(),
             'persyaratan' => $this->persyaratanAktif($jenis),
         ]);
@@ -65,15 +72,25 @@ class PengajuanController extends Controller
             return $this->tolakDuplikat($jenis);
         }
 
-        $data = $this->validasi($request, $jenis);
+        // KP: pembimbing ditetapkan operator, tidak dipilih mahasiswa. TA: mahasiswa memilih dosen.
+        $data = $this->validasi($request, $jenis, $jenis === JenisPengajuan::Ta);
+        $pilihan = Arr::pull($data, 'pembimbing_id');
 
-        $pengajuan = Pengajuan::create($data + [
-            'mahasiswa_id' => $user->id,
-            'jenis' => $jenis,
-            'status' => StatusPengajuan::Draft,
-        ]);
+        $pengajuan = DB::transaction(function () use ($data, $jenis, $user, $pilihan) {
+            $pengajuan = Pengajuan::create($data + [
+                'mahasiswa_id' => $user->id,
+                'jenis' => $jenis,
+                'status' => StatusPengajuan::Draft,
+            ]);
 
-        $this->workflow->catatAwal($pengajuan, $user);
+            $this->workflow->catatAwal($pengajuan, $user);
+
+            if ($pilihan !== null) {
+                $this->pembimbing->pilih($pengajuan, User::findOrFail($pilihan), $user);
+            }
+
+            return $pengajuan;
+        });
 
         return redirect()->route('mahasiswa.pengajuan.show', $pengajuan)
             ->with('sukses', 'Pengajuan dibuat sebagai draft. Unggah dokumen persyaratan, lalu kirim pengajuan.');
@@ -83,7 +100,10 @@ class PengajuanController extends Controller
     {
         $this->authorize('view', $pengajuan);
 
-        $pengajuan->load(['mahasiswa.programStudi', 'pembimbing', 'riwayat.user', 'dokumenResmi']);
+        $pengajuan->load([
+            'mahasiswa.programStudi', 'pembimbing', 'pembimbingPilihan', 'riwayat.user',
+            'riwayatPembimbing.dosen', 'riwayatPembimbing.oleh', 'dokumenResmi',
+        ]);
 
         return view('mahasiswa.pengajuan.show', ['pengajuan' => $pengajuan] + $this->workflow->dataDokumen($pengajuan));
     }
@@ -95,6 +115,7 @@ class PengajuanController extends Controller
         return view('mahasiswa.pengajuan.form', [
             'jenis' => $pengajuan->jenis,
             'pengajuan' => $pengajuan,
+            'bisaPilihPembimbing' => $this->bisaPilihPembimbing($pengajuan),
             'dosen' => $this->daftarDosen(),
             'persyaratan' => $this->persyaratanAktif($pengajuan->jenis),
         ]);
@@ -104,7 +125,18 @@ class PengajuanController extends Controller
     {
         $this->authorize('update', $pengajuan);
 
-        $pengajuan->update($this->validasi($request, $pengajuan->jenis));
+        // Dosen pilihan TA hanya dapat diganti selama draft. Setelah dikirim, penggantian lewat operator.
+        $bisaPilih = $this->bisaPilihPembimbing($pengajuan);
+        $data = $this->validasi($request, $pengajuan->jenis, $bisaPilih);
+        $pilihan = Arr::pull($data, 'pembimbing_id');
+
+        DB::transaction(function () use ($pengajuan, $data, $pilihan, $request, $bisaPilih) {
+            $pengajuan->update($data);
+
+            if ($bisaPilih && $pilihan !== null) {
+                $this->pembimbing->pilih($pengajuan, User::findOrFail($pilihan), $request->user());
+            }
+        });
 
         Aktivitas::catat('pengajuan.ubah', "Mengubah data pengajuan {$pengajuan->jenis->singkat()} #{$pengajuan->id}", $pengajuan);
 
@@ -136,18 +168,29 @@ class PengajuanController extends Controller
         return redirect()->route('mahasiswa.pengajuan.index', $jenis->value)->with('sukses', 'Draft pengajuan dihapus.');
     }
 
-    /** @return array<string, mixed> */
-    private function validasi(Request $request, JenisPengajuan $jenis): array
+    /** Mahasiswa hanya memilih pembimbing untuk TA yang masih draft. */
+    private function bisaPilihPembimbing(Pengajuan $pengajuan): bool
     {
-        return $request->validate([
+        return $pengajuan->jenis === JenisPengajuan::Ta && $pengajuan->status === StatusPengajuan::Draft;
+    }
+
+    /** @return array<string, mixed> */
+    private function validasi(Request $request, JenisPengajuan $jenis, bool $denganPilihanPembimbing): array
+    {
+        $aturan = [
             'judul' => ['required', 'string', 'max:255'],
             'deskripsi' => ['nullable', 'string', 'max:5000'],
             'instansi' => [$jenis === JenisPengajuan::Kp ? 'required' : 'nullable', 'string', 'max:255'],
-            'pembimbing_id' => [
+        ];
+
+        if ($denganPilihanPembimbing) {
+            $aturan['pembimbing_id'] = [
                 'required',
                 Rule::exists('users', 'id')->where(fn ($q) => $q->where('role', Role::Dosen->value)->where('aktif', true)),
-            ],
-        ]);
+            ];
+        }
+
+        return $request->validate($aturan);
     }
 
     /** Satu mahasiswa hanya boleh memiliki satu pengajuan per jenis yang belum diarsipkan. */

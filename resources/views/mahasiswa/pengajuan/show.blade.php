@@ -57,6 +57,7 @@
         <div class="space-y-6">
             @include('partials.pengajuan.ringkasan')
             @include('partials.pengajuan.riwayat')
+            @include('partials.pengajuan.riwayat-pembimbing')
         </div>
     </div>
 @endsection

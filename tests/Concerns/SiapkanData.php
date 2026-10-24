@@ -3,6 +3,7 @@
 namespace Tests\Concerns;
 
 use App\Enums\JenisPengajuan;
+use App\Enums\StatusPembimbing;
 use App\Enums\StatusPengajuan;
 use App\Models\Pengajuan;
 use App\Models\User;
@@ -29,9 +30,16 @@ trait SiapkanData
         StatusPengajuan $status = StatusPengajuan::Draft,
         JenisPengajuan $jenis = JenisPengajuan::Kp,
     ): Pengajuan {
+        // Bila dosen diberikan, pembimbing dianggap sah: KP ditetapkan operator, TA diterima dosen pilihan mahasiswa.
         return Pengajuan::create([
             'mahasiswa_id' => $mahasiswa->id,
             'pembimbing_id' => $dosen?->id,
+            'pembimbing_pilihan_id' => $dosen && $jenis === JenisPengajuan::Ta ? $dosen->id : null,
+            'status_pembimbing' => match (true) {
+                $dosen === null => StatusPembimbing::Belum,
+                $jenis === JenisPengajuan::Ta => StatusPembimbing::Diterima,
+                default => StatusPembimbing::Ditetapkan,
+            },
             'jenis' => $jenis,
             'judul' => 'Sistem Informasi Contoh',
             'instansi' => 'PT Contoh Nusantara',

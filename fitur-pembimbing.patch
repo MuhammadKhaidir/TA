@@ -1,0 +1,2230 @@
+From f857f5d9a899ee3c1216ee3e7bc8efbca442c410 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 25 Oct 2026 06:08:16 +0700
+Subject: [PATCH] Tambah alur dosen pembimbing KP dan TA
+
+- KP: dosen pembimbing ditetapkan operator dari daftar dosen (mahasiswa tidak memilih).
+- TA: mahasiswa memilih dosen saat pengajuan; dosen menerima atau menolak
+  (alasan wajib bila menolak). Bila ditolak, operator menetapkan pengganti
+  dengan beban bimbingan paling sedikit.
+- Dashboard mahasiswa menampilkan pembimbing KP dan TA beserta statusnya;
+  dashboard dosen dan operator menampilkan permintaan/antrean penetapan.
+- Riwayat dosen pembimbing (pelaku dan catatan) tersimpan dan tampil.
+- Dosen baru berwenang atas berkas setelah menjadi pembimbing yang sah.
+- Migrasi tambahan dengan backfill untuk pengajuan yang sudah punya pembimbing.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz6bmzU4tc523QrBXnnDzE
+---
+ README.md                                     |  31 +-
+ app/Enums/StatusPembimbing.php                |  58 +++
+ app/Http/Controllers/DashboardController.php  |  29 +-
+ .../Controllers/Dosen/BimbinganController.php |  42 +-
+ .../Mahasiswa/PengajuanController.php         |  75 +++-
+ .../Mahasiswa/StatusController.php            |   2 +-
+ .../Operator/DokumenResmiController.php       |   2 +-
+ .../Operator/PengajuanController.php          |  34 +-
+ .../Operator/VerifikasiController.php         |   2 +-
+ app/Models/Pengajuan.php                      |  72 +++-
+ app/Models/RiwayatPembimbing.php              |  37 ++
+ app/Models/User.php                           |  23 +-
+ app/Policies/PengajuanPolicy.php              |  18 +-
+ app/Services/PembimbingService.php            | 178 ++++++++
+ ...0001_add_pembimbing_to_pengajuan_table.php |  47 ++
+ ...000002_create_riwayat_pembimbing_table.php |  28 ++
+ lang/id/validation.php                        |   1 +
+ resources/views/dashboard/dosen.blade.php     |  10 +-
+ resources/views/dashboard/mahasiswa.blade.php |  42 +-
+ resources/views/dashboard/operator.blade.php  |  35 +-
+ .../views/dosen/bimbingan/index.blade.php     |  52 ++-
+ .../views/mahasiswa/pengajuan/form.blade.php  |  37 +-
+ .../views/mahasiswa/pengajuan/index.blade.php |   2 +-
+ .../views/mahasiswa/pengajuan/show.blade.php  |   1 +
+ .../views/mahasiswa/status/index.blade.php    |   7 +-
+ .../operator/dokumen-resmi/index.blade.php    |   2 +-
+ .../views/operator/pengajuan/index.blade.php  |  13 +-
+ .../views/operator/pengajuan/show.blade.php   |  78 +++-
+ .../views/operator/verifikasi/index.blade.php |   2 +-
+ .../partials/pengajuan/ringkasan.blade.php    |  11 +-
+ .../pengajuan/riwayat-pembimbing.blade.php    |  26 ++
+ routes/web.php                                |   1 +
+ tests/Concerns/SiapkanData.php                |   8 +
+ tests/Feature/AlurPengajuanTest.php           |  33 +-
+ tests/Feature/PembimbingTest.php              | 404 ++++++++++++++++++
+ tests/Feature/RenderHalamanTest.php           |  12 +-
+ 36 files changed, 1353 insertions(+), 102 deletions(-)
+ create mode 100644 app/Enums/StatusPembimbing.php
+ create mode 100644 app/Models/RiwayatPembimbing.php
+ create mode 100644 app/Services/PembimbingService.php
+ create mode 100644 database/migrations/2026_10_24_000001_add_pembimbing_to_pengajuan_table.php
+ create mode 100644 database/migrations/2026_10_24_000002_create_riwayat_pembimbing_table.php
+ create mode 100644 resources/views/partials/pengajuan/riwayat-pembimbing.blade.php
+ create mode 100644 tests/Feature/PembimbingTest.php
+
+diff --git a/README.md b/README.md
+index e8e1c7b..2f9a0cb 100644
+--- a/README.md
++++ b/README.md
+@@ -81,7 +81,7 @@ ## Akun contoh
+ 
+ ## Alur sistem
+ 
+-1. Mahasiswa membuat pengajuan KP/TA (judul, instansi, dosen pembimbing) dan mengunggah dokumen persyaratan. Pengajuan masih berstatus Draft.
++1. Mahasiswa membuat pengajuan KP/TA (judul, instansi; untuk TA ditambah dosen pembimbing pilihan) dan mengunggah dokumen persyaratan. Pengajuan masih berstatus Draft. Pembimbing KP tidak dipilih mahasiswa, lihat bagian Dosen pembimbing.
+ 2. Setelah semua dokumen wajib lengkap, mahasiswa mengirim pengajuan (Diajukan).
+ 3. Operator memeriksa dokumen yang menjadi tugas operator. Dokumen bisa Diterima atau Perlu Revisi (catatan wajib). Ada revisi: status Revisi Administrasi, mahasiswa memperbaiki hanya dokumen yang diminta, lalu mengirim ulang.
+ 4. Jika semua diterima, pengajuan Menunggu Dosen. Dosen pembimbing memeriksa dokumen akademik dengan cara yang sama (Revisi Akademik atau Disetujui).
+@@ -99,6 +99,28 @@ ## Alur sistem
+ 
+ Dokumen yang diunggah ulang disimpan sebagai versi baru; versi lama tetap ada sebagai jejak audit.
+ 
++## Dosen pembimbing
++
++Pembimbing KP dan TA berasal dari sumber yang berbeda.
++
++| | KP | TA |
++|---|---|---|
++| Siapa yang menentukan | Operator akademik, dari daftar dosen di database | Mahasiswa memilih saat membuat pengajuan |
++| Persetujuan dosen | Tidak perlu, langsung berlaku | Dosen pilihan menerima atau menolak (alasan wajib bila menolak) |
++| Bila ditolak | - | Operator menetapkan dosen pengganti |
++
++Alur TA: mahasiswa memilih dosen (status *Menunggu konfirmasi*), mengirim pengajuan, lalu permintaan muncul di halaman **Mahasiswa Bimbingan** milik dosen itu dan di kartu pada dashboard dosen. Dosen menerima (*Diterima*) atau menolak (*Ditolak*). Setelah ditolak, pengajuan masuk daftar **Perlu Penetapan Dosen Pembimbing** di dashboard operator dan dapat difilter di menu Pengelolaan KP/TA (filter Pembimbing: Perlu penetapan).
++
++Penetapan oleh operator ada di halaman Kelola pada pengajuan. Daftar dosen diurutkan dari **bimbingan aktif paling sedikit** (pengajuan yang sudah diarsipkan tidak dihitung) dan dosen dengan bimbingan paling sedikit sudah terpilih. Dosen yang menolak pengajuan itu tidak dapat dipilih lagi. Catatan wajib diisi bila operator menggantikan dosen yang masih menunggu konfirmasi atau yang sudah menerima.
++
++Hal lain yang perlu diketahui:
++
++- Dosen baru berwenang membuka dokumen dan memeriksa berkas setelah menjadi pembimbing yang sah (diterima atau ditetapkan). Dosen yang baru dipilih mahasiswa hanya melihat ringkasan permintaan.
++- Mahasiswa dapat mengganti dosen pilihan TA hanya selama pengajuan masih Draft.
++- Seluruh pemilihan, penerimaan, penolakan, dan penetapan tersimpan di riwayat dosen pembimbing beserta pelaku dan catatannya, tampil di halaman detail mahasiswa dan operator.
++- Dashboard mahasiswa menampilkan pembimbing KP dan TA beserta statusnya. Data diambil dari tabel yang sama dengan halaman lain.
++- Yang menetapkan pembimbing adalah operator, bukan admin. Bila di fakultas Anda berbeda, ubah ability `kelola` di `app/Policies/PengajuanPolicy.php` dan route `operator.pengajuan.pembimbing`.
++
+ ## Keamanan berkas
+ 
+ - Berkas disimpan di `storage/app/private`, tidak punya URL publik.
+@@ -137,7 +159,7 @@ ## Menjalankan uji otomatis
+ 
+ Uji memakai SQLite in-memory (butuh ekstensi `pdo_sqlite`), jadi tidak menyentuh database MySQL Anda.
+ 
+-Hasil terakhir di lingkungan pengembangan: **39 uji, 876 assertion, semuanya lulus.** Cakupannya:
++Hasil terakhir di lingkungan pengembangan: **52 uji, 1040 assertion, semuanya lulus.** Cakupannya:
+ 
+ - Login (email atau nomor induk), logout, akun nonaktif, pengalihan dashboard per peran, pencatatan log login.
+ - Matriks akses: setiap peran hanya dapat membuka halamannya sendiri (200) dan ditolak (403) di halaman peran lain, termasuk aksi tulis lintas peran dan ID yang tidak ada.
+@@ -145,7 +167,8 @@ ## Menjalankan uji otomatis
+ - Akses berkas privat: pemilik, pembimbing, dan operator dapat membuka; mahasiswa lain, dosen lain, admin, dan tamu ditolak; tidak ada URL publik.
+ - Sinkronisasi data setelah admin mengubah mahasiswa, dosen, program studi, dan persyaratan.
+ - CRUD admin (pengguna, program studi, persyaratan), validasi, perlindungan data yang dipakai, log aktivitas, profil, dan ganti kata sandi.
+-- Render semua halaman untuk setiap peran pada setiap status pengajuan.
++- Alur dosen pembimbing: KP ditetapkan operator, TA dipilih mahasiswa lalu diterima atau ditolak dosen, penetapan pengganti dengan bimbingan paling sedikit, hak akses, dan dashboard mahasiswa.
++- Render semua halaman untuk setiap peran pada setiap status pengajuan dan status pembimbing.
+ - Migrasi (naik dan rollback) serta seeder, termasuk aman dijalankan ulang.
+ 
+ ## Yang belum diuji
+@@ -161,7 +184,7 @@ ## Keterbatasan saat ini
+ - Dokumen resmi (surat pengantar, SK) diunggah operator sebagai berkas. Aplikasi belum membuat dokumen dari templat.
+ - Data Master baru berisi Program Studi.
+ - Belum ada notifikasi email, pencarian lintas arsip tingkat lanjut, atau ekspor laporan.
+-- Pembimbing dipilih saat pengajuan dan dapat diganti operator.
++- Satu pengajuan hanya memiliki satu dosen pembimbing (belum ada pembimbing kedua) dan belum ada batas kuota bimbingan per dosen.
+ 
+ ## Menempelkan ke proyek Laravel yang sudah ada
+ 
+diff --git a/app/Enums/StatusPembimbing.php b/app/Enums/StatusPembimbing.php
+new file mode 100644
+index 0000000..47c70d5
+--- /dev/null
++++ b/app/Enums/StatusPembimbing.php
+@@ -0,0 +1,58 @@
++<?php
++
++namespace App\Enums;
++
++/**
++ * Status dosen pembimbing pada sebuah pengajuan.
++ *
++ *  KP : belum -> ditetapkan (operator menetapkan dari daftar dosen)
++ *  TA : menunggu (dipilih mahasiswa) -> diterima | ditolak -> (bila ditolak) ditetapkan oleh operator
++ */
++enum StatusPembimbing: string
++{
++    case Belum = 'belum';
++    case Menunggu = 'menunggu';
++    case Diterima = 'diterima';
++    case Ditolak = 'ditolak';
++    case Ditetapkan = 'ditetapkan';
++
++    public function label(): string
++    {
++        return match ($this) {
++            self::Belum => 'Belum ditentukan',
++            self::Menunggu => 'Menunggu konfirmasi dosen',
++            self::Diterima => 'Diterima dosen',
++            self::Ditolak => 'Ditolak dosen',
++            self::Ditetapkan => 'Ditetapkan operator',
++        };
++    }
++
++    /** Label untuk baris riwayat pembimbing. */
++    public function labelRiwayat(): string
++    {
++        return match ($this) {
++            self::Belum => 'Belum ditentukan',
++            self::Menunggu => 'Dipilih mahasiswa',
++            self::Diterima => 'Diterima dosen',
++            self::Ditolak => 'Ditolak dosen',
++            self::Ditetapkan => 'Ditetapkan operator',
++        };
++    }
++
++    public function badge(): string
++    {
++        return match ($this) {
++            self::Belum => 'bg-slate-100 text-slate-700 ring-slate-300',
++            self::Menunggu => 'bg-blue-50 text-blue-700 ring-blue-200',
++            self::Diterima => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
++            self::Ditolak => 'bg-red-50 text-red-700 ring-red-200',
++            self::Ditetapkan => 'bg-navy-50 text-navy-800 ring-navy-200',
++        };
++    }
++
++    /** Pembimbing sudah sah: dosen boleh memeriksa berkas pengajuan. */
++    public function aktif(): bool
++    {
++        return in_array($this, [self::Diterima, self::Ditetapkan], true);
++    }
++}
+diff --git a/app/Http/Controllers/DashboardController.php b/app/Http/Controllers/DashboardController.php
+index 8c7260c..2dd00ba 100644
+--- a/app/Http/Controllers/DashboardController.php
++++ b/app/Http/Controllers/DashboardController.php
+@@ -2,6 +2,8 @@
+ 
+ namespace App\Http\Controllers;
+ 
++use App\Enums\JenisPengajuan;
++use App\Enums\StatusPembimbing;
+ use App\Enums\StatusPengajuan;
+ use App\Models\LogAktivitas;
+ use App\Models\Pemeriksaan;
+@@ -24,7 +26,11 @@ public function arahkan(Request $request): RedirectResponse
+     public function mahasiswa(Request $request): View
+     {
+         $user = $request->user()->load('programStudi');
+-        $pengajuan = $user->pengajuan()->with('pembimbing')->orderByDesc('updated_at')->get();
++        $pengajuan = $user->pengajuan()->with(['pembimbing', 'pembimbingPilihan'])->orderByDesc('updated_at')->get();
++
++        // Pembimbing per jenis: KP ditetapkan operator dari database dosen, TA berasal dari pilihan mahasiswa.
++        $pengajuanKp = $pengajuan->first(fn (Pengajuan $p) => $p->jenis === JenisPengajuan::Kp);
++        $pengajuanTa = $pengajuan->first(fn (Pengajuan $p) => $p->jenis === JenisPengajuan::Ta);
+ 
+         $perluRevisi = $pengajuan->filter(fn (Pengajuan $p) => in_array(
+             $p->status, [StatusPengajuan::RevisiAdministrasi, StatusPengajuan::RevisiAkademik], true,
+@@ -34,7 +40,7 @@ public function mahasiswa(Request $request): View
+         ))->count();
+         $selesai = $pengajuan->filter(fn (Pengajuan $p) => $p->status === StatusPengajuan::Diarsipkan)->count();
+ 
+-        return view('dashboard.mahasiswa', compact('user', 'pengajuan', 'perluRevisi', 'dalamProses', 'selesai'));
++        return view('dashboard.mahasiswa', compact('user', 'pengajuan', 'pengajuanKp', 'pengajuanTa', 'perluRevisi', 'dalamProses', 'selesai'));
+     }
+ 
+     public function dosen(Request $request): View
+@@ -51,7 +57,12 @@ public function dosen(Request $request): View
+         $selesai = Pengajuan::where('pembimbing_id', $user->id)->status(StatusPengajuan::Diarsipkan)->count();
+         $totalDiperiksa = Pemeriksaan::where('pemeriksa_id', $user->id)->count();
+ 
+-        return view('dashboard.dosen', compact('antrean', 'jumlahMahasiswa', 'selesai', 'totalDiperiksa'));
++        $permintaanPembimbing = Pengajuan::where('pembimbing_pilihan_id', $user->id)
++            ->where('status_pembimbing', StatusPembimbing::Menunggu->value)
++            ->where('status', '!=', StatusPengajuan::Draft->value)
++            ->count();
++
++        return view('dashboard.dosen', compact('antrean', 'jumlahMahasiswa', 'selesai', 'totalDiperiksa', 'permintaanPembimbing'));
+     }
+ 
+     public function operator(): View
+@@ -70,7 +81,17 @@ public function operator(): View
+             ->limit(5)
+             ->get();
+ 
+-        return view('dashboard.operator', compact('jumlah', 'antreanVerifikasi', 'perluDokumenResmi'));
++        $jumlahPerluPembimbing = Pengajuan::perluPembimbing()->count();
++
++        $perluPembimbing = Pengajuan::with(['mahasiswa.programStudi', 'pembimbingPilihan'])
++            ->perluPembimbing()
++            ->orderBy('diajukan_at')
++            ->limit(5)
++            ->get();
++
++        return view('dashboard.operator', compact(
++            'jumlah', 'antreanVerifikasi', 'perluDokumenResmi', 'jumlahPerluPembimbing', 'perluPembimbing',
++        ));
+     }
+ 
+     public function admin(): View
+diff --git a/app/Http/Controllers/Dosen/BimbinganController.php b/app/Http/Controllers/Dosen/BimbinganController.php
+index 885da54..1b99889 100644
+--- a/app/Http/Controllers/Dosen/BimbinganController.php
++++ b/app/Http/Controllers/Dosen/BimbinganController.php
+@@ -2,19 +2,35 @@
+ 
+ namespace App\Http\Controllers\Dosen;
+ 
++use App\Enums\StatusPembimbing;
++use App\Enums\StatusPengajuan;
+ use App\Http\Controllers\Controller;
+ use App\Models\Pengajuan;
++use App\Services\PembimbingService;
++use Illuminate\Http\RedirectResponse;
+ use Illuminate\Http\Request;
++use Illuminate\Validation\Rule;
+ use Illuminate\View\View;
+ 
+ class BimbinganController extends Controller
+ {
++    public function __construct(private PembimbingService $pembimbing) {}
++
+     public function index(Request $request): View
+     {
++        $user = $request->user();
+         $filter = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
+ 
++        // Permintaan pembimbing TA yang dipilih mahasiswa dan menunggu jawaban dosen ini.
++        $permintaan = Pengajuan::with('mahasiswa.programStudi')
++            ->where('pembimbing_pilihan_id', $user->id)
++            ->where('status_pembimbing', StatusPembimbing::Menunggu->value)
++            ->where('status', '!=', StatusPengajuan::Draft->value)
++            ->orderBy('diajukan_at')
++            ->get();
++
+         $daftar = Pengajuan::with('mahasiswa.programStudi')
+-            ->where('pembimbing_id', $request->user()->id)
++            ->where('pembimbing_id', $user->id)
+             ->when($filter['q'] ?? null, function ($query, $kata) {
+                 $query->whereHas('mahasiswa', fn ($m) => $m
+                     ->where('name', 'like', "%{$kata}%")
+@@ -24,6 +40,28 @@ public function index(Request $request): View
+             ->paginate(15)
+             ->withQueryString();
+ 
+-        return view('dosen.bimbingan.index', compact('daftar', 'filter'));
++        return view('dosen.bimbingan.index', compact('daftar', 'filter', 'permintaan'));
++    }
++
++    /** Dosen menerima atau menolak permintaan menjadi pembimbing TA. */
++    public function konfirmasi(Request $request, Pengajuan $pengajuan): RedirectResponse
++    {
++        $this->authorize('konfirmasiPembimbing', $pengajuan);
++
++        $data = $request->validate([
++            'keputusan' => ['required', Rule::in(['terima', 'tolak'])],
++            'catatan' => ['nullable', 'string', 'max:2000'],
++        ]);
++
++        $terima = $data['keputusan'] === 'terima';
++
++        $this->pembimbing->konfirmasi($pengajuan, $request->user(), $terima, $data['catatan'] ?? null);
++
++        return redirect()->route('dosen.bimbingan.index')->with(
++            'sukses',
++            $terima
++                ? 'Anda menjadi pembimbing TA mahasiswa tersebut.'
++                : 'Permintaan ditolak. Operator akademik akan menetapkan dosen pengganti.',
++        );
+     }
+ }
+diff --git a/app/Http/Controllers/Mahasiswa/PengajuanController.php b/app/Http/Controllers/Mahasiswa/PengajuanController.php
+index dd73c38..8a649bf 100644
+--- a/app/Http/Controllers/Mahasiswa/PengajuanController.php
++++ b/app/Http/Controllers/Mahasiswa/PengajuanController.php
+@@ -9,25 +9,31 @@
+ use App\Models\Pengajuan;
+ use App\Models\Persyaratan;
+ use App\Models\User;
++use App\Services\PembimbingService;
+ use App\Services\PengajuanWorkflow;
+ use App\Support\Aktivitas;
+ use Illuminate\Database\Eloquent\Collection;
+ use Illuminate\Http\RedirectResponse;
+ use Illuminate\Http\Request;
++use Illuminate\Support\Arr;
++use Illuminate\Support\Facades\DB;
+ use Illuminate\Support\Facades\Storage;
+ use Illuminate\Validation\Rule;
+ use Illuminate\View\View;
+ 
+ class PengajuanController extends Controller
+ {
+-    public function __construct(private PengajuanWorkflow $workflow) {}
++    public function __construct(
++        private PengajuanWorkflow $workflow,
++        private PembimbingService $pembimbing,
++    ) {}
+ 
+     public function index(Request $request, string $jenis): View
+     {
+         $jenis = JenisPengajuan::from($jenis);
+         $user = $request->user();
+ 
+-        $daftar = Pengajuan::with('pembimbing')
++        $daftar = Pengajuan::with(['pembimbing', 'pembimbingPilihan'])
+             ->where('mahasiswa_id', $user->id)
+             ->jenis($jenis)
+             ->orderByDesc('updated_at')
+@@ -51,6 +57,7 @@ public function create(Request $request, string $jenis): View|RedirectResponse
+         return view('mahasiswa.pengajuan.form', [
+             'jenis' => $jenis,
+             'pengajuan' => null,
++            'bisaPilihPembimbing' => $jenis === JenisPengajuan::Ta,
+             'dosen' => $this->daftarDosen(),
+             'persyaratan' => $this->persyaratanAktif($jenis),
+         ]);
+@@ -65,15 +72,25 @@ public function store(Request $request, string $jenis): RedirectResponse
+             return $this->tolakDuplikat($jenis);
+         }
+ 
+-        $data = $this->validasi($request, $jenis);
++        // KP: pembimbing ditetapkan operator, tidak dipilih mahasiswa. TA: mahasiswa memilih dosen.
++        $data = $this->validasi($request, $jenis, $jenis === JenisPengajuan::Ta);
++        $pilihan = Arr::pull($data, 'pembimbing_id');
+ 
+-        $pengajuan = Pengajuan::create($data + [
+-            'mahasiswa_id' => $user->id,
+-            'jenis' => $jenis,
+-            'status' => StatusPengajuan::Draft,
+-        ]);
++        $pengajuan = DB::transaction(function () use ($data, $jenis, $user, $pilihan) {
++            $pengajuan = Pengajuan::create($data + [
++                'mahasiswa_id' => $user->id,
++                'jenis' => $jenis,
++                'status' => StatusPengajuan::Draft,
++            ]);
++
++            $this->workflow->catatAwal($pengajuan, $user);
++
++            if ($pilihan !== null) {
++                $this->pembimbing->pilih($pengajuan, User::findOrFail($pilihan), $user);
++            }
+ 
+-        $this->workflow->catatAwal($pengajuan, $user);
++            return $pengajuan;
++        });
+ 
+         return redirect()->route('mahasiswa.pengajuan.show', $pengajuan)
+             ->with('sukses', 'Pengajuan dibuat sebagai draft. Unggah dokumen persyaratan, lalu kirim pengajuan.');
+@@ -83,7 +100,10 @@ public function show(Pengajuan $pengajuan): View
+     {
+         $this->authorize('view', $pengajuan);
+ 
+-        $pengajuan->load(['mahasiswa.programStudi', 'pembimbing', 'riwayat.user', 'dokumenResmi']);
++        $pengajuan->load([
++            'mahasiswa.programStudi', 'pembimbing', 'pembimbingPilihan', 'riwayat.user',
++            'riwayatPembimbing.dosen', 'riwayatPembimbing.oleh', 'dokumenResmi',
++        ]);
+ 
+         return view('mahasiswa.pengajuan.show', ['pengajuan' => $pengajuan] + $this->workflow->dataDokumen($pengajuan));
+     }
+@@ -95,6 +115,7 @@ public function edit(Pengajuan $pengajuan): View
+         return view('mahasiswa.pengajuan.form', [
+             'jenis' => $pengajuan->jenis,
+             'pengajuan' => $pengajuan,
++            'bisaPilihPembimbing' => $this->bisaPilihPembimbing($pengajuan),
+             'dosen' => $this->daftarDosen(),
+             'persyaratan' => $this->persyaratanAktif($pengajuan->jenis),
+         ]);
+@@ -104,7 +125,18 @@ public function update(Request $request, Pengajuan $pengajuan): RedirectResponse
+     {
+         $this->authorize('update', $pengajuan);
+ 
+-        $pengajuan->update($this->validasi($request, $pengajuan->jenis));
++        // Dosen pilihan TA hanya dapat diganti selama draft. Setelah dikirim, penggantian lewat operator.
++        $bisaPilih = $this->bisaPilihPembimbing($pengajuan);
++        $data = $this->validasi($request, $pengajuan->jenis, $bisaPilih);
++        $pilihan = Arr::pull($data, 'pembimbing_id');
++
++        DB::transaction(function () use ($pengajuan, $data, $pilihan, $request, $bisaPilih) {
++            $pengajuan->update($data);
++
++            if ($bisaPilih && $pilihan !== null) {
++                $this->pembimbing->pilih($pengajuan, User::findOrFail($pilihan), $request->user());
++            }
++        });
+ 
+         Aktivitas::catat('pengajuan.ubah', "Mengubah data pengajuan {$pengajuan->jenis->singkat()} #{$pengajuan->id}", $pengajuan);
+ 
+@@ -136,18 +168,29 @@ public function destroy(Pengajuan $pengajuan): RedirectResponse
+         return redirect()->route('mahasiswa.pengajuan.index', $jenis->value)->with('sukses', 'Draft pengajuan dihapus.');
+     }
+ 
++    /** Mahasiswa hanya memilih pembimbing untuk TA yang masih draft. */
++    private function bisaPilihPembimbing(Pengajuan $pengajuan): bool
++    {
++        return $pengajuan->jenis === JenisPengajuan::Ta && $pengajuan->status === StatusPengajuan::Draft;
++    }
++
+     /** @return array<string, mixed> */
+-    private function validasi(Request $request, JenisPengajuan $jenis): array
++    private function validasi(Request $request, JenisPengajuan $jenis, bool $denganPilihanPembimbing): array
+     {
+-        return $request->validate([
++        $aturan = [
+             'judul' => ['required', 'string', 'max:255'],
+             'deskripsi' => ['nullable', 'string', 'max:5000'],
+             'instansi' => [$jenis === JenisPengajuan::Kp ? 'required' : 'nullable', 'string', 'max:255'],
+-            'pembimbing_id' => [
++        ];
++
++        if ($denganPilihanPembimbing) {
++            $aturan['pembimbing_id'] = [
+                 'required',
+                 Rule::exists('users', 'id')->where(fn ($q) => $q->where('role', Role::Dosen->value)->where('aktif', true)),
+-            ],
+-        ]);
++            ];
++        }
++
++        return $request->validate($aturan);
+     }
+ 
+     /** Satu mahasiswa hanya boleh memiliki satu pengajuan per jenis yang belum diarsipkan. */
+diff --git a/app/Http/Controllers/Mahasiswa/StatusController.php b/app/Http/Controllers/Mahasiswa/StatusController.php
+index 4c8c70f..6b3f21e 100644
+--- a/app/Http/Controllers/Mahasiswa/StatusController.php
++++ b/app/Http/Controllers/Mahasiswa/StatusController.php
+@@ -11,7 +11,7 @@ class StatusController extends Controller
+ {
+     public function index(Request $request): View
+     {
+-        $daftar = Pengajuan::with(['pembimbing', 'riwayat.user'])
++        $daftar = Pengajuan::with(['pembimbing', 'pembimbingPilihan', 'riwayat.user', 'riwayatPembimbing.dosen', 'riwayatPembimbing.oleh'])
+             ->where('mahasiswa_id', $request->user()->id)
+             ->orderByDesc('updated_at')
+             ->get();
+diff --git a/app/Http/Controllers/Operator/DokumenResmiController.php b/app/Http/Controllers/Operator/DokumenResmiController.php
+index 24b6ad3..ed52a43 100644
+--- a/app/Http/Controllers/Operator/DokumenResmiController.php
++++ b/app/Http/Controllers/Operator/DokumenResmiController.php
+@@ -21,7 +21,7 @@ public function __construct(private PengajuanWorkflow $workflow) {}
+ 
+     public function index(): View
+     {
+-        $perluDiproses = Pengajuan::with(['mahasiswa.programStudi', 'pembimbing'])
++        $perluDiproses = Pengajuan::with(['mahasiswa.programStudi', 'pembimbing', 'pembimbingPilihan'])
+             ->status(StatusPengajuan::Disetujui)
+             ->orderBy('updated_at')
+             ->get();
+diff --git a/app/Http/Controllers/Operator/PengajuanController.php b/app/Http/Controllers/Operator/PengajuanController.php
+index a3dfe62..331c7dc 100644
+--- a/app/Http/Controllers/Operator/PengajuanController.php
++++ b/app/Http/Controllers/Operator/PengajuanController.php
+@@ -9,30 +9,35 @@
+ use App\Models\Pengajuan;
+ use App\Models\ProgramStudi;
+ use App\Models\User;
++use App\Services\PembimbingService;
+ use App\Services\PengajuanWorkflow;
+-use App\Support\Aktivitas;
+ use Illuminate\Http\RedirectResponse;
+ use Illuminate\Http\Request;
+ use Illuminate\Validation\Rule;
+ use Illuminate\View\View;
+ 
+-/** Menu "Pengelolaan KP/TA": melihat seluruh pengajuan dan mengatur dosen pembimbing. */
++/** Menu "Pengelolaan KP/TA": melihat seluruh pengajuan dan menetapkan dosen pembimbing. */
+ class PengajuanController extends Controller
+ {
+-    public function __construct(private PengajuanWorkflow $workflow) {}
++    public function __construct(
++        private PengajuanWorkflow $workflow,
++        private PembimbingService $pembimbing,
++    ) {}
+ 
+     public function index(Request $request): View
+     {
+         $filter = $request->validate([
+             'jenis' => ['nullable', Rule::in(array_keys(JenisPengajuan::pilihan()))],
+             'status' => ['nullable', Rule::in(array_keys(StatusPengajuan::pilihan()))],
++            'pembimbing' => ['nullable', Rule::in(['perlu'])],
+             'prodi' => ['nullable', 'integer'],
+             'q' => ['nullable', 'string', 'max:100'],
+         ]);
+ 
+-        $daftar = Pengajuan::with(['mahasiswa.programStudi', 'pembimbing'])
++        $daftar = Pengajuan::with(['mahasiswa.programStudi', 'pembimbing', 'pembimbingPilihan'])
+             ->when($filter['jenis'] ?? null, fn ($q, $v) => $q->where('jenis', $v))
+             ->when($filter['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
++            ->when(($filter['pembimbing'] ?? null) === 'perlu', fn ($q) => $q->perluPembimbing())
+             ->when($filter['prodi'] ?? null, fn ($q, $v) => $q->whereHas('mahasiswa', fn ($m) => $m->where('program_studi_id', $v)))
+             ->when($filter['q'] ?? null, function ($q, $kata) {
+                 $q->where(function ($w) use ($kata) {
+@@ -57,14 +62,19 @@ public function show(Pengajuan $pengajuan): View
+     {
+         $this->authorize('view', $pengajuan);
+ 
+-        $pengajuan->load(['mahasiswa.programStudi', 'pembimbing', 'riwayat.user', 'dokumenResmi', 'arsip']);
++        $pengajuan->load([
++            'mahasiswa.programStudi', 'pembimbing', 'pembimbingPilihan', 'riwayat.user',
++            'riwayatPembimbing.dosen', 'riwayatPembimbing.oleh', 'dokumenResmi', 'arsip',
++        ]);
+ 
+         return view('operator.pengajuan.show', [
+             'pengajuan' => $pengajuan,
+-            'dosen' => User::peran(Role::Dosen)->aktif()->orderBy('name')->get(),
++            // Diurutkan dari beban bimbingan paling sedikit.
++            'dosen' => $this->pembimbing->daftarDosen($pengajuan),
+         ] + $this->workflow->dataDokumen($pengajuan));
+     }
+ 
++    /** Menetapkan atau mengganti dosen pembimbing (KP maupun TA). */
+     public function pembimbing(Request $request, Pengajuan $pengajuan): RedirectResponse
+     {
+         $this->authorize('kelola', $pengajuan);
+@@ -74,17 +84,13 @@ public function pembimbing(Request $request, Pengajuan $pengajuan): RedirectResp
+                 'required',
+                 Rule::exists('users', 'id')->where(fn ($q) => $q->where('role', Role::Dosen->value)->where('aktif', true)),
+             ],
++            'catatan' => ['nullable', 'string', 'max:2000'],
+         ]);
+ 
+-        $pengajuan->update($data);
++        $dosen = User::findOrFail($data['pembimbing_id']);
+ 
+-        $dosen = User::find($data['pembimbing_id']);
+-        Aktivitas::catat(
+-            'pengajuan.pembimbing',
+-            "Menetapkan {$dosen->name} sebagai pembimbing pengajuan {$pengajuan->jenis->singkat()} #{$pengajuan->id}",
+-            $pengajuan,
+-        );
++        $this->pembimbing->tetapkan($pengajuan, $dosen, $request->user(), $data['catatan'] ?? null);
+ 
+-        return back()->with('sukses', 'Dosen pembimbing diperbarui.');
++        return back()->with('sukses', "{$dosen->name} ditetapkan sebagai dosen pembimbing.");
+     }
+ }
+diff --git a/app/Http/Controllers/Operator/VerifikasiController.php b/app/Http/Controllers/Operator/VerifikasiController.php
+index d67e761..d2304e4 100644
+--- a/app/Http/Controllers/Operator/VerifikasiController.php
++++ b/app/Http/Controllers/Operator/VerifikasiController.php
+@@ -18,7 +18,7 @@ public function __construct(private PengajuanWorkflow $workflow) {}
+     /** Antrean pengajuan yang menunggu verifikasi administrasi. */
+     public function index(): View
+     {
+-        $daftar = Pengajuan::with(['mahasiswa.programStudi', 'pembimbing'])
++        $daftar = Pengajuan::with(['mahasiswa.programStudi', 'pembimbing', 'pembimbingPilihan'])
+             ->status(StatusPengajuan::Diajukan)
+             ->orderBy('diajukan_at')
+             ->paginate(15);
+diff --git a/app/Models/Pengajuan.php b/app/Models/Pengajuan.php
+index f443663..e6b1cb2 100644
+--- a/app/Models/Pengajuan.php
++++ b/app/Models/Pengajuan.php
+@@ -3,6 +3,7 @@
+ namespace App\Models;
+ 
+ use App\Enums\JenisPengajuan;
++use App\Enums\StatusPembimbing;
+ use App\Enums\StatusPengajuan;
+ use Illuminate\Database\Eloquent\Builder;
+ use Illuminate\Database\Eloquent\Model;
+@@ -15,8 +16,13 @@ class Pengajuan extends Model
+     protected $table = 'pengajuan';
+ 
+     protected $fillable = [
+-        'mahasiswa_id', 'pembimbing_id', 'jenis', 'judul', 'deskripsi',
+-        'instansi', 'status', 'diajukan_at',
++        'mahasiswa_id', 'pembimbing_id', 'pembimbing_pilihan_id', 'status_pembimbing',
++        'jenis', 'judul', 'deskripsi', 'instansi', 'status', 'diajukan_at',
++    ];
++
++    /** Nilai awal agar model yang baru dibuat langsung memiliki status pembimbing. */
++    protected $attributes = [
++        'status_pembimbing' => 'belum',
+     ];
+ 
+     protected function casts(): array
+@@ -24,6 +30,7 @@ protected function casts(): array
+         return [
+             'jenis' => JenisPengajuan::class,
+             'status' => StatusPengajuan::class,
++            'status_pembimbing' => StatusPembimbing::class,
+             'diajukan_at' => 'datetime',
+         ];
+     }
+@@ -33,11 +40,23 @@ public function mahasiswa(): BelongsTo
+         return $this->belongsTo(User::class, 'mahasiswa_id');
+     }
+ 
++    /** Dosen pembimbing yang sah (sudah menerima atau ditetapkan operator). Null bila belum ada. */
+     public function pembimbing(): BelongsTo
+     {
+         return $this->belongsTo(User::class, 'pembimbing_id');
+     }
+ 
++    /** Khusus TA: dosen yang dipilih mahasiswa saat pengajuan. */
++    public function pembimbingPilihan(): BelongsTo
++    {
++        return $this->belongsTo(User::class, 'pembimbing_pilihan_id');
++    }
++
++    public function riwayatPembimbing(): HasMany
++    {
++        return $this->hasMany(RiwayatPembimbing::class, 'pengajuan_id')->orderBy('id');
++    }
++
+     public function dokumen(): HasMany
+     {
+         return $this->hasMany(DokumenPengajuan::class, 'pengajuan_id');
+@@ -77,4 +96,53 @@ public function scopeStatus(Builder $query, StatusPengajuan ...$status): Builder
+     {
+         return $query->whereIn('status', array_map(fn (StatusPengajuan $s) => $s->value, $status));
+     }
++
++    /**
++     * Pengajuan yang sudah dikirim tetapi masih membutuhkan penetapan pembimbing oleh operator:
++     * belum ada pembimbing (KP), ditolak dosen (TA), atau dosen pilihan mahasiswa sudah nonaktif.
++     */
++    public function scopePerluPembimbing(Builder $query): Builder
++    {
++        return $query
++            ->whereNotIn('status', [StatusPengajuan::Draft->value, StatusPengajuan::Diarsipkan->value])
++            ->where(function (Builder $q) {
++                $q->whereIn('status_pembimbing', [StatusPembimbing::Belum->value, StatusPembimbing::Ditolak->value])
++                    ->orWhere(function (Builder $w) {
++                        $w->where('status_pembimbing', StatusPembimbing::Menunggu->value)
++                            ->whereHas('pembimbingPilihan', fn (Builder $d) => $d->where('aktif', false));
++                    });
++            });
++    }
++
++    /** Teks singkat pembimbing untuk tabel: nama dosen sah, atau keadaan terkini bila belum ada. */
++    public function ringkasanPembimbing(): string
++    {
++        if ($this->pembimbing_id !== null) {
++            return $this->pembimbing?->name ?? '-';
++        }
++
++        return match ($this->status_pembimbing) {
++            StatusPembimbing::Menunggu => ($this->pembimbingPilihan?->name ?? '-').' (menunggu konfirmasi)',
++            StatusPembimbing::Ditolak => 'Ditolak dosen, menunggu penetapan operator',
++            default => 'Belum ditentukan',
++        };
++    }
++
++    /** Penjelasan singkat tentang asal dan status dosen pembimbing. */
++    public function keteranganPembimbing(): string
++    {
++        $pilihan = $this->pembimbingPilihan?->name ?? 'Dosen pilihan';
++
++        return match ($this->status_pembimbing) {
++            StatusPembimbing::Diterima => 'Dosen pilihan mahasiswa telah menerima permintaan pembimbing.',
++            StatusPembimbing::Ditetapkan => 'Ditetapkan oleh operator akademik.',
++            StatusPembimbing::Menunggu => $this->status === StatusPengajuan::Draft
++                ? "{$pilihan} baru menerima permintaan setelah pengajuan dikirim."
++                : "Menunggu konfirmasi dari {$pilihan}.",
++            StatusPembimbing::Ditolak => "{$pilihan} menolak. Operator akademik akan menetapkan dosen pengganti.",
++            default => $this->jenis === JenisPengajuan::Kp
++                ? 'Ditetapkan oleh operator akademik setelah pengajuan dikirim.'
++                : 'Belum ditentukan.',
++        };
++    }
+ }
+diff --git a/app/Models/RiwayatPembimbing.php b/app/Models/RiwayatPembimbing.php
+new file mode 100644
+index 0000000..975fd7e
+--- /dev/null
++++ b/app/Models/RiwayatPembimbing.php
+@@ -0,0 +1,37 @@
++<?php
++
++namespace App\Models;
++
++use App\Enums\StatusPembimbing;
++use Illuminate\Database\Eloquent\Model;
++use Illuminate\Database\Eloquent\Relations\BelongsTo;
++
++/** Jejak setiap pemilihan, konfirmasi, penolakan, dan penetapan dosen pembimbing. */
++class RiwayatPembimbing extends Model
++{
++    protected $table = 'riwayat_pembimbing';
++
++    protected $fillable = ['pengajuan_id', 'dosen_id', 'user_id', 'status', 'catatan'];
++
++    protected function casts(): array
++    {
++        return ['status' => StatusPembimbing::class];
++    }
++
++    public function pengajuan(): BelongsTo
++    {
++        return $this->belongsTo(Pengajuan::class, 'pengajuan_id');
++    }
++
++    /** Dosen yang bersangkutan pada baris riwayat ini. */
++    public function dosen(): BelongsTo
++    {
++        return $this->belongsTo(User::class, 'dosen_id');
++    }
++
++    /** Pengguna yang melakukan tindakan (mahasiswa, dosen, atau operator). */
++    public function oleh(): BelongsTo
++    {
++        return $this->belongsTo(User::class, 'user_id');
++    }
++}
+diff --git a/app/Models/User.php b/app/Models/User.php
+index aab4e7e..ab5a94c 100644
+--- a/app/Models/User.php
++++ b/app/Models/User.php
+@@ -3,6 +3,8 @@
+ namespace App\Models;
+ 
+ use App\Enums\Role;
++use App\Enums\StatusPembimbing;
++use App\Enums\StatusPengajuan;
+ use Database\Factories\UserFactory;
+ use Illuminate\Database\Eloquent\Builder;
+ use Illuminate\Database\Eloquent\Factories\HasFactory;
+@@ -45,12 +47,18 @@ public function pengajuan(): HasMany
+         return $this->hasMany(Pengajuan::class, 'mahasiswa_id');
+     }
+ 
+-    /** Pengajuan yang dibimbing dosen ini. */
++    /** Pengajuan yang dibimbing dosen ini (pembimbing sah). */
+     public function bimbingan(): HasMany
+     {
+         return $this->hasMany(Pengajuan::class, 'pembimbing_id');
+     }
+ 
++    /** Pengajuan TA yang memilih dosen ini sebagai calon pembimbing. */
++    public function permintaanPembimbing(): HasMany
++    {
++        return $this->hasMany(Pengajuan::class, 'pembimbing_pilihan_id');
++    }
++
+     public function pemeriksaan(): HasMany
+     {
+         return $this->hasMany(Pemeriksaan::class, 'pemeriksa_id');
+@@ -70,4 +78,17 @@ public function scopeAktif(Builder $query): Builder
+     {
+         return $query->where('aktif', true);
+     }
++
++    /**
++     * Menambahkan beban bimbingan dosen:
++     * beban_aktif (pengajuan yang sedang dibimbing, belum diarsipkan) dan
++     * beban_menunggu (permintaan TA yang belum dijawab).
++     */
++    public function scopeDenganBeban(Builder $query): Builder
++    {
++        return $query->withCount([
++            'bimbingan as beban_aktif' => fn (Builder $q) => $q->where('status', '!=', StatusPengajuan::Diarsipkan->value),
++            'permintaanPembimbing as beban_menunggu' => fn (Builder $q) => $q->where('status_pembimbing', StatusPembimbing::Menunggu->value),
++        ]);
++    }
+ }
+diff --git a/app/Policies/PengajuanPolicy.php b/app/Policies/PengajuanPolicy.php
+index cbaea6b..afc4086 100644
+--- a/app/Policies/PengajuanPolicy.php
++++ b/app/Policies/PengajuanPolicy.php
+@@ -2,7 +2,9 @@
+ 
+ namespace App\Policies;
+ 
++use App\Enums\JenisPengajuan;
+ use App\Enums\Role;
++use App\Enums\StatusPembimbing;
+ use App\Enums\StatusPengajuan;
+ use App\Models\Pengajuan;
+ use App\Models\User;
+@@ -53,7 +55,21 @@ public function periksa(User $user, Pengajuan $pengajuan): bool
+             && $pengajuan->status === StatusPengajuan::MenungguDosen;
+     }
+ 
+-    /** Operator mengganti dosen pembimbing selama belum diarsipkan. */
++    /**
++     * Dosen yang dipilih mahasiswa menjawab permintaan pembimbing TA.
++     * Baru berlaku setelah pengajuan dikirim, dan hanya selama permintaan masih menunggu.
++     */
++    public function konfirmasiPembimbing(User $user, Pengajuan $pengajuan): bool
++    {
++        return $user->role === Role::Dosen
++            && $pengajuan->jenis === JenisPengajuan::Ta
++            && $pengajuan->status_pembimbing === StatusPembimbing::Menunggu
++            && $pengajuan->pembimbing_pilihan_id !== null
++            && (int) $pengajuan->pembimbing_pilihan_id === (int) $user->id
++            && $pengajuan->status !== StatusPengajuan::Draft;
++    }
++
++    /** Operator menetapkan atau mengganti dosen pembimbing selama belum diarsipkan. */
+     public function kelola(User $user, Pengajuan $pengajuan): bool
+     {
+         return $user->role === Role::Operator && $pengajuan->status !== StatusPengajuan::Diarsipkan;
+diff --git a/app/Services/PembimbingService.php b/app/Services/PembimbingService.php
+new file mode 100644
+index 0000000..d55f636
+--- /dev/null
++++ b/app/Services/PembimbingService.php
+@@ -0,0 +1,178 @@
++<?php
++
++namespace App\Services;
++
++use App\Enums\JenisPengajuan;
++use App\Enums\Role;
++use App\Enums\StatusPembimbing;
++use App\Enums\StatusPengajuan;
++use App\Models\Pengajuan;
++use App\Models\RiwayatPembimbing;
++use App\Models\User;
++use App\Support\Aktivitas;
++use Illuminate\Support\Collection;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Validation\ValidationException;
++
++/**
++ * Seluruh perubahan dosen pembimbing lewat kelas ini.
++ *
++ * Aturan:
++ *  - KP : mahasiswa tidak memilih. Operator menetapkan dosen dari daftar dosen di database.
++ *  - TA : mahasiswa memilih dosen saat pengajuan (draft). Dosen tersebut menerima atau menolak
++ *         (alasan wajib). Bila ditolak, operator menetapkan dosen pengganti, sebaiknya yang
++ *         beban bimbingannya paling sedikit.
++ *  - pembimbing_id hanya terisi bila pembimbing sudah sah (diterima atau ditetapkan).
++ */
++class PembimbingService
++{
++    /** Mahasiswa memilih (atau mengganti) dosen pembimbing TA selama pengajuan masih draft. */
++    public function pilih(Pengajuan $pengajuan, User $dosen, User $oleh): void
++    {
++        if ($pengajuan->jenis !== JenisPengajuan::Ta) {
++            throw ValidationException::withMessages(['pembimbing_id' => 'Dosen pembimbing KP ditetapkan oleh operator akademik.']);
++        }
++
++        if ($pengajuan->status !== StatusPengajuan::Draft) {
++            throw ValidationException::withMessages(['pembimbing_id' => 'Dosen pilihan hanya dapat diubah selama pengajuan masih draft.']);
++        }
++
++        if ($dosen->role !== Role::Dosen || ! $dosen->aktif) {
++            throw ValidationException::withMessages(['pembimbing_id' => 'Dosen yang dipilih tidak tersedia.']);
++        }
++
++        if ((int) $pengajuan->pembimbing_pilihan_id === (int) $dosen->id
++            && $pengajuan->status_pembimbing === StatusPembimbing::Menunggu) {
++            return;
++        }
++
++        DB::transaction(function () use ($pengajuan, $dosen, $oleh) {
++            $pengajuan->forceFill([
++                'pembimbing_pilihan_id' => $dosen->id,
++                'pembimbing_id' => null,
++                'status_pembimbing' => StatusPembimbing::Menunggu,
++            ])->save();
++
++            $this->catat($pengajuan, $dosen, $oleh, StatusPembimbing::Menunggu, null,
++                "Memilih {$dosen->name} sebagai calon pembimbing TA #{$pengajuan->id}");
++        });
++    }
++
++    /** Dosen pilihan mahasiswa menerima atau menolak permintaan sebagai pembimbing TA. */
++    public function konfirmasi(Pengajuan $pengajuan, User $dosen, bool $terima, ?string $catatan = null): void
++    {
++        $catatan = filled($catatan) ? trim($catatan) : null;
++
++        if ($pengajuan->jenis !== JenisPengajuan::Ta
++            || $pengajuan->status_pembimbing !== StatusPembimbing::Menunggu
++            || (int) $pengajuan->pembimbing_pilihan_id !== (int) $dosen->id
++            || $pengajuan->status === StatusPengajuan::Draft) {
++            throw ValidationException::withMessages(['keputusan' => 'Permintaan ini sudah tidak menunggu konfirmasi Anda.']);
++        }
++
++        if (! $terima && $catatan === null) {
++            throw ValidationException::withMessages(['catatan' => 'Alasan penolakan wajib diisi agar mahasiswa dan operator mengetahuinya.']);
++        }
++
++        DB::transaction(function () use ($pengajuan, $dosen, $terima, $catatan) {
++            $pengajuan->forceFill([
++                'pembimbing_id' => $terima ? $dosen->id : null,
++                'status_pembimbing' => $terima ? StatusPembimbing::Diterima : StatusPembimbing::Ditolak,
++            ])->save();
++
++            $this->catat(
++                $pengajuan,
++                $dosen,
++                $dosen,
++                $terima ? StatusPembimbing::Diterima : StatusPembimbing::Ditolak,
++                $catatan,
++                ($terima ? 'Menerima' : 'Menolak')." permintaan pembimbing TA #{$pengajuan->id}",
++            );
++        });
++    }
++
++    /**
++     * Operator menetapkan (atau mengganti) dosen pembimbing, untuk KP maupun TA.
++     * Catatan wajib bila operator menggantikan permintaan yang masih menunggu atau pembimbing yang sudah diterima.
++     */
++    public function tetapkan(Pengajuan $pengajuan, User $dosen, User $operator, ?string $catatan = null): void
++    {
++        $catatan = filled($catatan) ? trim($catatan) : null;
++
++        if ($pengajuan->status === StatusPengajuan::Diarsipkan) {
++            throw ValidationException::withMessages(['pembimbing_id' => 'Pengajuan yang sudah diarsipkan tidak dapat diubah.']);
++        }
++
++        if ($dosen->role !== Role::Dosen || ! $dosen->aktif) {
++            throw ValidationException::withMessages(['pembimbing_id' => 'Dosen yang dipilih tidak aktif.']);
++        }
++
++        if ($pengajuan->pembimbing_id !== null && (int) $pengajuan->pembimbing_id === (int) $dosen->id) {
++            throw ValidationException::withMessages(['pembimbing_id' => 'Dosen tersebut sudah menjadi pembimbing pengajuan ini.']);
++        }
++
++        if ($this->idDosenYangMenolak($pengajuan)->contains($dosen->id)) {
++            throw ValidationException::withMessages(['pembimbing_id' => 'Dosen tersebut sudah menolak pengajuan ini.']);
++        }
++
++        $menggantikan = in_array($pengajuan->status_pembimbing, [StatusPembimbing::Menunggu, StatusPembimbing::Diterima], true);
++
++        if ($menggantikan && $catatan === null) {
++            throw ValidationException::withMessages(['catatan' => 'Catatan wajib diisi karena Anda menggantikan pembimbing yang dipilih atau sudah diterima.']);
++        }
++
++        DB::transaction(function () use ($pengajuan, $dosen, $operator, $catatan) {
++            $pengajuan->forceFill([
++                'pembimbing_id' => $dosen->id,
++                'status_pembimbing' => StatusPembimbing::Ditetapkan,
++            ])->save();
++
++            $this->catat($pengajuan, $dosen, $operator, StatusPembimbing::Ditetapkan, $catatan,
++                "Menetapkan {$dosen->name} sebagai pembimbing {$pengajuan->jenis->singkat()} #{$pengajuan->id}");
++        });
++    }
++
++    /**
++     * Daftar dosen aktif untuk penetapan, diurutkan dari beban bimbingan paling sedikit.
++     * Setiap dosen diberi atribut beban_aktif, beban_menunggu, dan menolak.
++     *
++     * @return Collection<int, User>
++     */
++    public function daftarDosen(Pengajuan $pengajuan): Collection
++    {
++        $menolak = $this->idDosenYangMenolak($pengajuan);
++
++        return User::peran(Role::Dosen)
++            ->aktif()
++            ->denganBeban()
++            ->with('programStudi')
++            ->orderBy('beban_aktif')
++            ->orderBy('beban_menunggu')
++            ->orderBy('name')
++            ->get()
++            ->each(fn (User $d) => $d->setAttribute('menolak', $menolak->contains($d->id)));
++    }
++
++    /** @return Collection<int, int> */
++    private function idDosenYangMenolak(Pengajuan $pengajuan): Collection
++    {
++        return RiwayatPembimbing::where('pengajuan_id', $pengajuan->id)
++            ->where('status', StatusPembimbing::Ditolak->value)
++            ->pluck('dosen_id')
++            ->filter()
++            ->map(fn ($id) => (int) $id);
++    }
++
++    private function catat(Pengajuan $pengajuan, ?User $dosen, ?User $oleh, StatusPembimbing $status, ?string $catatan, string $aktivitas): void
++    {
++        RiwayatPembimbing::create([
++            'pengajuan_id' => $pengajuan->id,
++            'dosen_id' => $dosen?->id,
++            'user_id' => $oleh?->id,
++            'status' => $status,
++            'catatan' => $catatan,
++        ]);
++
++        Aktivitas::catat('pembimbing.'.$status->value, $aktivitas, $pengajuan, $oleh);
++    }
++}
+diff --git a/database/migrations/2026_10_24_000001_add_pembimbing_to_pengajuan_table.php b/database/migrations/2026_10_24_000001_add_pembimbing_to_pengajuan_table.php
+new file mode 100644
+index 0000000..9ada8be
+--- /dev/null
++++ b/database/migrations/2026_10_24_000001_add_pembimbing_to_pengajuan_table.php
+@@ -0,0 +1,47 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Schema;
++
++/**
++ * Alur dosen pembimbing.
++ *
++ * - pembimbing_id          : dosen pembimbing yang SAH (sudah menerima atau ditetapkan operator); null bila belum ada.
++ * - pembimbing_pilihan_id  : khusus TA, dosen yang dipilih mahasiswa saat pengajuan (tetap tersimpan sebagai catatan).
++ * - status_pembimbing      : belum | menunggu | diterima | ditolak | ditetapkan.
++ *
++ * Migrasi tambahan: pengajuan lama yang sudah punya pembimbing dianggap sah
++ * (KP: ditetapkan, TA: diterima) agar akses dosen tidak tiba-tiba hilang.
++ */
++return new class extends Migration
++{
++    public function up(): void
++    {
++        Schema::table('pengajuan', function (Blueprint $table) {
++            $table->foreignId('pembimbing_pilihan_id')->nullable()->after('pembimbing_id')
++                ->constrained('users')->restrictOnDelete();
++            $table->string('status_pembimbing', 20)->default('belum')->after('pembimbing_pilihan_id')->index();
++        });
++
++        DB::table('pengajuan')
++            ->whereNotNull('pembimbing_id')
++            ->where('jenis', 'kp')
++            ->update(['status_pembimbing' => 'ditetapkan']);
++
++        DB::table('pengajuan')
++            ->whereNotNull('pembimbing_id')
++            ->where('jenis', 'ta')
++            ->update(['status_pembimbing' => 'diterima', 'pembimbing_pilihan_id' => DB::raw('pembimbing_id')]);
++    }
++
++    public function down(): void
++    {
++        Schema::table('pengajuan', function (Blueprint $table) {
++            $table->dropIndex(['status_pembimbing']);
++            $table->dropConstrainedForeignId('pembimbing_pilihan_id');
++            $table->dropColumn('status_pembimbing');
++        });
++    }
++};
+diff --git a/database/migrations/2026_10_24_000002_create_riwayat_pembimbing_table.php b/database/migrations/2026_10_24_000002_create_riwayat_pembimbing_table.php
+new file mode 100644
+index 0000000..d15e9fc
+--- /dev/null
++++ b/database/migrations/2026_10_24_000002_create_riwayat_pembimbing_table.php
+@@ -0,0 +1,28 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\Schema;
++
++return new class extends Migration
++{
++    public function up(): void
++    {
++        Schema::create('riwayat_pembimbing', function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('pengajuan_id')->constrained('pengajuan')->cascadeOnDelete();
++            $table->foreignId('dosen_id')->nullable()->constrained('users')->nullOnDelete();
++            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
++            $table->string('status', 20);
++            $table->text('catatan')->nullable();
++            $table->timestamps();
++
++            $table->index(['pengajuan_id', 'status']);
++        });
++    }
++
++    public function down(): void
++    {
++        Schema::dropIfExists('riwayat_pembimbing');
++    }
++};
+diff --git a/lang/id/validation.php b/lang/id/validation.php
+index 54487c2..cbd2e05 100644
+--- a/lang/id/validation.php
++++ b/lang/id/validation.php
+@@ -49,6 +49,7 @@
+         'deskripsi' => 'Deskripsi',
+         'instansi' => 'Instansi',
+         'pembimbing_id' => 'Dosen pembimbing',
++        'keputusan' => 'Keputusan',
+         'persyaratan_id' => 'Persyaratan',
+         'berkas' => 'Berkas',
+         'kode' => 'Kode',
+diff --git a/resources/views/dashboard/dosen.blade.php b/resources/views/dashboard/dosen.blade.php
+index b9a623a..293cdc4 100644
+--- a/resources/views/dashboard/dosen.blade.php
++++ b/resources/views/dashboard/dosen.blade.php
+@@ -5,13 +5,21 @@
+ @section('konten')
+     <x-page-header judul="Dashboard" sub="Ringkasan pemeriksaan berkas dan bimbingan Anda." />
+ 
+-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
++    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
++        <x-stat label="Permintaan Pembimbing" :nilai="$permintaanPembimbing" hint="Pilihan mahasiswa TA, menunggu jawaban Anda" :href="route('dosen.bimbingan.index')" />
+         <x-stat label="Menunggu Pemeriksaan" :nilai="$antrean->count()" hint="Berkas yang perlu Anda periksa" :href="route('dosen.pemeriksaan.index')" />
+         <x-stat label="Mahasiswa Bimbingan" :nilai="$jumlahMahasiswa" :href="route('dosen.bimbingan.index')" />
+         <x-stat label="Pengajuan Selesai" :nilai="$selesai" hint="Sudah diarsipkan" />
+         <x-stat label="Dokumen Diperiksa" :nilai="$totalDiperiksa" hint="Seluruh riwayat pemeriksaan" :href="route('dosen.riwayat.index')" />
+     </div>
+ 
++    @if ($permintaanPembimbing > 0)
++        <div class="alert alert-info mt-6">
++            Ada {{ $permintaanPembimbing }} mahasiswa TA yang memilih Anda sebagai calon pembimbing.
++            <a href="{{ route('dosen.bimbingan.index') }}" class="font-medium underline">Lihat dan jawab permintaan</a>
++        </div>
++    @endif
++
+     <section class="card mt-6">
+         <div class="card-header">
+             <h2 class="font-semibold text-slate-900">Antrean Pemeriksaan</h2>
+diff --git a/resources/views/dashboard/mahasiswa.blade.php b/resources/views/dashboard/mahasiswa.blade.php
+index 29e8b58..de283ad 100644
+--- a/resources/views/dashboard/mahasiswa.blade.php
++++ b/resources/views/dashboard/mahasiswa.blade.php
+@@ -60,14 +60,38 @@
+             @endif
+         </section>
+ 
+-        <section class="card">
+-            <div class="card-header"><h2 class="font-semibold text-slate-900">Informasi Akademik</h2></div>
+-            <dl class="divide-y divide-slate-100 px-5 py-2">
+-                <div class="dl-baris"><dt>Nama</dt><dd>{{ $user->name }}</dd></div>
+-                <div class="dl-baris"><dt>NIM</dt><dd>{{ $user->nomor_induk ?? '-' }}</dd></div>
+-                <div class="dl-baris"><dt>Prodi</dt><dd>{{ $user->programStudi?->namaLengkap() ?? '-' }}</dd></div>
+-                <div class="dl-baris"><dt>Angkatan</dt><dd>{{ $user->angkatan ?? '-' }}</dd></div>
+-            </dl>
+-        </section>
++        <div class="space-y-6">
++            <section class="card">
++                <div class="card-header"><h2 class="font-semibold text-slate-900">Dosen Pembimbing</h2></div>
++                <dl class="divide-y divide-slate-100 px-5 py-2">
++                    @foreach ([['Pembimbing KP', $pengajuanKp, 'KP'], ['Pembimbing TA', $pengajuanTa, 'TA']] as [$label, $p, $singkat])
++                        <div class="dl-baris">
++                            <dt>{{ $label }}</dt>
++                            <dd>
++                                @if ($p === null)
++                                    <span class="text-slate-500">Belum ada pengajuan {{ $singkat }}</span>
++                                @else
++                                    <span class="{{ $p->pembimbing_id ? 'font-medium' : '' }}">{{ $p->ringkasanPembimbing() }}</span>
++                                    <div class="mt-1">
++                                        <span class="badge {{ $p->status_pembimbing->badge() }}">{{ $p->status_pembimbing->label() }}</span>
++                                    </div>
++                                    <div class="mt-1 text-xs text-slate-500">{{ $p->keteranganPembimbing() }}</div>
++                                @endif
++                            </dd>
++                        </div>
++                    @endforeach
++                </dl>
++            </section>
++
++            <section class="card">
++                <div class="card-header"><h2 class="font-semibold text-slate-900">Informasi Akademik</h2></div>
++                <dl class="divide-y divide-slate-100 px-5 py-2">
++                    <div class="dl-baris"><dt>Nama</dt><dd>{{ $user->name }}</dd></div>
++                    <div class="dl-baris"><dt>NIM</dt><dd>{{ $user->nomor_induk ?? '-' }}</dd></div>
++                    <div class="dl-baris"><dt>Prodi</dt><dd>{{ $user->programStudi?->namaLengkap() ?? '-' }}</dd></div>
++                    <div class="dl-baris"><dt>Angkatan</dt><dd>{{ $user->angkatan ?? '-' }}</dd></div>
++                </dl>
++            </section>
++        </div>
+     </div>
+ @endsection
+diff --git a/resources/views/dashboard/operator.blade.php b/resources/views/dashboard/operator.blade.php
+index 18fdc96..a54b7ae 100644
+--- a/resources/views/dashboard/operator.blade.php
++++ b/resources/views/dashboard/operator.blade.php
+@@ -9,7 +9,8 @@
+ 
+     <x-page-header judul="Dashboard" sub="Ringkasan proses administrasi KP dan TA." />
+ 
+-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
++    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
++        <x-stat label="Perlu Pembimbing" :nilai="$jumlahPerluPembimbing" hint="Belum ada dosen pembimbing atau ditolak dosen" :href="route('operator.pengajuan.index', ['pembimbing' => 'perlu'])" />
+         <x-stat label="Perlu Verifikasi" :nilai="$hitung('diajukan')" hint="Menunggu pemeriksaan administrasi" :href="route('operator.verifikasi.index')" />
+         <x-stat label="Diperiksa Dosen" :nilai="$hitung('menunggu_dosen')" />
+         <x-stat label="Dalam Revisi" :nilai="$hitung('revisi_administrasi') + $hitung('revisi_akademik')" hint="Menunggu perbaikan mahasiswa" />
+@@ -75,5 +76,37 @@
+                 </div>
+             @endif
+         </section>
++
++        <section class="card xl:col-span-2">
++            <div class="card-header">
++                <h2 class="font-semibold text-slate-900">Perlu Penetapan Dosen Pembimbing</h2>
++                <a href="{{ route('operator.pengajuan.index', ['pembimbing' => 'perlu']) }}" class="tautan text-sm">Lihat semua</a>
++            </div>
++            @if ($perluPembimbing->isEmpty())
++                <x-empty pesan="Semua pengajuan yang sudah dikirim memiliki dosen pembimbing atau sedang menunggu konfirmasi dosen." />
++            @else
++                <div class="overflow-x-auto">
++                    <table class="tabel">
++                        <thead><tr><th>Mahasiswa</th><th>Jenis</th><th>Keadaan</th><th></th></tr></thead>
++                        <tbody>
++                            @foreach ($perluPembimbing as $p)
++                                <tr>
++                                    <td>
++                                        <div class="font-medium text-slate-900">{{ $p->mahasiswa->name }}</div>
++                                        <div class="text-xs text-slate-500">{{ $p->mahasiswa->nomor_induk }} &middot; {{ $p->mahasiswa->programStudi?->nama ?? '-' }}</div>
++                                    </td>
++                                    <td>{{ $p->jenis->singkat() }}</td>
++                                    <td>
++                                        <span class="badge {{ $p->status_pembimbing->badge() }}">{{ $p->status_pembimbing->label() }}</span>
++                                        <div class="mt-1 text-xs text-slate-500">{{ $p->keteranganPembimbing() }}</div>
++                                    </td>
++                                    <td class="text-right"><a href="{{ route('operator.pengajuan.show', $p) }}" class="btn btn-primary btn-sm">Tetapkan</a></td>
++                                </tr>
++                            @endforeach
++                        </tbody>
++                    </table>
++                </div>
++            @endif
++        </section>
+     </div>
+ @endsection
+diff --git a/resources/views/dosen/bimbingan/index.blade.php b/resources/views/dosen/bimbingan/index.blade.php
+index 8a99b48..6eb01ce 100644
+--- a/resources/views/dosen/bimbingan/index.blade.php
++++ b/resources/views/dosen/bimbingan/index.blade.php
+@@ -3,7 +3,57 @@
+ @section('judul', 'Mahasiswa Bimbingan')
+ 
+ @section('konten')
+-    <x-page-header judul="Mahasiswa Bimbingan" sub="Mahasiswa yang menetapkan Anda sebagai dosen pembimbing KP atau TA." />
++    <x-page-header judul="Mahasiswa Bimbingan" sub="Mahasiswa yang Anda bimbing, dan permintaan pembimbing TA yang menunggu jawaban Anda." />
++
++    @if ($permintaan->isNotEmpty())
++        <section class="card mb-6">
++            <div class="card-header">
++                <div>
++                    <h2 class="font-semibold text-slate-900">Permintaan Pembimbing TA</h2>
++                    <p class="text-sm text-slate-500">Mahasiswa memilih Anda sebagai calon pembimbing. Alasan wajib diisi bila Anda menolak.</p>
++                </div>
++                <span class="badge bg-blue-50 text-blue-700 ring-blue-200">{{ $permintaan->count() }} menunggu</span>
++            </div>
++            <ul class="divide-y divide-slate-100">
++                @foreach ($permintaan as $p)
++                    @php($baris = (int) old('baris') === $p->id)
++                    <li class="px-5 py-4">
++                        <div class="grid gap-4 lg:grid-cols-3">
++                            <div class="lg:col-span-2">
++                                <div class="font-medium text-slate-900">{{ $p->judul }}</div>
++                                <div class="mt-0.5 text-sm text-slate-600">
++                                    {{ $p->mahasiswa->name }} ({{ $p->mahasiswa->nomor_induk ?? '-' }})
++                                    &middot; {{ $p->mahasiswa->programStudi?->namaLengkap() ?? '-' }}@if ($p->mahasiswa->angkatan), angkatan {{ $p->mahasiswa->angkatan }}@endif
++                                </div>
++                                @if ($p->instansi)
++                                    <div class="text-sm text-slate-600">Lokasi penelitian: {{ $p->instansi }}</div>
++                                @endif
++                                @if ($p->deskripsi)
++                                    <p class="mt-2 whitespace-pre-line text-sm text-slate-700">{{ $p->deskripsi }}</p>
++                                @endif
++                                <div class="mt-2 text-xs text-slate-500">Dikirim {{ $p->diajukan_at?->translatedFormat('d M Y') ?? '-' }}</div>
++                            </div>
++
++                            <form method="POST" action="{{ route('dosen.bimbingan.konfirmasi', $p) }}" class="space-y-2">
++                                @csrf
++                                <input type="hidden" name="baris" value="{{ $p->id }}">
++                                <label for="catatan-{{ $p->id }}" class="label">Alasan (wajib jika menolak)</label>
++                                <textarea id="catatan-{{ $p->id }}" name="catatan" rows="2" class="input">{{ $baris ? old('catatan') : '' }}</textarea>
++                                @if ($baris)
++                                    @error('catatan')<p class="galat">{{ $message }}</p>@enderror
++                                    @error('keputusan')<p class="galat">{{ $message }}</p>@enderror
++                                @endif
++                                <div class="flex flex-wrap gap-2">
++                                    <button type="submit" name="keputusan" value="terima" class="btn btn-primary btn-sm">Terima</button>
++                                    <button type="submit" name="keputusan" value="tolak" class="btn btn-secondary btn-sm">Tolak</button>
++                                </div>
++                            </form>
++                        </div>
++                    </li>
++                @endforeach
++            </ul>
++        </section>
++    @endif
+ 
+     <form method="GET" class="card card-body mb-4 flex flex-wrap items-end gap-3">
+         <div class="min-w-[16rem] flex-1">
+diff --git a/resources/views/mahasiswa/pengajuan/form.blade.php b/resources/views/mahasiswa/pengajuan/form.blade.php
+index 938ed48..ebf8d5b 100644
+--- a/resources/views/mahasiswa/pengajuan/form.blade.php
++++ b/resources/views/mahasiswa/pengajuan/form.blade.php
+@@ -38,17 +38,32 @@ class="card lg:col-span-2">
+                     @error('deskripsi')<p class="galat">{{ $message }}</p>@enderror
+                 </div>
+ 
+-                <div>
+-                    <label for="pembimbing_id" class="label">Dosen pembimbing</label>
+-                    <select id="pembimbing_id" name="pembimbing_id" required class="input">
+-                        <option value="">Pilih dosen</option>
+-                        @foreach ($dosen as $d)
+-                            <option value="{{ $d->id }}" @selected((string) old('pembimbing_id', $pengajuan?->pembimbing_id) === (string) $d->id)>{{ $d->name }}</option>
+-                        @endforeach
+-                    </select>
+-                    <p class="hint">Operator akademik dapat menyesuaikan dosen pembimbing bila diperlukan.</p>
+-                    @error('pembimbing_id')<p class="galat">{{ $message }}</p>@enderror
+-                </div>
++                @if ($bisaPilihPembimbing)
++                    {{-- TA: mahasiswa memilih dosen, lalu dosen tersebut menerima atau menolak. --}}
++                    <div>
++                        <label for="pembimbing_id" class="label">Dosen pembimbing pilihan Anda</label>
++                        <select id="pembimbing_id" name="pembimbing_id" required class="input">
++                            <option value="">Pilih dosen</option>
++                            @foreach ($dosen as $d)
++                                <option value="{{ $d->id }}" @selected((string) old('pembimbing_id', $pengajuan?->pembimbing_pilihan_id) === (string) $d->id)>{{ $d->name }}</option>
++                            @endforeach
++                        </select>
++                        <p class="hint">Dosen yang Anda pilih akan diminta menerima atau menolak setelah pengajuan dikirim. Jika menolak, operator akademik akan menetapkan dosen pengganti.</p>
++                        @error('pembimbing_id')<p class="galat">{{ $message }}</p>@enderror
++                    </div>
++                @elseif ($jenis === \App\Enums\JenisPengajuan::Kp)
++                    {{-- KP: pembimbing ditetapkan operator dari database dosen. --}}
++                    <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
++                        <p class="font-medium">Dosen pembimbing KP</p>
++                        <p class="mt-0.5">Tidak perlu dipilih. Operator akademik menetapkan dosen pembimbing KP dari daftar dosen setelah pengajuan Anda dikirim.</p>
++                    </div>
++                @else
++                    <div>
++                        <span class="label">Dosen pembimbing</span>
++                        <p class="text-sm text-slate-800">{{ $pengajuan->ringkasanPembimbing() }}</p>
++                        <p class="hint">Dosen pilihan tidak dapat diubah setelah pengajuan dikirim. Hubungi operator akademik bila perlu penggantian.</p>
++                    </div>
++                @endif
+             </div>
+ 
+             <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 px-5 py-4">
+diff --git a/resources/views/mahasiswa/pengajuan/index.blade.php b/resources/views/mahasiswa/pengajuan/index.blade.php
+index 7b17e92..2211840 100644
+--- a/resources/views/mahasiswa/pengajuan/index.blade.php
++++ b/resources/views/mahasiswa/pengajuan/index.blade.php
+@@ -26,7 +26,7 @@
+                         @foreach ($daftar as $p)
+                             <tr>
+                                 <td class="font-medium text-slate-900">{{ $p->judul }}</td>
+-                                <td>{{ $p->pembimbing?->name ?? '-' }}</td>
++                                <td>{{ $p->ringkasanPembimbing() }}</td>
+                                 <td><x-status-badge :status="$p->status" /></td>
+                                 <td class="whitespace-nowrap">{{ $p->updated_at->translatedFormat('d M Y') }}</td>
+                                 <td class="text-right"><a href="{{ route('mahasiswa.pengajuan.show', $p) }}" class="btn btn-secondary btn-sm">Detail</a></td>
+diff --git a/resources/views/mahasiswa/pengajuan/show.blade.php b/resources/views/mahasiswa/pengajuan/show.blade.php
+index f620d6d..a49fe61 100644
+--- a/resources/views/mahasiswa/pengajuan/show.blade.php
++++ b/resources/views/mahasiswa/pengajuan/show.blade.php
+@@ -57,6 +57,7 @@
+         <div class="space-y-6">
+             @include('partials.pengajuan.ringkasan')
+             @include('partials.pengajuan.riwayat')
++            @include('partials.pengajuan.riwayat-pembimbing')
+         </div>
+     </div>
+ @endsection
+diff --git a/resources/views/mahasiswa/status/index.blade.php b/resources/views/mahasiswa/status/index.blade.php
+index a35c6f6..11a9c24 100644
+--- a/resources/views/mahasiswa/status/index.blade.php
++++ b/resources/views/mahasiswa/status/index.blade.php
+@@ -14,7 +14,7 @@
+                 </div>
+                 <dl class="divide-y divide-slate-100 px-5 py-2">
+                     <div class="dl-baris"><dt>Judul</dt><dd>{{ $p->judul }}</dd></div>
+-                    <div class="dl-baris"><dt>Dosen Pembimbing</dt><dd>{{ $p->pembimbing?->name ?? '-' }}</dd></div>
++                    <div class="dl-baris"><dt>Dosen Pembimbing</dt><dd>{{ $p->ringkasanPembimbing() }}<div class="mt-1 text-xs text-slate-500">{{ $p->keteranganPembimbing() }}</div></dd></div>
+                     <div class="dl-baris"><dt>Langkah berikutnya</dt><dd class="text-slate-600">{{ $p->status->keterangan() }}</dd></div>
+                 </dl>
+                 <div class="border-t border-slate-200 px-5 py-3">
+@@ -22,7 +22,10 @@
+                 </div>
+             </section>
+ 
+-            @include('partials.pengajuan.riwayat', ['pengajuan' => $p])
++            <div class="space-y-6">
++                @include('partials.pengajuan.riwayat', ['pengajuan' => $p])
++                @include('partials.pengajuan.riwayat-pembimbing', ['pengajuan' => $p])
++            </div>
+         </div>
+     @empty
+         <section class="card">
+diff --git a/resources/views/operator/dokumen-resmi/index.blade.php b/resources/views/operator/dokumen-resmi/index.blade.php
+index 33c2d97..b044025 100644
+--- a/resources/views/operator/dokumen-resmi/index.blade.php
++++ b/resources/views/operator/dokumen-resmi/index.blade.php
+@@ -22,7 +22,7 @@
+                                 </td>
+                                 <td>{{ $p->jenis->singkat() }}</td>
+                                 <td>{{ $p->judul }}</td>
+-                                <td>{{ $p->pembimbing?->name ?? '-' }}</td>
++                                <td>{{ $p->ringkasanPembimbing() }}</td>
+                                 <td class="text-right"><a href="{{ route('operator.dokumen-resmi.show', $p) }}" class="btn btn-primary btn-sm">Proses</a></td>
+                             </tr>
+                         @endforeach
+diff --git a/resources/views/operator/pengajuan/index.blade.php b/resources/views/operator/pengajuan/index.blade.php
+index 7294011..b15d051 100644
+--- a/resources/views/operator/pengajuan/index.blade.php
++++ b/resources/views/operator/pengajuan/index.blade.php
+@@ -5,7 +5,7 @@
+ @section('konten')
+     <x-page-header judul="Pengelolaan KP/TA" sub="Seluruh pengajuan Kerja Praktik dan Tugas Akhir." />
+ 
+-    <form method="GET" class="card card-body mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
++    <form method="GET" class="card card-body mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+         <div class="lg:col-span-2">
+             <label for="q" class="label">Cari</label>
+             <input id="q" name="q" type="text" value="{{ $filter['q'] ?? '' }}" placeholder="Judul, nama, atau NIM" class="input">
+@@ -37,7 +37,14 @@
+                 @endforeach
+             </select>
+         </div>
+-        <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-5">
++        <div>
++            <label for="pembimbing" class="label">Pembimbing</label>
++            <select id="pembimbing" name="pembimbing" class="input">
++                <option value="">Semua</option>
++                <option value="perlu" @selected(($filter['pembimbing'] ?? '') === 'perlu')>Perlu penetapan</option>
++            </select>
++        </div>
++        <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-6">
+             <button type="submit" class="btn btn-primary">Terapkan</button>
+             <a href="{{ route('operator.pengajuan.index') }}" class="btn btn-secondary">Reset</a>
+         </div>
+@@ -59,7 +66,7 @@
+                                 </td>
+                                 <td>{{ $p->jenis->singkat() }}</td>
+                                 <td>{{ $p->judul }}</td>
+-                                <td>{{ $p->pembimbing?->name ?? '-' }}</td>
++                                <td>{{ $p->ringkasanPembimbing() }}</td>
+                                 <td><x-status-badge :status="$p->status" /></td>
+                                 <td class="whitespace-nowrap">{{ $p->updated_at->translatedFormat('d M Y') }}</td>
+                                 <td class="text-right"><a href="{{ route('operator.pengajuan.show', $p) }}" class="btn btn-secondary btn-sm">Kelola</a></td>
+diff --git a/resources/views/operator/pengajuan/show.blade.php b/resources/views/operator/pengajuan/show.blade.php
+index c83d25a..520e026 100644
+--- a/resources/views/operator/pengajuan/show.blade.php
++++ b/resources/views/operator/pengajuan/show.blade.php
+@@ -22,21 +22,76 @@
+     <div class="grid gap-6 xl:grid-cols-3">
+         <div class="space-y-6 xl:col-span-2">
+             @can('kelola', $pengajuan)
++                @php
++                    $menggantikan = in_array($pengajuan->status_pembimbing, [\App\Enums\StatusPembimbing::Menunggu, \App\Enums\StatusPembimbing::Diterima], true);
++                    $rekomendasi = $dosen->first(fn ($d) => ! $d->menolak && (int) $d->id !== (int) $pengajuan->pembimbing_id)?->id;
++                @endphp
+                 <section class="card">
+-                    <div class="card-header"><h2 class="font-semibold text-slate-900">Dosen Pembimbing</h2></div>
+-                    <form method="POST" action="{{ route('operator.pengajuan.pembimbing', $pengajuan) }}" class="card-body flex flex-wrap items-end gap-3">
++                    <div class="card-header">
++                        <h2 class="font-semibold text-slate-900">Dosen Pembimbing</h2>
++                        <span class="badge {{ $pengajuan->status_pembimbing->badge() }}">{{ $pengajuan->status_pembimbing->label() }}</span>
++                    </div>
++                    <div class="border-b border-slate-100 px-5 py-3 text-sm">
++                        <div class="font-medium text-slate-900">{{ $pengajuan->ringkasanPembimbing() }}</div>
++                        <div class="text-xs text-slate-500">{{ $pengajuan->keteranganPembimbing() }}</div>
++                    </div>
++                    <form method="POST" action="{{ route('operator.pengajuan.pembimbing', $pengajuan) }}" class="card-body space-y-4">
+                         @csrf
+                         @method('PATCH')
+-                        <div class="min-w-[16rem] flex-1">
+-                            <label for="pembimbing_id" class="label">Pilih dosen</label>
+-                            <select id="pembimbing_id" name="pembimbing_id" required class="input">
+-                                @foreach ($dosen as $d)
+-                                    <option value="{{ $d->id }}" @selected((int) old('pembimbing_id', $pengajuan->pembimbing_id) === $d->id)>{{ $d->name }}</option>
+-                                @endforeach
+-                            </select>
+-                            @error('pembimbing_id')<p class="galat">{{ $message }}</p>@enderror
++
++                        <p class="text-sm text-slate-600">
++                            @if ($pengajuan->status_pembimbing === \App\Enums\StatusPembimbing::Ditolak)
++                                Dosen pilihan mahasiswa menolak. Pilih pengganti dengan beban bimbingan paling sedikit.
++                            @elseif ($menggantikan)
++                                Menetapkan dosen lain akan menggantikan dosen yang dipilih mahasiswa. Catatan wajib diisi.
++                            @else
++                                Pilih dosen pembimbing. Dosen dengan bimbingan aktif paling sedikit berada di urutan teratas.
++                            @endif
++                        </p>
++
++                        @error('pembimbing_id')<p class="galat">{{ $message }}</p>@enderror
++
++                        <div class="overflow-x-auto rounded-lg border border-slate-200">
++                            <table class="tabel">
++                                <thead>
++                                    <tr><th class="w-10"></th><th>Dosen</th><th>Program Studi</th><th>Bimbingan aktif</th><th>Permintaan menunggu</th></tr>
++                                </thead>
++                                <tbody>
++                                    @foreach ($dosen as $d)
++                                        @php($tidakBisa = $d->menolak || (int) $d->id === (int) $pengajuan->pembimbing_id)
++                                        <tr @class(['bg-slate-50 text-slate-500' => $tidakBisa])>
++                                            <td>
++                                                <input type="radio" name="pembimbing_id" id="dosen-{{ $d->id }}" value="{{ $d->id }}"
++                                                       @disabled($tidakBisa) @checked((int) old('pembimbing_id', $rekomendasi) === (int) $d->id)
++                                                       class="h-4 w-4 accent-navy-700">
++                                            </td>
++                                            <td>
++                                                <label for="dosen-{{ $d->id }}" class="font-medium text-slate-900">{{ $d->name }}</label>
++                                                @if ($d->id === $rekomendasi)
++                                                    <span class="badge ml-2 bg-emerald-50 text-emerald-700 ring-emerald-200">Bimbingan paling sedikit</span>
++                                                @endif
++                                                @if ($d->menolak)
++                                                    <span class="badge ml-2 bg-red-50 text-red-700 ring-red-200">Menolak pengajuan ini</span>
++                                                @elseif ((int) $d->id === (int) $pengajuan->pembimbing_id)
++                                                    <span class="badge ml-2 bg-navy-50 text-navy-800 ring-navy-200">Pembimbing saat ini</span>
++                                                @endif
++                                            </td>
++                                            <td>{{ $d->programStudi?->nama ?? '-' }}</td>
++                                            <td>{{ $d->beban_aktif }}</td>
++                                            <td>{{ $d->beban_menunggu }}</td>
++                                        </tr>
++                                    @endforeach
++                                </tbody>
++                            </table>
+                         </div>
+-                        <button type="submit" class="btn btn-primary">Simpan</button>
++
++                        <div>
++                            <label for="catatan" class="label">Catatan{{ $menggantikan ? '' : ' (opsional)' }}</label>
++                            <textarea id="catatan" name="catatan" rows="2" @required($menggantikan) class="input">{{ old('catatan') }}</textarea>
++                            @error('catatan')<p class="galat">{{ $message }}</p>@enderror
++                        </div>
++
++                        <button type="submit" class="btn btn-primary" @disabled($rekomendasi === null)>Tetapkan sebagai pembimbing</button>
+                     </form>
+                 </section>
+             @endcan
+@@ -51,6 +106,7 @@
+         <div class="space-y-6">
+             @include('partials.pengajuan.ringkasan')
+             @include('partials.pengajuan.riwayat')
++            @include('partials.pengajuan.riwayat-pembimbing')
+         </div>
+     </div>
+ @endsection
+diff --git a/resources/views/operator/verifikasi/index.blade.php b/resources/views/operator/verifikasi/index.blade.php
+index 8fa9091..7db77b7 100644
+--- a/resources/views/operator/verifikasi/index.blade.php
++++ b/resources/views/operator/verifikasi/index.blade.php
+@@ -22,7 +22,7 @@
+                                 <td>{{ $p->mahasiswa->programStudi?->namaLengkap() ?? '-' }}</td>
+                                 <td>{{ $p->jenis->singkat() }}</td>
+                                 <td>{{ $p->judul }}</td>
+-                                <td>{{ $p->pembimbing?->name ?? '-' }}</td>
++                                <td>{{ $p->ringkasanPembimbing() }}</td>
+                                 <td class="whitespace-nowrap">{{ $p->diajukan_at?->translatedFormat('d M Y') ?? '-' }}</td>
+                                 <td class="text-right"><a href="{{ route('operator.verifikasi.show', $p) }}" class="btn btn-primary btn-sm">Verifikasi</a></td>
+                             </tr>
+diff --git a/resources/views/partials/pengajuan/ringkasan.blade.php b/resources/views/partials/pengajuan/ringkasan.blade.php
+index 43952b5..3f745e8 100644
+--- a/resources/views/partials/pengajuan/ringkasan.blade.php
++++ b/resources/views/partials/pengajuan/ringkasan.blade.php
+@@ -21,7 +21,16 @@
+             <dt>Program Studi</dt>
+             <dd>{{ $pengajuan->mahasiswa->programStudi?->namaLengkap() ?? '-' }}@if ($pengajuan->mahasiswa->angkatan), angkatan {{ $pengajuan->mahasiswa->angkatan }}@endif</dd>
+         </div>
+-        <div class="dl-baris"><dt>Dosen Pembimbing</dt><dd>{{ $pengajuan->pembimbing?->name ?? '-' }}</dd></div>
++        <div class="dl-baris">
++            <dt>Dosen Pembimbing</dt>
++            <dd>
++                {{ $pengajuan->ringkasanPembimbing() }}
++                <div class="mt-1">
++                    <span class="badge {{ $pengajuan->status_pembimbing->badge() }}">{{ $pengajuan->status_pembimbing->label() }}</span>
++                </div>
++                <div class="mt-1 text-xs text-slate-500">{{ $pengajuan->keteranganPembimbing() }}</div>
++            </dd>
++        </div>
+         <div class="dl-baris"><dt>Dikirim</dt><dd>{{ $pengajuan->diajukan_at?->translatedFormat('d M Y H:i') ?? 'Belum dikirim' }}</dd></div>
+         <div class="dl-baris"><dt>Keterangan</dt><dd class="text-slate-600">{{ $pengajuan->status->keterangan() }}</dd></div>
+     </dl>
+diff --git a/resources/views/partials/pengajuan/riwayat-pembimbing.blade.php b/resources/views/partials/pengajuan/riwayat-pembimbing.blade.php
+new file mode 100644
+index 0000000..49d46d1
+--- /dev/null
++++ b/resources/views/partials/pengajuan/riwayat-pembimbing.blade.php
+@@ -0,0 +1,26 @@
++{{-- Membutuhkan: $pengajuan (relasi riwayatPembimbing.dosen dan riwayatPembimbing.oleh sudah dimuat) --}}
++@if ($pengajuan->riwayatPembimbing->isNotEmpty())
++    <section class="card">
++        <div class="card-header">
++            <h2 class="font-semibold text-slate-900">Riwayat Dosen Pembimbing</h2>
++        </div>
++        <ol class="px-5 py-4">
++            @foreach ($pengajuan->riwayatPembimbing->reverse() as $r)
++                <li class="relative border-l-2 border-slate-200 pb-5 pl-5 last:pb-0">
++                    <span class="absolute -left-[7px] top-1 h-3 w-3 rounded-full border-2 border-white bg-navy-600"></span>
++                    <div class="flex flex-wrap items-center gap-2">
++                        <span class="badge {{ $r->status->badge() }}">{{ $r->status->labelRiwayat() }}</span>
++                        <span class="text-xs text-slate-500">{{ $r->created_at->translatedFormat('d M Y H:i') }}</span>
++                    </div>
++                    <div class="mt-1 text-sm text-slate-800">{{ $r->dosen?->name ?? 'Dosen dihapus' }}</div>
++                    <div class="text-xs text-slate-500">
++                        oleh {{ $r->oleh ? $r->oleh->name.' ('.$r->oleh->role->label().')' : 'Sistem' }}
++                    </div>
++                    @if (filled($r->catatan))
++                        <div class="mt-1 whitespace-pre-line text-sm text-slate-700">{{ $r->catatan }}</div>
++                    @endif
++                </li>
++            @endforeach
++        </ol>
++    </section>
++@endif
+diff --git a/routes/web.php b/routes/web.php
+index 2137a37..2e1b83c 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -69,6 +69,7 @@
+         Route::post('/pemeriksaan/{pengajuan}', [Dosen\PemeriksaanController::class, 'store'])->name('pemeriksaan.store');
+ 
+         Route::get('/bimbingan', [Dosen\BimbinganController::class, 'index'])->name('bimbingan.index');
++        Route::post('/bimbingan/{pengajuan}/konfirmasi', [Dosen\BimbinganController::class, 'konfirmasi'])->name('bimbingan.konfirmasi');
+         Route::get('/riwayat', [Dosen\RiwayatController::class, 'index'])->name('riwayat.index');
+     });
+ 
+diff --git a/tests/Concerns/SiapkanData.php b/tests/Concerns/SiapkanData.php
+index 3cbcad4..8df012a 100644
+--- a/tests/Concerns/SiapkanData.php
++++ b/tests/Concerns/SiapkanData.php
+@@ -3,6 +3,7 @@
+ namespace Tests\Concerns;
+ 
+ use App\Enums\JenisPengajuan;
++use App\Enums\StatusPembimbing;
+ use App\Enums\StatusPengajuan;
+ use App\Models\Pengajuan;
+ use App\Models\User;
+@@ -29,9 +30,16 @@ protected function buatPengajuan(
+         StatusPengajuan $status = StatusPengajuan::Draft,
+         JenisPengajuan $jenis = JenisPengajuan::Kp,
+     ): Pengajuan {
++        // Bila dosen diberikan, pembimbing dianggap sah: KP ditetapkan operator, TA diterima dosen pilihan mahasiswa.
+         return Pengajuan::create([
+             'mahasiswa_id' => $mahasiswa->id,
+             'pembimbing_id' => $dosen?->id,
++            'pembimbing_pilihan_id' => $dosen && $jenis === JenisPengajuan::Ta ? $dosen->id : null,
++            'status_pembimbing' => match (true) {
++                $dosen === null => StatusPembimbing::Belum,
++                $jenis === JenisPengajuan::Ta => StatusPembimbing::Diterima,
++                default => StatusPembimbing::Ditetapkan,
++            },
+             'jenis' => $jenis,
+             'judul' => 'Sistem Informasi Contoh',
+             'instansi' => 'PT Contoh Nusantara',
+diff --git a/tests/Feature/AlurPengajuanTest.php b/tests/Feature/AlurPengajuanTest.php
+index 0fa17d5..77cf86a 100644
+--- a/tests/Feature/AlurPengajuanTest.php
++++ b/tests/Feature/AlurPengajuanTest.php
+@@ -5,6 +5,7 @@
+ use App\Enums\JenisPengajuan;
+ use App\Enums\Role;
+ use App\Enums\StatusDokumen;
++use App\Enums\StatusPembimbing;
+ use App\Enums\StatusPengajuan;
+ use App\Models\DokumenPengajuan;
+ use App\Models\Pengajuan;
+@@ -80,22 +81,25 @@ public function test_alur_lengkap_kp_dari_pengajuan_sampai_arsip(): void
+     {
+         $wajib = Persyaratan::aktif()->untuk(JenisPengajuan::Kp)->where('wajib', true)->orderBy('urutan')->get();
+ 
+-        // 1. Mahasiswa membuat pengajuan (draft).
++        // 1. Mahasiswa membuat pengajuan KP (draft). Pembimbing KP ditetapkan operator, bukan dipilih mahasiswa,
++        //    sehingga pembimbing_id yang ikut terkirim diabaikan.
+         $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.store', 'kp'), [
+             'judul' => 'Rancang Bangun Sistem Arsip Digital',
+             'instansi' => 'Dinas Komunikasi dan Informatika',
+             'deskripsi' => 'Kerja praktik pengembangan aplikasi web.',
+-            'pembimbing_id' => $this->dosen->id,
++            'pembimbing_id' => $this->dosenLain->id,
+         ])->assertSessionHasNoErrors();
+ 
+         $p = Pengajuan::firstOrFail();
+         $this->assertSame(StatusPengajuan::Draft, $p->status);
+         $this->assertSame($this->mahasiswa->id, (int) $p->mahasiswa_id);
+-        $this->assertSame($this->dosen->id, (int) $p->pembimbing_id);
++        $this->assertNull($p->pembimbing_id);
++        $this->assertNull($p->pembimbing_pilihan_id);
++        $this->assertSame(StatusPembimbing::Belum, $p->status_pembimbing);
+ 
+         // Pengajuan KP kedua selama yang pertama berjalan ditolak.
+         $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.store', 'kp'), [
+-            'judul' => 'Duplikat', 'instansi' => 'X', 'pembimbing_id' => $this->dosen->id,
++            'judul' => 'Duplikat', 'instansi' => 'X',
+         ])->assertSessionHas('galat');
+         $this->assertSame(1, Pengajuan::count());
+ 
+@@ -129,6 +133,16 @@ public function test_alur_lengkap_kp_dari_pengajuan_sampai_arsip(): void
+         // Setelah dikirim, mahasiswa tidak dapat lagi mengganti dokumen.
+         $this->unggah($p, $wajib->first())->assertForbidden();
+ 
++        // Pembimbing KP ditetapkan operator dari daftar dosen. Sebelum itu dosen belum berwenang atas pengajuan ini.
++        $this->actingAs($this->dosen)->get(route('dosen.pemeriksaan.show', $p))->assertForbidden();
++        $this->actingAs($this->dosen)->patch(route('operator.pengajuan.pembimbing', $p), ['pembimbing_id' => $this->dosen->id])
++            ->assertForbidden();
++        $this->actingAs($this->operator)->patch(route('operator.pengajuan.pembimbing', $p), ['pembimbing_id' => $this->dosen->id])
++            ->assertSessionHasNoErrors();
++        $p->refresh();
++        $this->assertSame($this->dosen->id, (int) $p->pembimbing_id);
++        $this->assertSame(StatusPembimbing::Ditetapkan, $p->status_pembimbing);
++
+         // 5. Operator: dosen tidak berwenang; hasil tanpa keputusan dan revisi tanpa catatan ditolak.
+         $this->periksa($this->dosen, 'operator.verifikasi.store', $p, [])->assertForbidden();
+ 
+@@ -293,23 +307,20 @@ public function test_berkas_privat_hanya_dapat_diakses_pihak_yang_berwenang(): v
+ 
+     public function test_draft_dapat_diubah_dan_dihapus_beserta_berkasnya(): void
+     {
+-        $p = $this->buatPengajuan($this->mahasiswa, $this->dosen);
++        $p = $this->buatPengajuan($this->mahasiswa);
+         $syarat = Persyaratan::aktif()->untuk(JenisPengajuan::Kp)->firstOrFail();
+         $this->unggah($p, $syarat)->assertSessionHasNoErrors();
+         $path = $p->dokumen()->firstOrFail()->path;
+         Storage::disk('local')->assertExists($path);
+ 
++        // Pada KP, kiriman pembimbing_id tidak berpengaruh karena pembimbing ditetapkan operator.
+         $this->actingAs($this->mahasiswa)->put(route('mahasiswa.pengajuan.update', $p), [
+             'judul' => 'Judul Diperbarui', 'instansi' => 'Instansi Baru', 'pembimbing_id' => $this->dosenLain->id,
+         ])->assertSessionHasNoErrors();
+         $p->refresh();
+         $this->assertSame('Judul Diperbarui', $p->judul);
+-        $this->assertSame($this->dosenLain->id, (int) $p->pembimbing_id);
+-
+-        // Pembimbing harus dosen aktif, bukan sembarang pengguna.
+-        $this->actingAs($this->mahasiswa)->put(route('mahasiswa.pengajuan.update', $p), [
+-            'judul' => 'X', 'instansi' => 'Y', 'pembimbing_id' => $this->operator->id,
+-        ])->assertSessionHasErrors('pembimbing_id');
++        $this->assertNull($p->pembimbing_id);
++        $this->assertNull($p->pembimbing_pilihan_id);
+ 
+         $this->actingAs($this->mahasiswa)->delete(route('mahasiswa.pengajuan.destroy', $p))->assertSessionHasNoErrors();
+         $this->assertDatabaseMissing('pengajuan', ['id' => $p->id]);
+diff --git a/tests/Feature/PembimbingTest.php b/tests/Feature/PembimbingTest.php
+new file mode 100644
+index 0000000..d84e2b4
+--- /dev/null
++++ b/tests/Feature/PembimbingTest.php
+@@ -0,0 +1,404 @@
++<?php
++
++namespace Tests\Feature;
++
++use App\Enums\JenisPengajuan;
++use App\Enums\StatusDokumen;
++use App\Enums\StatusPembimbing;
++use App\Enums\StatusPengajuan;
++use App\Models\DokumenPengajuan;
++use App\Models\Pengajuan;
++use App\Models\Persyaratan;
++use App\Models\ProgramStudi;
++use App\Models\User;
++use App\Services\PembimbingService;
++use Illuminate\Foundation\Testing\RefreshDatabase;
++use Tests\Concerns\SiapkanData;
++use Tests\TestCase;
++
++/**
++ * Alur dosen pembimbing:
++ *  - KP : ditetapkan operator dari database dosen (mahasiswa tidak memilih).
++ *  - TA : dipilih mahasiswa, dosen menerima atau menolak; bila ditolak operator menetapkan
++ *         pengganti yang beban bimbingannya paling sedikit.
++ */
++class PembimbingTest extends TestCase
++{
++    use RefreshDatabase, SiapkanData;
++
++    private User $mahasiswa;
++
++    private User $dosenA;
++
++    private User $dosenB;
++
++    private User $dosenC;
++
++    private User $operator;
++
++    private User $admin;
++
++    protected function setUp(): void
++    {
++        parent::setUp();
++
++        $this->siapkanMaster();
++
++        $this->mahasiswa = User::factory()->mahasiswa()->create([
++            'name' => 'Mahasiswa Uji', 'program_studi_id' => ProgramStudi::first()->id, 'angkatan' => 2022,
++        ]);
++        $this->dosenA = User::factory()->dosen()->create(['name' => 'Dosen Alpha']);
++        $this->dosenB = User::factory()->dosen()->create(['name' => 'Dosen Bravo']);
++        $this->dosenC = User::factory()->dosen()->create(['name' => 'Dosen Charlie']);
++        $this->operator = User::factory()->operator()->create();
++        $this->admin = User::factory()->admin()->create();
++    }
++
++    /** Pengajuan TA yang memilih $pilihan dan menunggu konfirmasinya. */
++    private function buatTa(StatusPengajuan $status, User $pilihan, ?User $mahasiswa = null): Pengajuan
++    {
++        return Pengajuan::create([
++            'mahasiswa_id' => ($mahasiswa ?? $this->mahasiswa)->id,
++            'pembimbing_pilihan_id' => $pilihan->id,
++            'pembimbing_id' => null,
++            'status_pembimbing' => StatusPembimbing::Menunggu,
++            'jenis' => JenisPengajuan::Ta,
++            'judul' => 'Judul TA Uji',
++            'deskripsi' => 'Deskripsi TA uji.',
++            'status' => $status,
++            'diajukan_at' => $status === StatusPengajuan::Draft ? null : now(),
++        ]);
++    }
++
++    private function konfirmasi(User $dosen, Pengajuan $p, array $data)
++    {
++        return $this->actingAs($dosen->fresh())->post(route('dosen.bimbingan.konfirmasi', $p), $data);
++    }
++
++    private function tetapkan(User $oleh, Pengajuan $p, User $dosen, array $tambahan = [])
++    {
++        return $this->actingAs($oleh->fresh())->patch(
++            route('operator.pengajuan.pembimbing', $p),
++            ['pembimbing_id' => $dosen->id] + $tambahan,
++        );
++    }
++
++    public function test_kp_tidak_memilih_dosen_dan_kiriman_pembimbing_diabaikan(): void
++    {
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.pengajuan.create', 'kp'))
++            ->assertOk()
++            ->assertDontSee('name="pembimbing_id"', false)
++            ->assertSee('Operator akademik menetapkan dosen pembimbing KP');
++
++        $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.store', 'kp'), [
++            'judul' => 'KP Uji', 'instansi' => 'PT Uji', 'pembimbing_id' => $this->dosenA->id,
++        ])->assertSessionHasNoErrors();
++
++        $p = Pengajuan::firstOrFail();
++        $this->assertNull($p->pembimbing_id);
++        $this->assertNull($p->pembimbing_pilihan_id);
++        $this->assertSame(StatusPembimbing::Belum, $p->status_pembimbing);
++        $this->assertDatabaseCount('riwayat_pembimbing', 0);
++    }
++
++    public function test_ta_wajib_memilih_dosen_aktif_dan_pilihan_tercatat(): void
++    {
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.pengajuan.create', 'ta'))
++            ->assertOk()
++            ->assertSee('name="pembimbing_id"', false)
++            ->assertSee('Dosen Alpha')->assertSee('Dosen Bravo');
++
++        $dasar = ['judul' => 'TA Uji', 'instansi' => 'Lab Uji'];
++        $nonaktif = User::factory()->dosen()->nonaktif()->create();
++
++        $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.store', 'ta'), $dasar)
++            ->assertSessionHasErrors('pembimbing_id');
++        $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.store', 'ta'), $dasar + ['pembimbing_id' => $this->operator->id])
++            ->assertSessionHasErrors('pembimbing_id');
++        $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.store', 'ta'), $dasar + ['pembimbing_id' => $nonaktif->id])
++            ->assertSessionHasErrors('pembimbing_id');
++        $this->assertDatabaseCount('pengajuan', 0);
++
++        $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.store', 'ta'), $dasar + ['pembimbing_id' => $this->dosenA->id])
++            ->assertSessionHasNoErrors();
++
++        $p = Pengajuan::firstOrFail();
++        $this->assertSame($this->dosenA->id, (int) $p->pembimbing_pilihan_id);
++        $this->assertNull($p->pembimbing_id);
++        $this->assertSame(StatusPembimbing::Menunggu, $p->status_pembimbing);
++        $this->assertDatabaseHas('riwayat_pembimbing', [
++            'pengajuan_id' => $p->id, 'dosen_id' => $this->dosenA->id, 'user_id' => $this->mahasiswa->id, 'status' => 'menunggu',
++        ]);
++
++        // Selama draft, mahasiswa masih boleh mengganti dosen pilihannya.
++        $this->actingAs($this->mahasiswa)->put(route('mahasiswa.pengajuan.update', $p), $dasar + ['pembimbing_id' => $this->dosenB->id])
++            ->assertSessionHasNoErrors();
++        $this->assertSame($this->dosenB->id, (int) $p->fresh()->pembimbing_pilihan_id);
++        $this->assertDatabaseCount('riwayat_pembimbing', 2);
++    }
++
++    public function test_dosen_pilihan_baru_melihat_permintaan_setelah_dikirim_dan_belum_berwenang_atas_berkas(): void
++    {
++        $p = $this->buatTa(StatusPengajuan::Draft, $this->dosenA);
++
++        // Selama draft, permintaan belum tampil dan belum bisa dijawab.
++        $this->actingAs($this->dosenA)->get(route('dosen.bimbingan.index'))->assertOk()->assertDontSee('Judul TA Uji');
++        $this->konfirmasi($this->dosenA, $p, ['keputusan' => 'terima'])->assertForbidden();
++
++        $p->update(['status' => StatusPengajuan::Diajukan, 'diajukan_at' => now()]);
++
++        $this->actingAs($this->dosenA)->get(route('dosen.bimbingan.index'))
++            ->assertOk()->assertSee('Permintaan Pembimbing TA')->assertSee('Judul TA Uji')->assertSee('Mahasiswa Uji');
++        $this->actingAs($this->dosenA)->get(route('dosen.dashboard'))->assertOk()->assertSee('memilih Anda sebagai calon pembimbing');
++
++        // Dosen lain tidak melihat dan tidak dapat menjawab.
++        $this->actingAs($this->dosenB)->get(route('dosen.bimbingan.index'))->assertOk()->assertDontSee('Judul TA Uji');
++        $this->konfirmasi($this->dosenB, $p, ['keputusan' => 'terima'])->assertForbidden();
++
++        // Sebelum menerima, dosen pilihan belum berwenang atas isi pengajuan maupun berkasnya.
++        $syarat = Persyaratan::aktif()->untuk(JenisPengajuan::Ta)->firstOrFail();
++        $dokumen = DokumenPengajuan::create([
++            'pengajuan_id' => $p->id, 'persyaratan_id' => $syarat->id, 'diunggah_oleh' => $this->mahasiswa->id,
++            'versi' => 1, 'terbaru' => true, 'nama_asli' => 'a.pdf', 'path' => 'x/a.pdf', 'mime' => 'application/pdf',
++            'ukuran' => 10, 'status' => StatusDokumen::Menunggu,
++        ]);
++        $this->actingAs($this->dosenA)->get(route('dosen.pemeriksaan.show', $p))->assertForbidden();
++        $this->actingAs($this->dosenA)->get(route('berkas.dokumen', ['dokumen' => $dokumen]))->assertForbidden();
++
++        // Mahasiswa melihat dosen pilihannya sedang menunggu konfirmasi.
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.dashboard'))
++            ->assertOk()->assertSee('Dosen Alpha (menunggu konfirmasi)')->assertSee('Menunggu konfirmasi dosen');
++    }
++
++    public function test_dosen_menerima_permintaan_ta(): void
++    {
++        $p = $this->buatTa(StatusPengajuan::Diajukan, $this->dosenA);
++
++        $this->konfirmasi($this->dosenA, $p, ['keputusan' => 'terima'])
++            ->assertSessionHasNoErrors()->assertRedirect(route('dosen.bimbingan.index'));
++
++        $p->refresh();
++        $this->assertSame($this->dosenA->id, (int) $p->pembimbing_id);
++        $this->assertSame($this->dosenA->id, (int) $p->pembimbing_pilihan_id);
++        $this->assertSame(StatusPembimbing::Diterima, $p->status_pembimbing);
++        $this->assertDatabaseHas('riwayat_pembimbing', [
++            'pengajuan_id' => $p->id, 'dosen_id' => $this->dosenA->id, 'user_id' => $this->dosenA->id, 'status' => 'diterima',
++        ]);
++        $this->assertDatabaseHas('log_aktivitas', ['user_id' => $this->dosenA->id, 'aksi' => 'pembimbing.diterima']);
++
++        // Kini menjadi mahasiswa bimbingan dan berwenang atas pengajuan.
++        $this->actingAs($this->dosenA)->get(route('dosen.bimbingan.index'))
++            ->assertOk()->assertDontSee('Permintaan Pembimbing TA')->assertSee('Mahasiswa Uji')->assertSee('Judul TA Uji');
++        $this->actingAs($this->dosenA)->get(route('dosen.pemeriksaan.show', $p))->assertOk();
++        $this->actingAs($this->dosenA)->get(route('dosen.dashboard'))->assertOk()->assertDontSee('memilih Anda sebagai calon pembimbing');
++
++        // Permintaan yang sudah dijawab tidak dapat dijawab lagi.
++        $this->konfirmasi($this->dosenA, $p, ['keputusan' => 'tolak', 'catatan' => 'Berubah pikiran'])->assertForbidden();
++        $this->assertSame(StatusPembimbing::Diterima, $p->fresh()->status_pembimbing);
++
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.dashboard'))
++            ->assertOk()->assertSee('Dosen Alpha')->assertSee('Diterima dosen');
++    }
++
++    public function test_dosen_menolak_wajib_beralasan_lalu_operator_menetapkan_dosen_dengan_bimbingan_tersedikit(): void
++    {
++        // Beban bimbingan aktif: Alpha 1, Bravo 2, Charlie 0 (pengajuan yang sudah diarsipkan tidak dihitung).
++        $lain = fn () => User::factory()->mahasiswa()->create();
++        $this->buatPengajuan($lain(), $this->dosenA, StatusPengajuan::Diajukan);
++        $this->buatPengajuan($lain(), $this->dosenB, StatusPengajuan::Diajukan);
++        $this->buatPengajuan($lain(), $this->dosenB, StatusPengajuan::MenungguDosen);
++        $this->buatPengajuan($lain(), $this->dosenC, StatusPengajuan::Diarsipkan);
++
++        $p = $this->buatTa(StatusPengajuan::Diajukan, $this->dosenA);
++
++        // Menolak tanpa alasan ditolak.
++        $this->konfirmasi($this->dosenA, $p, ['keputusan' => 'tolak', 'catatan' => ''])->assertSessionHasErrors('catatan');
++        $this->assertSame(StatusPembimbing::Menunggu, $p->fresh()->status_pembimbing);
++
++        $this->konfirmasi($this->dosenA, $p, ['keputusan' => 'tolak', 'catatan' => 'Bidang tidak sesuai keahlian saya.'])
++            ->assertSessionHasNoErrors();
++
++        $p->refresh();
++        $this->assertNull($p->pembimbing_id);
++        $this->assertSame($this->dosenA->id, (int) $p->pembimbing_pilihan_id);
++        $this->assertSame(StatusPembimbing::Ditolak, $p->status_pembimbing);
++        $this->assertDatabaseHas('riwayat_pembimbing', [
++            'pengajuan_id' => $p->id, 'dosen_id' => $this->dosenA->id, 'status' => 'ditolak', 'catatan' => 'Bidang tidak sesuai keahlian saya.',
++        ]);
++        $this->actingAs($this->dosenA)->get(route('dosen.pemeriksaan.show', $p))->assertForbidden();
++
++        // Mahasiswa melihat penolakan dan alasannya.
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.dashboard'))
++            ->assertOk()->assertSee('Ditolak dosen')->assertSee('Dosen Alpha menolak.');
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.status.index'))
++            ->assertOk()->assertSee('Bidang tidak sesuai keahlian saya.');
++
++        // Operator melihatnya sebagai pengajuan yang perlu penetapan.
++        $this->actingAs($this->operator)->get(route('operator.dashboard'))
++            ->assertOk()->assertSee('Perlu Penetapan Dosen Pembimbing')->assertSee('Mahasiswa Uji');
++        $this->actingAs($this->operator)->get(route('operator.pengajuan.index', ['pembimbing' => 'perlu']))
++            ->assertOk()->assertSee('Judul TA Uji');
++
++        // Daftar dosen urut dari bimbingan paling sedikit; yang sudah menolak tidak dapat dipilih.
++        $beban = app(PembimbingService::class)->daftarDosen($p)->pluck('beban_aktif', 'name');
++        $this->assertSame(0, $beban['Dosen Charlie']);
++        $this->assertSame(1, $beban['Dosen Alpha']);
++        $this->assertSame(2, $beban['Dosen Bravo']);
++
++        $this->actingAs($this->operator)->get(route('operator.pengajuan.show', $p))
++            ->assertOk()
++            ->assertSeeInOrder(['Dosen Charlie', 'Dosen Alpha', 'Dosen Bravo'])
++            ->assertSee('Bimbingan paling sedikit')
++            ->assertSee('Menolak pengajuan ini');
++
++        // Dosen yang sudah menolak tidak dapat ditetapkan kembali.
++        $this->tetapkan($this->operator, $p, $this->dosenA)->assertSessionHasErrors('pembimbing_id');
++        $this->assertNull($p->fresh()->pembimbing_id);
++
++        // Operator menetapkan dosen dengan bimbingan paling sedikit.
++        $this->tetapkan($this->operator, $p, $this->dosenC)->assertSessionHasNoErrors();
++
++        $p->refresh();
++        $this->assertSame($this->dosenC->id, (int) $p->pembimbing_id);
++        $this->assertSame($this->dosenA->id, (int) $p->pembimbing_pilihan_id);
++        $this->assertSame(StatusPembimbing::Ditetapkan, $p->status_pembimbing);
++        $this->assertSame(1, $p->riwayatPembimbing()->where('status', 'ditolak')->count());
++        $this->assertSame(1, $p->riwayatPembimbing()->where('status', 'ditetapkan')->count());
++        $this->assertDatabaseHas('riwayat_pembimbing', [
++            'pengajuan_id' => $p->id, 'dosen_id' => $this->dosenC->id, 'user_id' => $this->operator->id, 'status' => 'ditetapkan',
++        ]);
++
++        $this->actingAs($this->dosenC)->get(route('dosen.pemeriksaan.show', $p))->assertOk();
++        $this->actingAs($this->dosenC)->get(route('dosen.bimbingan.index'))->assertOk()->assertSee('Mahasiswa Uji');
++        $this->assertSame(0, Pengajuan::perluPembimbing()->count());
++
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.dashboard'))
++            ->assertOk()->assertSee('Dosen Charlie')->assertSee('Ditetapkan operator');
++        $this->actingAs($this->operator)->get(route('operator.pengajuan.show', $p))
++            ->assertOk()->assertSee('Riwayat Dosen Pembimbing')->assertSee('Bidang tidak sesuai keahlian saya.');
++    }
++
++    public function test_pembimbing_kp_ditetapkan_operator_dan_tampil_di_dashboard_mahasiswa(): void
++    {
++        $kp = $this->buatPengajuan($this->mahasiswa, null, StatusPengajuan::Diajukan, JenisPengajuan::Kp);
++        $mahasiswaDua = User::factory()->mahasiswa()->create(['name' => 'Mahasiswa Dua']);
++        $this->buatPengajuan($mahasiswaDua, null, StatusPengajuan::Draft, JenisPengajuan::Kp);
++
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.dashboard'))
++            ->assertOk()->assertSee('Pembimbing KP')->assertSee('Pembimbing TA')
++            ->assertSee('Belum ditentukan')->assertSee('Belum ada pengajuan TA');
++
++        // Antrean operator hanya memuat pengajuan yang sudah dikirim, bukan draft.
++        $this->assertSame(1, Pengajuan::perluPembimbing()->count());
++        $this->actingAs($this->operator)->get(route('operator.dashboard'))
++            ->assertOk()->assertSee('Mahasiswa Uji')->assertDontSee('Mahasiswa Dua');
++
++        $this->tetapkan($this->operator, $kp, $this->dosenB)->assertSessionHasNoErrors();
++
++        $kp->refresh();
++        $this->assertSame($this->dosenB->id, (int) $kp->pembimbing_id);
++        $this->assertNull($kp->pembimbing_pilihan_id);
++        $this->assertSame(StatusPembimbing::Ditetapkan, $kp->status_pembimbing);
++
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.dashboard'))
++            ->assertOk()->assertSee('Dosen Bravo')->assertSee('Ditetapkan operator');
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.pengajuan.show', $kp))
++            ->assertOk()->assertSee('Dosen Bravo');
++        $this->actingAs($this->dosenB)->get(route('dosen.bimbingan.index'))->assertOk()->assertSee('Mahasiswa Uji');
++    }
++
++    public function test_dashboard_menampilkan_pembimbing_kp_dan_ta_dari_sumber_masing_masing(): void
++    {
++        $this->buatPengajuan($this->mahasiswa, $this->dosenA, StatusPengajuan::Diajukan, JenisPengajuan::Kp);
++        $this->buatTa(StatusPengajuan::Draft, $this->dosenB);
++
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.dashboard'))
++            ->assertOk()
++            ->assertSeeInOrder(['Pembimbing KP', 'Dosen Alpha', 'Ditetapkan operator', 'Pembimbing TA', 'Dosen Bravo (menunggu konfirmasi)']);
++    }
++
++    public function test_hanya_operator_yang_menetapkan_dan_hanya_dosen_pilihan_yang_menjawab(): void
++    {
++        $p = $this->buatTa(StatusPengajuan::Diajukan, $this->dosenA);
++
++        foreach ([$this->mahasiswa, $this->dosenA, $this->dosenB, $this->admin] as $pengguna) {
++            $this->tetapkan($pengguna, $p, $this->dosenC)->assertForbidden();
++        }
++
++        foreach ([$this->mahasiswa, $this->dosenB, $this->operator, $this->admin] as $pengguna) {
++            $this->konfirmasi($pengguna, $p, ['keputusan' => 'terima'])->assertForbidden();
++        }
++
++        $p->refresh();
++        $this->assertNull($p->pembimbing_id);
++        $this->assertSame(StatusPembimbing::Menunggu, $p->status_pembimbing);
++        $this->assertDatabaseCount('riwayat_pembimbing', 0);
++    }
++
++    public function test_operator_wajib_beralasan_saat_menggantikan_dosen_pilihan_mahasiswa(): void
++    {
++        $p = $this->buatTa(StatusPengajuan::Diajukan, $this->dosenA);
++
++        // Menggantikan dosen yang masih menunggu konfirmasi harus beralasan.
++        $this->tetapkan($this->operator, $p, $this->dosenB)->assertSessionHasErrors('catatan');
++        $this->assertNull($p->fresh()->pembimbing_id);
++
++        $this->tetapkan($this->operator, $p, $this->dosenB, ['catatan' => 'Dosen Alpha sedang cuti panjang.'])
++            ->assertSessionHasNoErrors();
++        $this->assertSame($this->dosenB->id, (int) $p->fresh()->pembimbing_id);
++        $this->assertDatabaseHas('riwayat_pembimbing', ['pengajuan_id' => $p->id, 'status' => 'ditetapkan', 'catatan' => 'Dosen Alpha sedang cuti panjang.']);
++
++        // Mengganti pembimbing yang ditetapkan operator tidak perlu alasan, tetapi dosen yang sama ditolak.
++        $this->tetapkan($this->operator, $p, $this->dosenC)->assertSessionHasNoErrors();
++        $this->tetapkan($this->operator, $p, $this->dosenC)->assertSessionHasErrors('pembimbing_id');
++
++        // Menggantikan dosen yang sudah menerima juga harus beralasan.
++        $mahasiswaDua = User::factory()->mahasiswa()->create();
++        $diterima = $this->buatPengajuan($mahasiswaDua, $this->dosenA, StatusPengajuan::Diajukan, JenisPengajuan::Ta);
++        $this->tetapkan($this->operator, $diterima, $this->dosenB)->assertSessionHasErrors('catatan');
++        $this->assertSame($this->dosenA->id, (int) $diterima->fresh()->pembimbing_id);
++    }
++
++    public function test_pengajuan_yang_sudah_diarsipkan_tidak_dapat_diganti_pembimbingnya(): void
++    {
++        $p = $this->buatPengajuan($this->mahasiswa, $this->dosenA, StatusPengajuan::Diarsipkan);
++
++        $this->tetapkan($this->operator, $p, $this->dosenB)->assertForbidden();
++        $this->assertSame($this->dosenA->id, (int) $p->fresh()->pembimbing_id);
++    }
++
++    public function test_mahasiswa_tidak_dapat_mengganti_dosen_pilihan_setelah_pengajuan_dikirim(): void
++    {
++        $p = $this->buatTa(StatusPengajuan::RevisiAkademik, $this->dosenA);
++
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.pengajuan.edit', $p))
++            ->assertOk()->assertDontSee('name="pembimbing_id"', false)->assertSee('tidak dapat diubah setelah pengajuan dikirim');
++
++        $this->actingAs($this->mahasiswa)->put(route('mahasiswa.pengajuan.update', $p), [
++            'judul' => 'Judul Revisi', 'pembimbing_id' => $this->dosenB->id,
++        ])->assertSessionHasNoErrors();
++
++        $p->refresh();
++        $this->assertSame('Judul Revisi', $p->judul);
++        $this->assertSame($this->dosenA->id, (int) $p->pembimbing_pilihan_id);
++        $this->assertDatabaseCount('riwayat_pembimbing', 0);
++    }
++
++    public function test_permintaan_ke_dosen_yang_dinonaktifkan_masuk_antrean_operator(): void
++    {
++        $this->buatTa(StatusPengajuan::Diajukan, $this->dosenA);
++        $this->assertSame(0, Pengajuan::perluPembimbing()->count());
++
++        $this->dosenA->update(['aktif' => false]);
++
++        $this->assertSame(1, Pengajuan::perluPembimbing()->count());
++    }
++
++    public function test_dosen_pilihan_yang_masih_dipakai_tidak_dapat_dihapus_admin(): void
++    {
++        $this->buatTa(StatusPengajuan::Diajukan, $this->dosenA);
++
++        $this->actingAs($this->admin)->delete(route('admin.users.destroy', $this->dosenA))->assertSessionHas('galat');
++        $this->assertDatabaseHas('users', ['id' => $this->dosenA->id]);
++    }
++}
+diff --git a/tests/Feature/RenderHalamanTest.php b/tests/Feature/RenderHalamanTest.php
+index 4d5b391..128ea05 100644
+--- a/tests/Feature/RenderHalamanTest.php
++++ b/tests/Feature/RenderHalamanTest.php
+@@ -4,6 +4,7 @@
+ 
+ use App\Enums\JenisPengajuan;
+ use App\Enums\StatusDokumen;
++use App\Enums\StatusPembimbing;
+ use App\Enums\StatusPengajuan;
+ use App\Models\Arsip;
+ use App\Models\DokumenPengajuan;
+@@ -65,11 +66,20 @@ public function test_semua_halaman_tampil_untuk_setiap_role_pada_semua_status():
+         $semua = [];
+         foreach (StatusPengajuan::cases() as $i => $status) {
+             $jenis = $i % 2 === 0 ? JenisPengajuan::Kp : JenisPengajuan::Ta;
++            // Setiap status pembimbing (belum, menunggu, diterima, ditolak, ditetapkan) ikut tampil di semua halaman.
++            $pembimbing = StatusPembimbing::cases()[$i % count(StatusPembimbing::cases())];
+             $p = Pengajuan::create([
+-                'mahasiswa_id' => $mahasiswa->id, 'pembimbing_id' => $dosen->id, 'jenis' => $jenis,
++                'mahasiswa_id' => $mahasiswa->id,
++                'pembimbing_id' => $pembimbing->aktif() ? $dosen->id : null,
++                'pembimbing_pilihan_id' => $pembimbing === StatusPembimbing::Belum || $pembimbing === StatusPembimbing::Ditetapkan ? null : $dosen->id,
++                'status_pembimbing' => $pembimbing,
++                'jenis' => $jenis,
+                 'judul' => "Judul {$status->value}", 'deskripsi' => 'Deskripsi contoh.', 'instansi' => 'Instansi Contoh',
+                 'status' => $status, 'diajukan_at' => $status === StatusPengajuan::Draft ? null : now(),
+             ]);
++            $p->riwayatPembimbing()->create([
++                'dosen_id' => $dosen->id, 'user_id' => $mahasiswa->id, 'status' => $pembimbing, 'catatan' => 'Catatan uji pembimbing',
++            ]);
+ 
+             foreach (Persyaratan::aktif()->untuk($jenis)->get() as $syarat) {
+                 foreach ([1, 2] as $versi) {
+-- 
+2.43.0
+

@@ -21,7 +21,7 @@ class DokumenResmiController extends Controller
 
     public function index(): View
     {
-        $perluDiproses = Pengajuan::with(['mahasiswa.programStudi', 'pembimbing'])
+        $perluDiproses = Pengajuan::with(['mahasiswa.programStudi', 'pembimbing', 'pembimbingPilihan'])
             ->status(StatusPengajuan::Disetujui)
             ->orderBy('updated_at')
             ->get();

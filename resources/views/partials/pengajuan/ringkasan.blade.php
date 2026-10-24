@@ -21,7 +21,16 @@
             <dt>Program Studi</dt>
             <dd>{{ $pengajuan->mahasiswa->programStudi?->namaLengkap() ?? '-' }}@if ($pengajuan->mahasiswa->angkatan), angkatan {{ $pengajuan->mahasiswa->angkatan }}@endif</dd>
         </div>
-        <div class="dl-baris"><dt>Dosen Pembimbing</dt><dd>{{ $pengajuan->pembimbing?->name ?? '-' }}</dd></div>
+        <div class="dl-baris">
+            <dt>Dosen Pembimbing</dt>
+            <dd>
+                {{ $pengajuan->ringkasanPembimbing() }}
+                <div class="mt-1">
+                    <span class="badge {{ $pengajuan->status_pembimbing->badge() }}">{{ $pengajuan->status_pembimbing->label() }}</span>
+                </div>
+                <div class="mt-1 text-xs text-slate-500">{{ $pengajuan->keteranganPembimbing() }}</div>
+            </dd>
+        </div>
         <div class="dl-baris"><dt>Dikirim</dt><dd>{{ $pengajuan->diajukan_at?->translatedFormat('d M Y H:i') ?? 'Belum dikirim' }}</dd></div>
         <div class="dl-baris"><dt>Keterangan</dt><dd class="text-slate-600">{{ $pengajuan->status->keterangan() }}</dd></div>
     </dl>

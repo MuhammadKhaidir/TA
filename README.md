@@ -81,7 +81,7 @@ Seeder memakai `firstOrCreate`, jadi aman dijalankan ulang dan tidak menimpa dat
 
 ## Alur sistem
 
-1. Mahasiswa membuat pengajuan KP/TA (judul, instansi, dosen pembimbing) dan mengunggah dokumen persyaratan. Pengajuan masih berstatus Draft.
+1. Mahasiswa membuat pengajuan KP/TA (judul, instansi; untuk TA ditambah dosen pembimbing pilihan) dan mengunggah dokumen persyaratan. Pengajuan masih berstatus Draft. Pembimbing KP tidak dipilih mahasiswa, lihat bagian Dosen pembimbing.
 2. Setelah semua dokumen wajib lengkap, mahasiswa mengirim pengajuan (Diajukan).
 3. Operator memeriksa dokumen yang menjadi tugas operator. Dokumen bisa Diterima atau Perlu Revisi (catatan wajib). Ada revisi: status Revisi Administrasi, mahasiswa memperbaiki hanya dokumen yang diminta, lalu mengirim ulang.
 4. Jika semua diterima, pengajuan Menunggu Dosen. Dosen pembimbing memeriksa dokumen akademik dengan cara yang sama (Revisi Akademik atau Disetujui).
@@ -98,6 +98,28 @@ draft -> diajukan -> menunggu_dosen -> disetujui -> diarsipkan
 Setiap perubahan status disimpan di tabel `riwayat_status` (siapa, kapan, catatan) dan tampil sebagai riwayat di halaman detail. Tindakan penting juga masuk ke Log Aktivitas.
 
 Dokumen yang diunggah ulang disimpan sebagai versi baru; versi lama tetap ada sebagai jejak audit.
+
+## Dosen pembimbing
+
+Pembimbing KP dan TA berasal dari sumber yang berbeda.
+
+| | KP | TA |
+|---|---|---|
+| Siapa yang menentukan | Operator akademik, dari daftar dosen di database | Mahasiswa memilih saat membuat pengajuan |
+| Persetujuan dosen | Tidak perlu, langsung berlaku | Dosen pilihan menerima atau menolak (alasan wajib bila menolak) |
+| Bila ditolak | - | Operator menetapkan dosen pengganti |
+
+Alur TA: mahasiswa memilih dosen (status *Menunggu konfirmasi*), mengirim pengajuan, lalu permintaan muncul di halaman **Mahasiswa Bimbingan** milik dosen itu dan di kartu pada dashboard dosen. Dosen menerima (*Diterima*) atau menolak (*Ditolak*). Setelah ditolak, pengajuan masuk daftar **Perlu Penetapan Dosen Pembimbing** di dashboard operator dan dapat difilter di menu Pengelolaan KP/TA (filter Pembimbing: Perlu penetapan).
+
+Penetapan oleh operator ada di halaman Kelola pada pengajuan. Daftar dosen diurutkan dari **bimbingan aktif paling sedikit** (pengajuan yang sudah diarsipkan tidak dihitung) dan dosen dengan bimbingan paling sedikit sudah terpilih. Dosen yang menolak pengajuan itu tidak dapat dipilih lagi. Catatan wajib diisi bila operator menggantikan dosen yang masih menunggu konfirmasi atau yang sudah menerima.
+
+Hal lain yang perlu diketahui:
+
+- Dosen baru berwenang membuka dokumen dan memeriksa berkas setelah menjadi pembimbing yang sah (diterima atau ditetapkan). Dosen yang baru dipilih mahasiswa hanya melihat ringkasan permintaan.
+- Mahasiswa dapat mengganti dosen pilihan TA hanya selama pengajuan masih Draft.
+- Seluruh pemilihan, penerimaan, penolakan, dan penetapan tersimpan di riwayat dosen pembimbing beserta pelaku dan catatannya, tampil di halaman detail mahasiswa dan operator.
+- Dashboard mahasiswa menampilkan pembimbing KP dan TA beserta statusnya. Data diambil dari tabel yang sama dengan halaman lain.
+- Yang menetapkan pembimbing adalah operator, bukan admin. Bila di fakultas Anda berbeda, ubah ability `kelola` di `app/Policies/PengajuanPolicy.php` dan route `operator.pengajuan.pembimbing`.
 
 ## Keamanan berkas
 
@@ -137,7 +159,7 @@ php artisan test
 
 Uji memakai SQLite in-memory (butuh ekstensi `pdo_sqlite`), jadi tidak menyentuh database MySQL Anda.
 
-Hasil terakhir di lingkungan pengembangan: **39 uji, 876 assertion, semuanya lulus.** Cakupannya:
+Hasil terakhir di lingkungan pengembangan: **52 uji, 1040 assertion, semuanya lulus.** Cakupannya:
 
 - Login (email atau nomor induk), logout, akun nonaktif, pengalihan dashboard per peran, pencatatan log login.
 - Matriks akses: setiap peran hanya dapat membuka halamannya sendiri (200) dan ditolak (403) di halaman peran lain, termasuk aksi tulis lintas peran dan ID yang tidak ada.
@@ -145,7 +167,8 @@ Hasil terakhir di lingkungan pengembangan: **39 uji, 876 assertion, semuanya lul
 - Akses berkas privat: pemilik, pembimbing, dan operator dapat membuka; mahasiswa lain, dosen lain, admin, dan tamu ditolak; tidak ada URL publik.
 - Sinkronisasi data setelah admin mengubah mahasiswa, dosen, program studi, dan persyaratan.
 - CRUD admin (pengguna, program studi, persyaratan), validasi, perlindungan data yang dipakai, log aktivitas, profil, dan ganti kata sandi.
-- Render semua halaman untuk setiap peran pada setiap status pengajuan.
+- Alur dosen pembimbing: KP ditetapkan operator, TA dipilih mahasiswa lalu diterima atau ditolak dosen, penetapan pengganti dengan bimbingan paling sedikit, hak akses, dan dashboard mahasiswa.
+- Render semua halaman untuk setiap peran pada setiap status pengajuan dan status pembimbing.
 - Migrasi (naik dan rollback) serta seeder, termasuk aman dijalankan ulang.
 
 ## Yang belum diuji
@@ -161,7 +184,7 @@ Hal berikut belum bisa diuji di lingkungan pengembangan dan sebaiknya Anda cek s
 - Dokumen resmi (surat pengantar, SK) diunggah operator sebagai berkas. Aplikasi belum membuat dokumen dari templat.
 - Data Master baru berisi Program Studi.
 - Belum ada notifikasi email, pencarian lintas arsip tingkat lanjut, atau ekspor laporan.
-- Pembimbing dipilih saat pengajuan dan dapat diganti operator.
+- Satu pengajuan hanya memiliki satu dosen pembimbing (belum ada pembimbing kedua) dan belum ada batas kuota bimbingan per dosen.
 
 ## Menempelkan ke proyek Laravel yang sudah ada
 

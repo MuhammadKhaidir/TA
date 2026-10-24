@@ -5,12 +5,20 @@
 @section('konten')
     <x-page-header judul="Dashboard" sub="Ringkasan pemeriksaan berkas dan bimbingan Anda." />
 
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <x-stat label="Permintaan Pembimbing" :nilai="$permintaanPembimbing" hint="Pilihan mahasiswa TA, menunggu jawaban Anda" :href="route('dosen.bimbingan.index')" />
         <x-stat label="Menunggu Pemeriksaan" :nilai="$antrean->count()" hint="Berkas yang perlu Anda periksa" :href="route('dosen.pemeriksaan.index')" />
         <x-stat label="Mahasiswa Bimbingan" :nilai="$jumlahMahasiswa" :href="route('dosen.bimbingan.index')" />
         <x-stat label="Pengajuan Selesai" :nilai="$selesai" hint="Sudah diarsipkan" />
         <x-stat label="Dokumen Diperiksa" :nilai="$totalDiperiksa" hint="Seluruh riwayat pemeriksaan" :href="route('dosen.riwayat.index')" />
     </div>
+
+    @if ($permintaanPembimbing > 0)
+        <div class="alert alert-info mt-6">
+            Ada {{ $permintaanPembimbing }} mahasiswa TA yang memilih Anda sebagai calon pembimbing.
+            <a href="{{ route('dosen.bimbingan.index') }}" class="font-medium underline">Lihat dan jawab permintaan</a>
+        </div>
+    @endif
 
     <section class="card mt-6">
         <div class="card-header">

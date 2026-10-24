@@ -18,7 +18,7 @@ class VerifikasiController extends Controller
     /** Antrean pengajuan yang menunggu verifikasi administrasi. */
     public function index(): View
     {
-        $daftar = Pengajuan::with(['mahasiswa.programStudi', 'pembimbing'])
+        $daftar = Pengajuan::with(['mahasiswa.programStudi', 'pembimbing', 'pembimbingPilihan'])
             ->status(StatusPengajuan::Diajukan)
             ->orderBy('diajukan_at')
             ->paginate(15);

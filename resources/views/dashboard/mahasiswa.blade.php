@@ -60,14 +60,38 @@
             @endif
         </section>
 
-        <section class="card">
-            <div class="card-header"><h2 class="font-semibold text-slate-900">Informasi Akademik</h2></div>
-            <dl class="divide-y divide-slate-100 px-5 py-2">
-                <div class="dl-baris"><dt>Nama</dt><dd>{{ $user->name }}</dd></div>
-                <div class="dl-baris"><dt>NIM</dt><dd>{{ $user->nomor_induk ?? '-' }}</dd></div>
-                <div class="dl-baris"><dt>Prodi</dt><dd>{{ $user->programStudi?->namaLengkap() ?? '-' }}</dd></div>
-                <div class="dl-baris"><dt>Angkatan</dt><dd>{{ $user->angkatan ?? '-' }}</dd></div>
-            </dl>
-        </section>
+        <div class="space-y-6">
+            <section class="card">
+                <div class="card-header"><h2 class="font-semibold text-slate-900">Dosen Pembimbing</h2></div>
+                <dl class="divide-y divide-slate-100 px-5 py-2">
+                    @foreach ([['Pembimbing KP', $pengajuanKp, 'KP'], ['Pembimbing TA', $pengajuanTa, 'TA']] as [$label, $p, $singkat])
+                        <div class="dl-baris">
+                            <dt>{{ $label }}</dt>
+                            <dd>
+                                @if ($p === null)
+                                    <span class="text-slate-500">Belum ada pengajuan {{ $singkat }}</span>
+                                @else
+                                    <span class="{{ $p->pembimbing_id ? 'font-medium' : '' }}">{{ $p->ringkasanPembimbing() }}</span>
+                                    <div class="mt-1">
+                                        <span class="badge {{ $p->status_pembimbing->badge() }}">{{ $p->status_pembimbing->label() }}</span>
+                                    </div>
+                                    <div class="mt-1 text-xs text-slate-500">{{ $p->keteranganPembimbing() }}</div>
+                                @endif
+                            </dd>
+                        </div>
+                    @endforeach
+                </dl>
+            </section>
+
+            <section class="card">
+                <div class="card-header"><h2 class="font-semibold text-slate-900">Informasi Akademik</h2></div>
+                <dl class="divide-y divide-slate-100 px-5 py-2">
+                    <div class="dl-baris"><dt>Nama</dt><dd>{{ $user->name }}</dd></div>
+                    <div class="dl-baris"><dt>NIM</dt><dd>{{ $user->nomor_induk ?? '-' }}</dd></div>
+                    <div class="dl-baris"><dt>Prodi</dt><dd>{{ $user->programStudi?->namaLengkap() ?? '-' }}</dd></div>
+                    <div class="dl-baris"><dt>Angkatan</dt><dd>{{ $user->angkatan ?? '-' }}</dd></div>
+                </dl>
+            </section>
+        </div>
     </div>
 @endsection

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\JenisPengajuan;
 use App\Enums\StatusDokumen;
+use App\Enums\StatusPembimbing;
 use App\Enums\StatusPengajuan;
 use App\Models\Arsip;
 use App\Models\DokumenPengajuan;
@@ -65,10 +66,19 @@ class RenderHalamanTest extends TestCase
         $semua = [];
         foreach (StatusPengajuan::cases() as $i => $status) {
             $jenis = $i % 2 === 0 ? JenisPengajuan::Kp : JenisPengajuan::Ta;
+            // Setiap status pembimbing (belum, menunggu, diterima, ditolak, ditetapkan) ikut tampil di semua halaman.
+            $pembimbing = StatusPembimbing::cases()[$i % count(StatusPembimbing::cases())];
             $p = Pengajuan::create([
-                'mahasiswa_id' => $mahasiswa->id, 'pembimbing_id' => $dosen->id, 'jenis' => $jenis,
+                'mahasiswa_id' => $mahasiswa->id,
+                'pembimbing_id' => $pembimbing->aktif() ? $dosen->id : null,
+                'pembimbing_pilihan_id' => $pembimbing === StatusPembimbing::Belum || $pembimbing === StatusPembimbing::Ditetapkan ? null : $dosen->id,
+                'status_pembimbing' => $pembimbing,
+                'jenis' => $jenis,
                 'judul' => "Judul {$status->value}", 'deskripsi' => 'Deskripsi contoh.', 'instansi' => 'Instansi Contoh',
                 'status' => $status, 'diajukan_at' => $status === StatusPengajuan::Draft ? null : now(),
+            ]);
+            $p->riwayatPembimbing()->create([
+                'dosen_id' => $dosen->id, 'user_id' => $mahasiswa->id, 'status' => $pembimbing, 'catatan' => 'Catatan uji pembimbing',
             ]);
 
             foreach (Persyaratan::aktif()->untuk($jenis)->get() as $syarat) {

@@ -5,7 +5,7 @@
 @section('konten')
     <x-page-header judul="Pengelolaan KP/TA" sub="Seluruh pengajuan Kerja Praktik dan Tugas Akhir." />
 
-    <form method="GET" class="card card-body mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <form method="GET" class="card card-body mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <div class="lg:col-span-2">
             <label for="q" class="label">Cari</label>
             <input id="q" name="q" type="text" value="{{ $filter['q'] ?? '' }}" placeholder="Judul, nama, atau NIM" class="input">
@@ -37,7 +37,14 @@
                 @endforeach
             </select>
         </div>
-        <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-5">
+        <div>
+            <label for="pembimbing" class="label">Pembimbing</label>
+            <select id="pembimbing" name="pembimbing" class="input">
+                <option value="">Semua</option>
+                <option value="perlu" @selected(($filter['pembimbing'] ?? '') === 'perlu')>Perlu penetapan</option>
+            </select>
+        </div>
+        <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-6">
             <button type="submit" class="btn btn-primary">Terapkan</button>
             <a href="{{ route('operator.pengajuan.index') }}" class="btn btn-secondary">Reset</a>
         </div>
@@ -59,7 +66,7 @@
                                 </td>
                                 <td>{{ $p->jenis->singkat() }}</td>
                                 <td>{{ $p->judul }}</td>
-                                <td>{{ $p->pembimbing?->name ?? '-' }}</td>
+                                <td>{{ $p->ringkasanPembimbing() }}</td>
                                 <td><x-status-badge :status="$p->status" /></td>
                                 <td class="whitespace-nowrap">{{ $p->updated_at->translatedFormat('d M Y') }}</td>
                                 <td class="text-right"><a href="{{ route('operator.pengajuan.show', $p) }}" class="btn btn-secondary btn-sm">Kelola</a></td>

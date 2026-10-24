@@ -22,7 +22,7 @@
                                 </td>
                                 <td>{{ $p->jenis->singkat() }}</td>
                                 <td>{{ $p->judul }}</td>
-                                <td>{{ $p->pembimbing?->name ?? '-' }}</td>
+                                <td>{{ $p->ringkasanPembimbing() }}</td>
                                 <td class="text-right"><a href="{{ route('operator.dokumen-resmi.show', $p) }}" class="btn btn-primary btn-sm">Proses</a></td>
                             </tr>
                         @endforeach

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\JenisPengajuan;
+use App\Enums\StatusPembimbing;
 use App\Enums\StatusPengajuan;
 use App\Models\LogAktivitas;
 use App\Models\Pemeriksaan;
@@ -24,7 +26,11 @@ class DashboardController extends Controller
     public function mahasiswa(Request $request): View
     {
         $user = $request->user()->load('programStudi');
-        $pengajuan = $user->pengajuan()->with('pembimbing')->orderByDesc('updated_at')->get();
+        $pengajuan = $user->pengajuan()->with(['pembimbing', 'pembimbingPilihan'])->orderByDesc('updated_at')->get();
+
+        // Pembimbing per jenis: KP ditetapkan operator dari database dosen, TA berasal dari pilihan mahasiswa.
+        $pengajuanKp = $pengajuan->first(fn (Pengajuan $p) => $p->jenis === JenisPengajuan::Kp);
+        $pengajuanTa = $pengajuan->first(fn (Pengajuan $p) => $p->jenis === JenisPengajuan::Ta);
 
         $perluRevisi = $pengajuan->filter(fn (Pengajuan $p) => in_array(
             $p->status, [StatusPengajuan::RevisiAdministrasi, StatusPengajuan::RevisiAkademik], true,
@@ -34,7 +40,7 @@ class DashboardController extends Controller
         ))->count();
         $selesai = $pengajuan->filter(fn (Pengajuan $p) => $p->status === StatusPengajuan::Diarsipkan)->count();
 
-        return view('dashboard.mahasiswa', compact('user', 'pengajuan', 'perluRevisi', 'dalamProses', 'selesai'));
+        return view('dashboard.mahasiswa', compact('user', 'pengajuan', 'pengajuanKp', 'pengajuanTa', 'perluRevisi', 'dalamProses', 'selesai'));
     }
 
     public function dosen(Request $request): View
@@ -51,7 +57,12 @@ class DashboardController extends Controller
         $selesai = Pengajuan::where('pembimbing_id', $user->id)->status(StatusPengajuan::Diarsipkan)->count();
         $totalDiperiksa = Pemeriksaan::where('pemeriksa_id', $user->id)->count();
 
-        return view('dashboard.dosen', compact('antrean', 'jumlahMahasiswa', 'selesai', 'totalDiperiksa'));
+        $permintaanPembimbing = Pengajuan::where('pembimbing_pilihan_id', $user->id)
+            ->where('status_pembimbing', StatusPembimbing::Menunggu->value)
+            ->where('status', '!=', StatusPengajuan::Draft->value)
+            ->count();
+
+        return view('dashboard.dosen', compact('antrean', 'jumlahMahasiswa', 'selesai', 'totalDiperiksa', 'permintaanPembimbing'));
     }
 
     public function operator(): View
@@ -70,7 +81,17 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
-        return view('dashboard.operator', compact('jumlah', 'antreanVerifikasi', 'perluDokumenResmi'));
+        $jumlahPerluPembimbing = Pengajuan::perluPembimbing()->count();
+
+        $perluPembimbing = Pengajuan::with(['mahasiswa.programStudi', 'pembimbingPilihan'])
+            ->perluPembimbing()
+            ->orderBy('diajukan_at')
+            ->limit(5)
+            ->get();
+
+        return view('dashboard.operator', compact(
+            'jumlah', 'antreanVerifikasi', 'perluDokumenResmi', 'jumlahPerluPembimbing', 'perluPembimbing',
+        ));
     }
 
     public function admin(): View

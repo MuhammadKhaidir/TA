@@ -14,7 +14,7 @@
                 </div>
                 <dl class="divide-y divide-slate-100 px-5 py-2">
                     <div class="dl-baris"><dt>Judul</dt><dd>{{ $p->judul }}</dd></div>
-                    <div class="dl-baris"><dt>Dosen Pembimbing</dt><dd>{{ $p->pembimbing?->name ?? '-' }}</dd></div>
+                    <div class="dl-baris"><dt>Dosen Pembimbing</dt><dd>{{ $p->ringkasanPembimbing() }}<div class="mt-1 text-xs text-slate-500">{{ $p->keteranganPembimbing() }}</div></dd></div>
                     <div class="dl-baris"><dt>Langkah berikutnya</dt><dd class="text-slate-600">{{ $p->status->keterangan() }}</dd></div>
                 </dl>
                 <div class="border-t border-slate-200 px-5 py-3">
@@ -22,7 +22,10 @@
                 </div>
             </section>
 
-            @include('partials.pengajuan.riwayat', ['pengajuan' => $p])
+            <div class="space-y-6">
+                @include('partials.pengajuan.riwayat', ['pengajuan' => $p])
+                @include('partials.pengajuan.riwayat-pembimbing', ['pengajuan' => $p])
+            </div>
         </div>
     @empty
         <section class="card">

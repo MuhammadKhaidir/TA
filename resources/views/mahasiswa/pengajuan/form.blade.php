@@ -38,17 +38,32 @@
                     @error('deskripsi')<p class="galat">{{ $message }}</p>@enderror
                 </div>
 
-                <div>
-                    <label for="pembimbing_id" class="label">Dosen pembimbing</label>
-                    <select id="pembimbing_id" name="pembimbing_id" required class="input">
-                        <option value="">Pilih dosen</option>
-                        @foreach ($dosen as $d)
-                            <option value="{{ $d->id }}" @selected((string) old('pembimbing_id', $pengajuan?->pembimbing_id) === (string) $d->id)>{{ $d->name }}</option>
-                        @endforeach
-                    </select>
-                    <p class="hint">Operator akademik dapat menyesuaikan dosen pembimbing bila diperlukan.</p>
-                    @error('pembimbing_id')<p class="galat">{{ $message }}</p>@enderror
-                </div>
+                @if ($bisaPilihPembimbing)
+                    {{-- TA: mahasiswa memilih dosen, lalu dosen tersebut menerima atau menolak. --}}
+                    <div>
+                        <label for="pembimbing_id" class="label">Dosen pembimbing pilihan Anda</label>
+                        <select id="pembimbing_id" name="pembimbing_id" required class="input">
+                            <option value="">Pilih dosen</option>
+                            @foreach ($dosen as $d)
+                                <option value="{{ $d->id }}" @selected((string) old('pembimbing_id', $pengajuan?->pembimbing_pilihan_id) === (string) $d->id)>{{ $d->name }}</option>
+                            @endforeach
+                        </select>
+                        <p class="hint">Dosen yang Anda pilih akan diminta menerima atau menolak setelah pengajuan dikirim. Jika menolak, operator akademik akan menetapkan dosen pengganti.</p>
+                        @error('pembimbing_id')<p class="galat">{{ $message }}</p>@enderror
+                    </div>
+                @elseif ($jenis === \App\Enums\JenisPengajuan::Kp)
+                    {{-- KP: pembimbing ditetapkan operator dari database dosen. --}}
+                    <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                        <p class="font-medium">Dosen pembimbing KP</p>
+                        <p class="mt-0.5">Tidak perlu dipilih. Operator akademik menetapkan dosen pembimbing KP dari daftar dosen setelah pengajuan Anda dikirim.</p>
+                    </div>
+                @else
+                    <div>
+                        <span class="label">Dosen pembimbing</span>
+                        <p class="text-sm text-slate-800">{{ $pengajuan->ringkasanPembimbing() }}</p>
+                        <p class="hint">Dosen pilihan tidak dapat diubah setelah pengajuan dikirim. Hubungi operator akademik bila perlu penggantian.</p>
+                    </div>
+                @endif
             </div>
 
             <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 px-5 py-4">

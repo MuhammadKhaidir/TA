@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\JenisPengajuan;
 use App\Enums\Role;
 use App\Enums\StatusDokumen;
+use App\Enums\StatusPembimbing;
 use App\Enums\StatusPengajuan;
 use App\Models\DokumenPengajuan;
 use App\Models\Pengajuan;
@@ -80,22 +81,25 @@ class AlurPengajuanTest extends TestCase
     {
         $wajib = Persyaratan::aktif()->untuk(JenisPengajuan::Kp)->where('wajib', true)->orderBy('urutan')->get();
 
-        // 1. Mahasiswa membuat pengajuan (draft).
+        // 1. Mahasiswa membuat pengajuan KP (draft). Pembimbing KP ditetapkan operator, bukan dipilih mahasiswa,
+        //    sehingga pembimbing_id yang ikut terkirim diabaikan.
         $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.store', 'kp'), [
             'judul' => 'Rancang Bangun Sistem Arsip Digital',
             'instansi' => 'Dinas Komunikasi dan Informatika',
             'deskripsi' => 'Kerja praktik pengembangan aplikasi web.',
-            'pembimbing_id' => $this->dosen->id,
+            'pembimbing_id' => $this->dosenLain->id,
         ])->assertSessionHasNoErrors();
 
         $p = Pengajuan::firstOrFail();
         $this->assertSame(StatusPengajuan::Draft, $p->status);
         $this->assertSame($this->mahasiswa->id, (int) $p->mahasiswa_id);
-        $this->assertSame($this->dosen->id, (int) $p->pembimbing_id);
+        $this->assertNull($p->pembimbing_id);
+        $this->assertNull($p->pembimbing_pilihan_id);
+        $this->assertSame(StatusPembimbing::Belum, $p->status_pembimbing);
 
         // Pengajuan KP kedua selama yang pertama berjalan ditolak.
         $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.store', 'kp'), [
-            'judul' => 'Duplikat', 'instansi' => 'X', 'pembimbing_id' => $this->dosen->id,
+            'judul' => 'Duplikat', 'instansi' => 'X',
         ])->assertSessionHas('galat');
         $this->assertSame(1, Pengajuan::count());
 
@@ -128,6 +132,16 @@ class AlurPengajuanTest extends TestCase
 
         // Setelah dikirim, mahasiswa tidak dapat lagi mengganti dokumen.
         $this->unggah($p, $wajib->first())->assertForbidden();
+
+        // Pembimbing KP ditetapkan operator dari daftar dosen. Sebelum itu dosen belum berwenang atas pengajuan ini.
+        $this->actingAs($this->dosen)->get(route('dosen.pemeriksaan.show', $p))->assertForbidden();
+        $this->actingAs($this->dosen)->patch(route('operator.pengajuan.pembimbing', $p), ['pembimbing_id' => $this->dosen->id])
+            ->assertForbidden();
+        $this->actingAs($this->operator)->patch(route('operator.pengajuan.pembimbing', $p), ['pembimbing_id' => $this->dosen->id])
+            ->assertSessionHasNoErrors();
+        $p->refresh();
+        $this->assertSame($this->dosen->id, (int) $p->pembimbing_id);
+        $this->assertSame(StatusPembimbing::Ditetapkan, $p->status_pembimbing);
 
         // 5. Operator: dosen tidak berwenang; hasil tanpa keputusan dan revisi tanpa catatan ditolak.
         $this->periksa($this->dosen, 'operator.verifikasi.store', $p, [])->assertForbidden();
@@ -293,23 +307,20 @@ class AlurPengajuanTest extends TestCase
 
     public function test_draft_dapat_diubah_dan_dihapus_beserta_berkasnya(): void
     {
-        $p = $this->buatPengajuan($this->mahasiswa, $this->dosen);
+        $p = $this->buatPengajuan($this->mahasiswa);
         $syarat = Persyaratan::aktif()->untuk(JenisPengajuan::Kp)->firstOrFail();
         $this->unggah($p, $syarat)->assertSessionHasNoErrors();
         $path = $p->dokumen()->firstOrFail()->path;
         Storage::disk('local')->assertExists($path);
 
+        // Pada KP, kiriman pembimbing_id tidak berpengaruh karena pembimbing ditetapkan operator.
         $this->actingAs($this->mahasiswa)->put(route('mahasiswa.pengajuan.update', $p), [
             'judul' => 'Judul Diperbarui', 'instansi' => 'Instansi Baru', 'pembimbing_id' => $this->dosenLain->id,
         ])->assertSessionHasNoErrors();
         $p->refresh();
         $this->assertSame('Judul Diperbarui', $p->judul);
-        $this->assertSame($this->dosenLain->id, (int) $p->pembimbing_id);
-
-        // Pembimbing harus dosen aktif, bukan sembarang pengguna.
-        $this->actingAs($this->mahasiswa)->put(route('mahasiswa.pengajuan.update', $p), [
-            'judul' => 'X', 'instansi' => 'Y', 'pembimbing_id' => $this->operator->id,
-        ])->assertSessionHasErrors('pembimbing_id');
+        $this->assertNull($p->pembimbing_id);
+        $this->assertNull($p->pembimbing_pilihan_id);
 
         $this->actingAs($this->mahasiswa)->delete(route('mahasiswa.pengajuan.destroy', $p))->assertSessionHasNoErrors();
         $this->assertDatabaseMissing('pengajuan', ['id' => $p->id]);

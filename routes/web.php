@@ -69,6 +69,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/pemeriksaan/{pengajuan}', [Dosen\PemeriksaanController::class, 'store'])->name('pemeriksaan.store');
 
         Route::get('/bimbingan', [Dosen\BimbinganController::class, 'index'])->name('bimbingan.index');
+        Route::post('/bimbingan/{pengajuan}/konfirmasi', [Dosen\BimbinganController::class, 'konfirmasi'])->name('bimbingan.konfirmasi');
         Route::get('/riwayat', [Dosen\RiwayatController::class, 'index'])->name('riwayat.index');
     });
 

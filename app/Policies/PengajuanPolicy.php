@@ -2,7 +2,9 @@
 
 namespace App\Policies;
 
+use App\Enums\JenisPengajuan;
 use App\Enums\Role;
+use App\Enums\StatusPembimbing;
 use App\Enums\StatusPengajuan;
 use App\Models\Pengajuan;
 use App\Models\User;
@@ -53,7 +55,21 @@ class PengajuanPolicy
             && $pengajuan->status === StatusPengajuan::MenungguDosen;
     }
 
-    /** Operator mengganti dosen pembimbing selama belum diarsipkan. */
+    /**
+     * Dosen yang dipilih mahasiswa menjawab permintaan pembimbing TA.
+     * Baru berlaku setelah pengajuan dikirim, dan hanya selama permintaan masih menunggu.
+     */
+    public function konfirmasiPembimbing(User $user, Pengajuan $pengajuan): bool
+    {
+        return $user->role === Role::Dosen
+            && $pengajuan->jenis === JenisPengajuan::Ta
+            && $pengajuan->status_pembimbing === StatusPembimbing::Menunggu
+            && $pengajuan->pembimbing_pilihan_id !== null
+            && (int) $pengajuan->pembimbing_pilihan_id === (int) $user->id
+            && $pengajuan->status !== StatusPengajuan::Draft;
+    }
+
+    /** Operator menetapkan atau mengganti dosen pembimbing selama belum diarsipkan. */
     public function kelola(User $user, Pengajuan $pengajuan): bool
     {
         return $user->role === Role::Operator && $pengajuan->status !== StatusPengajuan::Diarsipkan;

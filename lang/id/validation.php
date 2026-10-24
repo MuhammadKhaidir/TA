@@ -49,6 +49,7 @@ return [
         'deskripsi' => 'Deskripsi',
         'instansi' => 'Instansi',
         'pembimbing_id' => 'Dosen pembimbing',
+        'keputusan' => 'Keputusan',
         'persyaratan_id' => 'Persyaratan',
         'berkas' => 'Berkas',
         'kode' => 'Kode',
