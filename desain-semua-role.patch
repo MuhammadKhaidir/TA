@@ -1,0 +1,575 @@
+From 45aa926e677702e3350de9e22ab06390da5ec1fa Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 26 Oct 2026 01:27:08 +0700
+Subject: [PATCH] Samakan tampilan semua role dengan tema mahasiswa
+
+Hanya tampilan; tidak ada perubahan route, controller, model, policy, data, atau alur.
+
+- layouts/app kini selalu memakai kerangka pasir (sidebar krem + header ringkas)
+  untuk Mahasiswa, Dosen, Operator, dan Admin. Menu tetap dari App\Support\Menu.
+- Hapus sidebar dan navbar navy lama (partials/sidebar, partials/navbar) beserta
+  kode JS dan CSS menu-link yang tidak terpakai.
+- Komponen ikon dipindah ke x-pasir.icon dan dilengkapi ikon menu role lain.
+- Warna slate dipetakan ke krem/tinta di dalam .tema-pasir sehingga semua tabel,
+  form, dan kartu halaman role lain ikut serasi tanpa mengubah markup.
+- Halaman galat (403/404) ikut tema pasir. Sidebar dilebarkan ke 19rem agar
+  label menu panjang tidak patah baris.
+- Tes: TemaTampilanTest diperluas untuk semua role.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz6bmzU4tc523QrBXnnDzE
+---
+ resources/css/app.css                         | 34 ++++++++-----
+ resources/js/app.js                           | 26 +---------
+ .../components/{mhs => pasir}/icon.blade.php  | 44 +++++++++++++++-
+ resources/views/dashboard/mahasiswa.blade.php | 10 ++--
+ resources/views/layouts/app.blade.php         | 28 ++---------
+ resources/views/layouts/guest.blade.php       | 15 ++++--
+ resources/views/partials/navbar.blade.php     | 33 ------------
+ .../views/partials/shell-pasir.blade.php      | 18 +++----
+ resources/views/partials/sidebar.blade.php    | 35 -------------
+ tests/Feature/TemaTampilanTest.php            | 50 ++++++++++++-------
+ 10 files changed, 123 insertions(+), 170 deletions(-)
+ rename resources/views/components/{mhs => pasir}/icon.blade.php (56%)
+ delete mode 100644 resources/views/partials/navbar.blade.php
+ delete mode 100644 resources/views/partials/sidebar.blade.php
+
+diff --git a/resources/css/app.css b/resources/css/app.css
+index 59c70b1..6279185 100644
+--- a/resources/css/app.css
++++ b/resources/css/app.css
+@@ -47,6 +47,23 @@ @layer base {
+     body {
+         @apply bg-slate-50 text-slate-800 antialiased;
+     }
++
++    /*
++     * Tema pasir: abu-abu dingin (slate) yang dipakai di banyak halaman dipetakan ke krem hangat dan tinta navy.
++     * Cukup mengganti variabel warna di dalam .tema-pasir, jadi markup halaman tidak perlu diubah.
++     */
++    .tema-pasir {
++        --color-slate-50: #faf6ee;
++        --color-slate-100: #f8f2e8;
++        --color-slate-200: #f0e6d6;
++        --color-slate-300: #e6d6bd;
++        --color-slate-400: #9aa1b2;
++        --color-slate-500: #747c91;
++        --color-slate-600: #565e75;
++        --color-slate-700: #3a4460;
++        --color-slate-800: #263153;
++        --color-slate-900: #19223f;
++    }
+ }
+ 
+ @layer components {
+@@ -131,14 +148,6 @@ @layer components {
+         @apply border-blue-200 bg-blue-50 text-blue-900;
+     }
+ 
+-    /* Menu sidebar */
+-    .menu-link {
+-        @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900;
+-    }
+-    .menu-link-aktif {
+-        @apply bg-navy-50 text-navy-800 hover:bg-navy-50 hover:text-navy-800;
+-    }
+-
+     /* Judul halaman dan angka statistik (dipakai komponen page-header dan stat) */
+     .judul-halaman {
+         @apply text-xl font-semibold text-navy-900 sm:text-2xl;
+@@ -174,9 +183,8 @@ @layer components {
+ 
+     /*
+      * TEMA PASIR
+-     * Aktif bila <body> memakai kelas .tema-pasir (halaman login dan semua halaman mahasiswa).
+-     * Menimpa kelas komponen bersama supaya halaman yang sudah ada ikut berganti rupa
+-     * tanpa mengubah markup. Role lain tetap memakai tema navy di atas.
++     * Aktif bila <body> memakai kelas .tema-pasir (halaman login dan seluruh halaman setelah login, semua role).
++     * Menimpa kelas komponen bersama supaya halaman yang sudah ada ikut berganti rupa tanpa mengubah markup.
+      */
+     .tema-pasir .card {
+         @apply rounded-2xl border-sand-200 bg-white/70 shadow-[0_1px_3px_rgba(118,87,50,0.06)];
+@@ -236,7 +244,7 @@ @layer components {
+  * Atribut data-collapsed dan data-drawer dipasang oleh resources/js/app.js.
+  */
+ .sidebar-pasir {
+-    width: 18rem;
++    width: 19rem;
+ }
+ 
+ @media (min-width: 1024px) {
+@@ -248,7 +256,7 @@ @media (min-width: 1024px) {
+         transition: margin-left 0.3s ease, opacity 0.25s ease, visibility 0s;
+     }
+     .shell-pasir[data-collapsed='true'] .sidebar-pasir {
+-        margin-left: -18rem;
++        margin-left: -19rem;
+         opacity: 0;
+         visibility: hidden;
+         pointer-events: none;
+diff --git a/resources/js/app.js b/resources/js/app.js
+index e216821..2ebd0c6 100644
+--- a/resources/js/app.js
++++ b/resources/js/app.js
+@@ -1,28 +1,4 @@
+ document.addEventListener('DOMContentLoaded', () => {
+-    // Sidebar responsif: tombol menu membuka/menutup sidebar pada layar kecil.
+-    const sidebar = document.getElementById('sidebar');
+-    const overlay = document.getElementById('sidebar-overlay');
+-
+-    const atur = (buka) => {
+-        if (!sidebar) {
+-            return;
+-        }
+-        sidebar.classList.toggle('-translate-x-full', !buka);
+-        if (overlay) {
+-            overlay.classList.toggle('hidden', !buka);
+-        }
+-    };
+-
+-    document.querySelectorAll('[data-sidebar-toggle]').forEach((tombol) => {
+-        tombol.addEventListener('click', () => {
+-            atur(sidebar && sidebar.classList.contains('-translate-x-full'));
+-        });
+-    });
+-
+-    if (overlay) {
+-        overlay.addEventListener('click', () => atur(false));
+-    }
+-
+     // Konfirmasi sebelum aksi yang menghapus data.
+     document.querySelectorAll('form[data-konfirmasi]').forEach((form) => {
+         form.addEventListener('submit', (event) => {
+@@ -33,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
+     });
+ });
+ 
+-// Tema pasir: sidebar mahasiswa (desktop bisa dilipat, layar kecil berupa laci), dropdown pengguna,
++// Tema pasir: sidebar (desktop bisa dilipat, layar kecil berupa laci), dropdown pengguna,
+ // slideshow foto di halaman login, dan tombol tampil/sembunyikan kata sandi.
+ document.addEventListener('DOMContentLoaded', () => {
+     const shell = document.getElementById('shell-pasir');
+diff --git a/resources/views/components/mhs/icon.blade.php b/resources/views/components/pasir/icon.blade.php
+similarity index 56%
+rename from resources/views/components/mhs/icon.blade.php
+rename to resources/views/components/pasir/icon.blade.php
+index 880ec96..6596a51 100644
+--- a/resources/views/components/mhs/icon.blade.php
++++ b/resources/views/components/pasir/icon.blade.php
+@@ -1,6 +1,6 @@
+ {{--
+-    Ikon garis tipis untuk tema pasir (login dan area mahasiswa).
+-    Pakai: <x-mhs.icon name="doc" class="h-5 w-5" />  (ukuran wajib diberikan lewat class)
++    Ikon garis tipis untuk tema pasir (login dan seluruh halaman setelah login).
++    Pakai: <x-pasir.icon name="doc" class="h-5 w-5" />  (ukuran wajib diberikan lewat class)
+ --}}
+ @props(['name'])
+ 
+@@ -39,6 +39,46 @@
+         @case('folder')
+             <path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-10Z" />
+             @break
++        @case('clipboard')
++            <rect x="6" y="4.5" width="12" height="16.5" rx="2.5" />
++            <path d="M9.5 4.5V4a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5v.5M9.3 13.2l2 2 3.6-3.9" />
++            @break
++        @case('users')
++            <circle cx="9" cy="8.5" r="3" />
++            <path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5M16 5.8a3 3 0 0 1 0 5.4M17.5 14.7c2 .5 3.5 2.2 3.5 4.8" />
++            @break
++        @case('clock')
++            <circle cx="12" cy="12" r="8.5" />
++            <path d="M12 7.5V12l3 2" />
++            @break
++        @case('shield')
++            <path d="M12 3 5 6v5.5c0 4.2 2.9 7.6 7 9 4.1-1.4 7-4.8 7-9V6l-7-3Z" />
++            <path d="m9.2 12 2 2 3.6-4" />
++            @break
++        @case('inbox')
++            <path d="M4 13.5 6.2 5.5h11.6L20 13.5" />
++            <path d="M4 13.5V18a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4.5h-5l-1 2h-4l-1-2H4Z" />
++            @break
++        @case('document')
++            <path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
++            <path d="M14 3v4h4M9 12h6M9 16h6" />
++            @break
++        @case('archive')
++            <rect x="3.5" y="4.5" width="17" height="4" rx="1" />
++            <path d="M5 8.5V19a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8.5M10 12.5h4" />
++            @break
++        @case('database')
++            <ellipse cx="12" cy="6" rx="7.5" ry="3" />
++            <path d="M4.5 6v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6M4.5 12v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6" />
++            @break
++        @case('sliders')
++            <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
++            <circle cx="15" cy="7" r="2" />
++            <circle cx="9" cy="17" r="2" />
++            @break
++        @case('activity')
++            <path d="M3 12h4l3-8 4 16 3-8h4" />
++            @break
+         @case('plus')
+             <path d="M12 5v14M5 12h14" />
+             @break
+diff --git a/resources/views/dashboard/mahasiswa.blade.php b/resources/views/dashboard/mahasiswa.blade.php
+index d553797..e4fa6eb 100644
+--- a/resources/views/dashboard/mahasiswa.blade.php
++++ b/resources/views/dashboard/mahasiswa.blade.php
+@@ -5,8 +5,8 @@
+ @section('konten')
+     <x-page-header judul="Dashboard" sub="Ringkasan pengajuan Kerja Praktik dan Tugas Akhir Anda.">
+         <x-slot:aksi>
+-            <a href="{{ route('mahasiswa.pengajuan.create', 'kp') }}" class="btn btn-secondary"><x-mhs.icon name="plus" class="h-4 w-4" />Ajukan KP</a>
+-            <a href="{{ route('mahasiswa.pengajuan.create', 'ta') }}" class="btn btn-primary"><x-mhs.icon name="plus" class="h-4 w-4" />Ajukan TA</a>
++            <a href="{{ route('mahasiswa.pengajuan.create', 'kp') }}" class="btn btn-secondary"><x-pasir.icon name="plus" class="h-4 w-4" />Ajukan KP</a>
++            <a href="{{ route('mahasiswa.pengajuan.create', 'ta') }}" class="btn btn-primary"><x-pasir.icon name="plus" class="h-4 w-4" />Ajukan TA</a>
+         </x-slot:aksi>
+     </x-page-header>
+ 
+@@ -18,7 +18,7 @@
+             @else
+                 <div class="card relative flex items-start gap-4 p-6">
+             @endif
+-                <span class="ikon-gelembung h-12 w-12"><x-mhs.icon :name="$ikon" class="h-6 w-6" /></span>
++                <span class="ikon-gelembung h-12 w-12"><x-pasir.icon :name="$ikon" class="h-6 w-6" /></span>
+                 <div class="min-w-0 flex-1">
+                     <p class="sub-label">{{ $judulKartu }}</p>
+                     @if ($p)
+@@ -42,7 +42,7 @@
+                     </div>
+                 </div>
+                 @if ($p)
+-                    <x-mhs.icon name="chevron-right" class="absolute right-5 top-6 h-4 w-4 text-ink-500 transition group-hover:translate-x-0.5" />
++                    <x-pasir.icon name="chevron-right" class="absolute right-5 top-6 h-4 w-4 text-ink-500 transition group-hover:translate-x-0.5" />
+                 @endif
+             @if ($p)
+                 </a>
+@@ -52,7 +52,7 @@
+         @endforeach
+ 
+         <div class="card flex items-start gap-4 p-6">
+-            <span class="ikon-gelembung h-12 w-12"><x-mhs.icon name="history" class="h-6 w-6" /></span>
++            <span class="ikon-gelembung h-12 w-12"><x-pasir.icon name="history" class="h-6 w-6" /></span>
+             <div class="min-w-0 flex-1">
+                 <p class="sub-label">Informasi Akademik</p>
+                 <p class="mt-1.5 truncate text-lg font-semibold text-ink-900">{{ $user->name }}</p>
+diff --git a/resources/views/layouts/app.blade.php b/resources/views/layouts/app.blade.php
+index 0faf340..43c2b22 100644
+--- a/resources/views/layouts/app.blade.php
++++ b/resources/views/layouts/app.blade.php
+@@ -1,4 +1,3 @@
+-@php($pasir = auth()->user()?->role === \App\Enums\Role::Mahasiswa)
+ <!DOCTYPE html>
+ <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+ <head>
+@@ -8,27 +7,8 @@
+     <title>@yield('judul', 'Dashboard') - {{ config('app.name') }}</title>
+     @vite(['resources/css/app.css', 'resources/js/app.js'])
+ </head>
+-@if ($pasir)
+-    {{-- Mahasiswa: tema pasir (sidebar krem, header ringkas). Role lain memakai tema navy di bawah. --}}
+-    <body class="tema-pasir bg-sand-50 font-sans text-ink-900 antialiased">
+-        @include('partials.shell-pasir')
+-    </body>
+-@else
+-    <body>
+-        <div class="min-h-screen">
+-            <div id="sidebar-overlay" class="fixed inset-0 z-30 hidden bg-slate-900/40 lg:hidden"></div>
+-
+-            @include('partials.sidebar')
+-
+-            <div class="lg:pl-64">
+-                @include('partials.navbar')
+-
+-                <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+-                    @include('partials.flash')
+-                    @yield('konten')
+-                </main>
+-            </div>
+-        </div>
+-    </body>
+-@endif
++{{-- Semua role memakai tema pasir (sidebar krem, header ringkas). Menu per role dari App\Support\Menu. --}}
++<body class="tema-pasir bg-sand-50 font-sans text-ink-900 antialiased">
++    @include('partials.shell-pasir')
++</body>
+ </html>
+diff --git a/resources/views/layouts/guest.blade.php b/resources/views/layouts/guest.blade.php
+index ad2be34..581d31e 100644
+--- a/resources/views/layouts/guest.blade.php
++++ b/resources/views/layouts/guest.blade.php
+@@ -7,13 +7,18 @@
+     <title>@yield('judul', 'Masuk') - {{ config('app.name') }}</title>
+     @vite(['resources/css/app.css', 'resources/js/app.js'])
+ </head>
+-<body>
++{{-- Dipakai halaman galat (403, 404). Halaman login memakai layouts.auth. --}}
++<body class="tema-pasir bg-gradient-to-br from-sand-50 to-sand-100 font-sans text-ink-900 antialiased">
+     <div class="flex min-h-screen flex-col items-center justify-center px-4 py-10">
+         <div class="mb-8 flex items-center gap-3">
+-            <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-navy-700 text-base font-bold text-white">FK</div>
++            @if (file_exists(public_path('images/UnsriLogo.png')))
++                <img src="{{ asset('images/UnsriLogo.png') }}" alt="Logo Universitas Sriwijaya" class="h-11 w-auto shrink-0 object-contain">
++            @else
++                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-ink-800 text-base font-bold text-white">FK</div>
++            @endif
+             <div class="leading-tight">
+-                <div class="text-base font-semibold text-navy-900">Arsip Berkas KP dan TA</div>
+-                <div class="text-sm text-slate-500">Fasilkom Universitas Sriwijaya</div>
++                <div class="font-serif text-base font-bold text-ink-900">Arsip Berkas KP dan TA</div>
++                <div class="text-sm text-ink-600">Fasilkom Universitas Sriwijaya</div>
+             </div>
+         </div>
+ 
+@@ -21,7 +26,7 @@
+             @yield('konten')
+         </div>
+ 
+-        <p class="mt-8 text-center text-xs text-slate-400">
++        <p class="mt-8 text-center text-xs text-ink-500">
+             Sistem Pengumpulan dan Arsip Digital Berkas Kerja Praktik dan Tugas Akhir
+         </p>
+     </div>
+diff --git a/resources/views/partials/navbar.blade.php b/resources/views/partials/navbar.blade.php
+deleted file mode 100644
+index fff248e..0000000
+--- a/resources/views/partials/navbar.blade.php
++++ /dev/null
+@@ -1,33 +0,0 @@
+-<header class="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6 lg:px-8">
+-    <div class="flex items-center gap-3">
+-        <button type="button" data-sidebar-toggle class="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden" aria-label="Buka atau tutup menu">
+-            <x-icon name="menu" />
+-        </button>
+-        <div class="hidden text-sm text-slate-500 sm:block">Sistem Pengumpulan dan Arsip Digital Berkas KP dan TA</div>
+-    </div>
+-
+-    <details class="relative">
+-        <summary class="flex cursor-pointer list-none items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-100 [&::-webkit-details-marker]:hidden">
+-            <span class="flex h-8 w-8 items-center justify-center rounded-full bg-navy-100 text-sm font-semibold text-navy-700">
+-                {{ strtoupper(mb_substr(auth()->user()->name, 0, 1)) }}
+-            </span>
+-            <span class="hidden text-left leading-tight sm:block">
+-                <span class="block text-sm font-medium text-slate-800">{{ auth()->user()->name }}</span>
+-                <span class="block text-xs text-slate-500">{{ auth()->user()->role->label() }}</span>
+-            </span>
+-            <x-icon name="chevron-down" class="h-4 w-4 text-slate-400" />
+-        </summary>
+-
+-        <div class="absolute right-0 mt-2 w-56 rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+-            <div class="border-b border-slate-100 px-4 py-2 sm:hidden">
+-                <div class="text-sm font-medium text-slate-800">{{ auth()->user()->name }}</div>
+-                <div class="text-xs text-slate-500">{{ auth()->user()->role->label() }}</div>
+-            </div>
+-            <a href="{{ route('profil.show') }}" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Profil</a>
+-            <form method="POST" action="{{ route('logout') }}">
+-                @csrf
+-                <button type="submit" class="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">Logout</button>
+-            </form>
+-        </div>
+-    </details>
+-</header>
+diff --git a/resources/views/partials/shell-pasir.blade.php b/resources/views/partials/shell-pasir.blade.php
+index a0aaa12..2c2e4f1 100644
+--- a/resources/views/partials/shell-pasir.blade.php
++++ b/resources/views/partials/shell-pasir.blade.php
+@@ -1,5 +1,5 @@
+ {{--
+-    Kerangka halaman tema pasir untuk role Mahasiswa: sidebar krem yang bisa dilipat + header ringkas.
++    Kerangka halaman tema pasir untuk semua role (Mahasiswa, Dosen, Operator, Admin): sidebar krem yang bisa dilipat + header ringkas.
+     Hanya tampilan. Menu tetap dari App\Support\Menu::untuk(), sehingga isi dan hak akses menu tidak berubah.
+ 
+     Latar halaman: public/images/BackgroundDashboard.png (dilewati bila berkasnya tidak ada).
+@@ -59,12 +59,12 @@ class="sidebar-pasir flex shrink-0 flex-col overflow-hidden border-r border-sand
+             <p class="sub-label px-5 pb-1">{{ $pengguna->role->label() }}</p>
+             @foreach ($menu as $butir)
+                 <a href="{{ $butir['url'] }}"
+-                   class="relative flex items-center gap-4 rounded-2xl px-5 py-3.5 text-[17px] font-medium transition-colors duration-200 {{ $butir['aktif'] ? 'bg-sand-300/60 font-semibold text-ink-900' : 'text-ink-700 hover:bg-sand-200/70 hover:text-ink-900' }}"
++                   class="relative flex items-center gap-4 rounded-2xl px-5 py-3.5 text-[16px] font-medium transition-colors duration-200 {{ $butir['aktif'] ? 'bg-sand-300/60 font-semibold text-ink-900' : 'text-ink-700 hover:bg-sand-200/70 hover:text-ink-900' }}"
+                    @if ($butir['aktif']) aria-current="page" @endif>
+                     @if ($butir['aktif'])
+                         <span class="absolute -left-3 top-1/2 h-10 w-1.5 -translate-y-1/2 rounded-full bg-gradient-to-b from-[#c9a46a] to-[#98743f]" aria-hidden="true"></span>
+                     @endif
+-                    <x-mhs.icon :name="$butir['icon']" :class="$butir['aktif'] ? 'h-6 w-6 shrink-0 text-sand-600' : 'h-6 w-6 shrink-0 text-ink-600'" />
++                    <x-pasir.icon :name="$butir['icon']" :class="$butir['aktif'] ? 'h-6 w-6 shrink-0 text-sand-600' : 'h-6 w-6 shrink-0 text-ink-600'" />
+                     <span>{{ $butir['label'] }}</span>
+                 </a>
+             @endforeach
+@@ -75,13 +75,13 @@ class="relative flex items-center gap-4 rounded-2xl px-5 py-3.5 text-[17px] font
+             <a href="{{ route('profil.show') }}"
+                class="flex items-center gap-4 rounded-2xl px-5 py-2.5 text-[15px] font-medium transition-colors duration-200 {{ request()->routeIs('profil.*') ? 'bg-sand-300/60 font-semibold text-ink-900' : 'text-ink-700 hover:bg-sand-200/70 hover:text-ink-900' }}"
+                @if (request()->routeIs('profil.*')) aria-current="page" @endif>
+-                <x-mhs.icon name="user" class="h-5 w-5 shrink-0 text-ink-600" />
++                <x-pasir.icon name="user" class="h-5 w-5 shrink-0 text-ink-600" />
+                 <span>Profil</span>
+             </a>
+             <form method="POST" action="{{ route('logout') }}">
+                 @csrf
+                 <button type="submit" class="flex w-full items-center gap-4 rounded-2xl px-5 py-2.5 text-left text-[15px] font-medium text-ink-700 transition-colors duration-200 hover:bg-sand-200/70 hover:text-ink-900">
+-                    <x-mhs.icon name="logout" class="h-5 w-5 shrink-0 text-ink-600" />
++                    <x-pasir.icon name="logout" class="h-5 w-5 shrink-0 text-ink-600" />
+                     <span>Logout</span>
+                 </button>
+             </form>
+@@ -127,13 +127,13 @@ class="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-[#b8955f] tran
+             <details class="relative shrink-0" data-dropdown>
+                 <summary class="flex cursor-pointer list-none items-center gap-3 rounded-full bg-white/80 py-1.5 pl-1.5 pr-4 shadow-[0_4px_20px_rgba(152,116,63,0.12)] ring-1 ring-sand-200/80 transition hover:bg-white [&::-webkit-details-marker]:hidden">
+                     <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-b from-sand-100 to-sand-200 text-sand-600 ring-1 ring-sand-300/60">
+-                        <x-mhs.icon name="user" class="h-6 w-6" />
++                        <x-pasir.icon name="user" class="h-6 w-6" />
+                     </span>
+                     <span class="hidden text-left leading-tight sm:block">
+                         <span class="block text-sm font-semibold text-ink-900">{{ $pengguna->name }}</span>
+                         <span class="block text-xs text-ink-500">{{ $pengguna->role->label() }}</span>
+                     </span>
+-                    <x-mhs.icon name="chevron-down" class="h-4 w-4 text-ink-500" />
++                    <x-pasir.icon name="chevron-down" class="h-4 w-4 text-ink-500" />
+                 </summary>
+ 
+                 <div class="absolute right-0 mt-3 w-64 rounded-2xl border border-sand-200 bg-white p-2 shadow-lg">
+@@ -142,13 +142,13 @@ class="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-[#b8955f] tran
+                         <p class="text-xs text-ink-500">{{ $pengguna->nomor_induk ? $pengguna->nomor_induk.' · ' : '' }}{{ $pengguna->role->label() }}</p>
+                     </div>
+                     <a href="{{ route('profil.show') }}" class="mt-1 flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-800 transition hover:bg-sand-100">
+-                        <x-mhs.icon name="user" class="h-4 w-4 text-ink-500" />
++                        <x-pasir.icon name="user" class="h-4 w-4 text-ink-500" />
+                         Profil
+                     </a>
+                     <form method="POST" action="{{ route('logout') }}">
+                         @csrf
+                         <button type="submit" class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink-800 transition hover:bg-sand-100">
+-                            <x-mhs.icon name="logout" class="h-4 w-4 text-ink-500" />
++                            <x-pasir.icon name="logout" class="h-4 w-4 text-ink-500" />
+                             Logout
+                         </button>
+                     </form>
+diff --git a/resources/views/partials/sidebar.blade.php b/resources/views/partials/sidebar.blade.php
+deleted file mode 100644
+index eaba085..0000000
+--- a/resources/views/partials/sidebar.blade.php
++++ /dev/null
+@@ -1,35 +0,0 @@
+-@php($menu = \App\Support\Menu::untuk(auth()->user()))
+-
+-<aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col border-r border-slate-200 bg-white transition-transform lg:translate-x-0" aria-label="Menu utama">
+-    <div class="flex h-16 shrink-0 items-center gap-3 border-b border-slate-200 px-5">
+-        <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-navy-700 text-sm font-bold text-white">FK</div>
+-        <div class="leading-tight">
+-            <div class="text-sm font-semibold text-navy-900">Arsip KP &amp; TA</div>
+-            <div class="text-xs text-slate-500">Fasilkom Unsri</div>
+-        </div>
+-    </div>
+-
+-    <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+-        <div class="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{{ auth()->user()->role->label() }}</div>
+-        @foreach ($menu as $butir)
+-            <a href="{{ $butir['url'] }}" class="menu-link {{ $butir['aktif'] ? 'menu-link-aktif' : '' }}" @if ($butir['aktif']) aria-current="page" @endif>
+-                <x-icon :name="$butir['icon']" />
+-                <span>{{ $butir['label'] }}</span>
+-            </a>
+-        @endforeach
+-    </nav>
+-
+-    <div class="shrink-0 space-y-1 border-t border-slate-200 px-3 py-3">
+-        <a href="{{ route('profil.show') }}" class="menu-link {{ request()->routeIs('profil.*') ? 'menu-link-aktif' : '' }}">
+-            <x-icon name="user" />
+-            <span>Profil</span>
+-        </a>
+-        <form method="POST" action="{{ route('logout') }}">
+-            @csrf
+-            <button type="submit" class="menu-link w-full text-left">
+-                <x-icon name="logout" />
+-                <span>Logout</span>
+-            </button>
+-        </form>
+-    </div>
+-</aside>
+diff --git a/tests/Feature/TemaTampilanTest.php b/tests/Feature/TemaTampilanTest.php
+index 3a8de20..f0bcfef 100644
+--- a/tests/Feature/TemaTampilanTest.php
++++ b/tests/Feature/TemaTampilanTest.php
+@@ -8,8 +8,8 @@
+ use Tests\TestCase;
+ 
+ /**
+- * Tema pasir (sand/ink) hanya untuk halaman login dan area Mahasiswa. Role lain tetap memakai tema navy.
+- * Tes ini hanya memastikan kerangka tampilan terpasang pada halaman yang tepat; fungsi halaman diuji di tes lain.
++ * Tema pasir (sand/ink) dipakai halaman login, halaman galat, dan semua halaman setelah login untuk semua role.
++ * Tes ini hanya memastikan kerangka tampilan terpasang; fungsi halaman diuji di tes lain.
+  */
+ class TemaTampilanTest extends TestCase
+ {
+@@ -28,40 +28,52 @@ public function test_halaman_login_memakai_tema_pasir_dan_form_tidak_berubah():
+             ->assertSee('Masuk ke akun Anda');
+     }
+ 
+-    public function test_halaman_mahasiswa_memakai_kerangka_pasir_dengan_menu_profil_dan_logout(): void
++    public function test_dashboard_semua_role_memakai_kerangka_pasir_dengan_menu_profil_dan_logout(): void
+     {
+-        $mahasiswa = User::factory()->mahasiswa()->create();
++        foreach (Role::cases() as $role) {
++            $user = User::factory()->create(['role' => $role]);
+ 
+-        foreach ([
+-            route('mahasiswa.dashboard'),
+-            route('mahasiswa.status.index'),
+-            route('mahasiswa.berkas.index'),
+-            route('mahasiswa.pengajuan.index', 'kp'),
+-            route('profil.show'),
+-        ] as $url) {
+-            $this->actingAs($mahasiswa)->get($url)
++            $this->actingAs($user)->get(route($role->value.'.dashboard'))
+                 ->assertOk()
+                 ->assertSee('tema-pasir', false)
+                 ->assertSee('id="shell-pasir"', false)
+                 ->assertSee('id="toggle-pasir"', false)
+                 ->assertSee('Profil')
+                 ->assertSee('Logout');
++
++            $this->actingAs($user)->get(route('profil.show'))
++                ->assertOk()
++                ->assertSee('id="shell-pasir"', false);
+         }
+     }
+ 
+-    public function test_role_selain_mahasiswa_tetap_memakai_tema_navy(): void
++    public function test_halaman_mahasiswa_memakai_kerangka_pasir(): void
+     {
+-        foreach ([Role::Dosen, Role::Operator, Role::Admin] as $role) {
+-            $user = User::factory()->create(['role' => $role]);
++        $mahasiswa = User::factory()->mahasiswa()->create();
+ 
+-            $this->actingAs($user)->get(route($role->value.'.dashboard'))
++        foreach ([
++            route('mahasiswa.status.index'),
++            route('mahasiswa.berkas.index'),
++            route('mahasiswa.pengajuan.index', 'kp'),
++        ] as $url) {
++            $this->actingAs($mahasiswa)->get($url)
+                 ->assertOk()
+-                ->assertDontSee('tema-pasir', false)
+-                ->assertDontSee('shell-pasir', false)
+-                ->assertSee('id="sidebar"', false);
++                ->assertSee('id="shell-pasir"', false);
+         }
+     }
+ 
++    public function test_halaman_galat_memakai_tema_pasir(): void
++    {
++        $mahasiswa = User::factory()->mahasiswa()->create();
++
++        $this->actingAs($mahasiswa)->get('/admin/pengguna')
++            ->assertForbidden()
++            ->assertSee('tema-pasir', false);
++        $this->get('/halaman-yang-tidak-ada')
++            ->assertNotFound()
++            ->assertSee('tema-pasir', false);
++    }
++
+     public function test_gambar_tema_tersedia_di_public(): void
+     {
+         foreach (['UnsriLogo.png', 'UnsriBG.png', 'FasilkomUnsri.png', 'BackgroundDashboard.png'] as $berkas) {
+-- 
+2.43.0
+

@@ -1,5 +1,5 @@
 {{--
-    Kerangka halaman tema pasir untuk role Mahasiswa: sidebar krem yang bisa dilipat + header ringkas.
+    Kerangka halaman tema pasir untuk semua role (Mahasiswa, Dosen, Operator, Admin): sidebar krem yang bisa dilipat + header ringkas.
     Hanya tampilan. Menu tetap dari App\Support\Menu::untuk(), sehingga isi dan hak akses menu tidak berubah.
 
     Latar halaman: public/images/BackgroundDashboard.png (dilewati bila berkasnya tidak ada).
@@ -59,12 +59,12 @@
             <p class="sub-label px-5 pb-1">{{ $pengguna->role->label() }}</p>
             @foreach ($menu as $butir)
                 <a href="{{ $butir['url'] }}"
-                   class="relative flex items-center gap-4 rounded-2xl px-5 py-3.5 text-[17px] font-medium transition-colors duration-200 {{ $butir['aktif'] ? 'bg-sand-300/60 font-semibold text-ink-900' : 'text-ink-700 hover:bg-sand-200/70 hover:text-ink-900' }}"
+                   class="relative flex items-center gap-4 rounded-2xl px-5 py-3.5 text-[16px] font-medium transition-colors duration-200 {{ $butir['aktif'] ? 'bg-sand-300/60 font-semibold text-ink-900' : 'text-ink-700 hover:bg-sand-200/70 hover:text-ink-900' }}"
                    @if ($butir['aktif']) aria-current="page" @endif>
                     @if ($butir['aktif'])
                         <span class="absolute -left-3 top-1/2 h-10 w-1.5 -translate-y-1/2 rounded-full bg-gradient-to-b from-[#c9a46a] to-[#98743f]" aria-hidden="true"></span>
                     @endif
-                    <x-mhs.icon :name="$butir['icon']" :class="$butir['aktif'] ? 'h-6 w-6 shrink-0 text-sand-600' : 'h-6 w-6 shrink-0 text-ink-600'" />
+                    <x-pasir.icon :name="$butir['icon']" :class="$butir['aktif'] ? 'h-6 w-6 shrink-0 text-sand-600' : 'h-6 w-6 shrink-0 text-ink-600'" />
                     <span>{{ $butir['label'] }}</span>
                 </a>
             @endforeach
@@ -75,13 +75,13 @@
             <a href="{{ route('profil.show') }}"
                class="flex items-center gap-4 rounded-2xl px-5 py-2.5 text-[15px] font-medium transition-colors duration-200 {{ request()->routeIs('profil.*') ? 'bg-sand-300/60 font-semibold text-ink-900' : 'text-ink-700 hover:bg-sand-200/70 hover:text-ink-900' }}"
                @if (request()->routeIs('profil.*')) aria-current="page" @endif>
-                <x-mhs.icon name="user" class="h-5 w-5 shrink-0 text-ink-600" />
+                <x-pasir.icon name="user" class="h-5 w-5 shrink-0 text-ink-600" />
                 <span>Profil</span>
             </a>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
                 <button type="submit" class="flex w-full items-center gap-4 rounded-2xl px-5 py-2.5 text-left text-[15px] font-medium text-ink-700 transition-colors duration-200 hover:bg-sand-200/70 hover:text-ink-900">
-                    <x-mhs.icon name="logout" class="h-5 w-5 shrink-0 text-ink-600" />
+                    <x-pasir.icon name="logout" class="h-5 w-5 shrink-0 text-ink-600" />
                     <span>Logout</span>
                 </button>
             </form>
@@ -127,13 +127,13 @@
             <details class="relative shrink-0" data-dropdown>
                 <summary class="flex cursor-pointer list-none items-center gap-3 rounded-full bg-white/80 py-1.5 pl-1.5 pr-4 shadow-[0_4px_20px_rgba(152,116,63,0.12)] ring-1 ring-sand-200/80 transition hover:bg-white [&::-webkit-details-marker]:hidden">
                     <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-b from-sand-100 to-sand-200 text-sand-600 ring-1 ring-sand-300/60">
-                        <x-mhs.icon name="user" class="h-6 w-6" />
+                        <x-pasir.icon name="user" class="h-6 w-6" />
                     </span>
                     <span class="hidden text-left leading-tight sm:block">
                         <span class="block text-sm font-semibold text-ink-900">{{ $pengguna->name }}</span>
                         <span class="block text-xs text-ink-500">{{ $pengguna->role->label() }}</span>
                     </span>
-                    <x-mhs.icon name="chevron-down" class="h-4 w-4 text-ink-500" />
+                    <x-pasir.icon name="chevron-down" class="h-4 w-4 text-ink-500" />
                 </summary>
 
                 <div class="absolute right-0 mt-3 w-64 rounded-2xl border border-sand-200 bg-white p-2 shadow-lg">
@@ -142,13 +142,13 @@
                         <p class="text-xs text-ink-500">{{ $pengguna->nomor_induk ? $pengguna->nomor_induk.' · ' : '' }}{{ $pengguna->role->label() }}</p>
                     </div>
                     <a href="{{ route('profil.show') }}" class="mt-1 flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-800 transition hover:bg-sand-100">
-                        <x-mhs.icon name="user" class="h-4 w-4 text-ink-500" />
+                        <x-pasir.icon name="user" class="h-4 w-4 text-ink-500" />
                         Profil
                     </a>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink-800 transition hover:bg-sand-100">
-                            <x-mhs.icon name="logout" class="h-4 w-4 text-ink-500" />
+                            <x-pasir.icon name="logout" class="h-4 w-4 text-ink-500" />
                             Logout
                         </button>
                     </form>

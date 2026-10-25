@@ -47,6 +47,23 @@
     body {
         @apply bg-slate-50 text-slate-800 antialiased;
     }
+
+    /*
+     * Tema pasir: abu-abu dingin (slate) yang dipakai di banyak halaman dipetakan ke krem hangat dan tinta navy.
+     * Cukup mengganti variabel warna di dalam .tema-pasir, jadi markup halaman tidak perlu diubah.
+     */
+    .tema-pasir {
+        --color-slate-50: #faf6ee;
+        --color-slate-100: #f8f2e8;
+        --color-slate-200: #f0e6d6;
+        --color-slate-300: #e6d6bd;
+        --color-slate-400: #9aa1b2;
+        --color-slate-500: #747c91;
+        --color-slate-600: #565e75;
+        --color-slate-700: #3a4460;
+        --color-slate-800: #263153;
+        --color-slate-900: #19223f;
+    }
 }
 
 @layer components {
@@ -131,14 +148,6 @@
         @apply border-blue-200 bg-blue-50 text-blue-900;
     }
 
-    /* Menu sidebar */
-    .menu-link {
-        @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900;
-    }
-    .menu-link-aktif {
-        @apply bg-navy-50 text-navy-800 hover:bg-navy-50 hover:text-navy-800;
-    }
-
     /* Judul halaman dan angka statistik (dipakai komponen page-header dan stat) */
     .judul-halaman {
         @apply text-xl font-semibold text-navy-900 sm:text-2xl;
@@ -174,9 +183,8 @@
 
     /*
      * TEMA PASIR
-     * Aktif bila <body> memakai kelas .tema-pasir (halaman login dan semua halaman mahasiswa).
-     * Menimpa kelas komponen bersama supaya halaman yang sudah ada ikut berganti rupa
-     * tanpa mengubah markup. Role lain tetap memakai tema navy di atas.
+     * Aktif bila <body> memakai kelas .tema-pasir (halaman login dan seluruh halaman setelah login, semua role).
+     * Menimpa kelas komponen bersama supaya halaman yang sudah ada ikut berganti rupa tanpa mengubah markup.
      */
     .tema-pasir .card {
         @apply rounded-2xl border-sand-200 bg-white/70 shadow-[0_1px_3px_rgba(118,87,50,0.06)];
@@ -236,7 +244,7 @@
  * Atribut data-collapsed dan data-drawer dipasang oleh resources/js/app.js.
  */
 .sidebar-pasir {
-    width: 18rem;
+    width: 19rem;
 }
 
 @media (min-width: 1024px) {
@@ -248,7 +256,7 @@
         transition: margin-left 0.3s ease, opacity 0.25s ease, visibility 0s;
     }
     .shell-pasir[data-collapsed='true'] .sidebar-pasir {
-        margin-left: -18rem;
+        margin-left: -19rem;
         opacity: 0;
         visibility: hidden;
         pointer-events: none;

@@ -8,8 +8,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Tema pasir (sand/ink) hanya untuk halaman login dan area Mahasiswa. Role lain tetap memakai tema navy.
- * Tes ini hanya memastikan kerangka tampilan terpasang pada halaman yang tepat; fungsi halaman diuji di tes lain.
+ * Tema pasir (sand/ink) dipakai halaman login, halaman galat, dan semua halaman setelah login untuk semua role.
+ * Tes ini hanya memastikan kerangka tampilan terpasang; fungsi halaman diuji di tes lain.
  */
 class TemaTampilanTest extends TestCase
 {
@@ -28,38 +28,50 @@ class TemaTampilanTest extends TestCase
             ->assertSee('Masuk ke akun Anda');
     }
 
-    public function test_halaman_mahasiswa_memakai_kerangka_pasir_dengan_menu_profil_dan_logout(): void
+    public function test_dashboard_semua_role_memakai_kerangka_pasir_dengan_menu_profil_dan_logout(): void
     {
-        $mahasiswa = User::factory()->mahasiswa()->create();
+        foreach (Role::cases() as $role) {
+            $user = User::factory()->create(['role' => $role]);
 
-        foreach ([
-            route('mahasiswa.dashboard'),
-            route('mahasiswa.status.index'),
-            route('mahasiswa.berkas.index'),
-            route('mahasiswa.pengajuan.index', 'kp'),
-            route('profil.show'),
-        ] as $url) {
-            $this->actingAs($mahasiswa)->get($url)
+            $this->actingAs($user)->get(route($role->value.'.dashboard'))
                 ->assertOk()
                 ->assertSee('tema-pasir', false)
                 ->assertSee('id="shell-pasir"', false)
                 ->assertSee('id="toggle-pasir"', false)
                 ->assertSee('Profil')
                 ->assertSee('Logout');
+
+            $this->actingAs($user)->get(route('profil.show'))
+                ->assertOk()
+                ->assertSee('id="shell-pasir"', false);
         }
     }
 
-    public function test_role_selain_mahasiswa_tetap_memakai_tema_navy(): void
+    public function test_halaman_mahasiswa_memakai_kerangka_pasir(): void
     {
-        foreach ([Role::Dosen, Role::Operator, Role::Admin] as $role) {
-            $user = User::factory()->create(['role' => $role]);
+        $mahasiswa = User::factory()->mahasiswa()->create();
 
-            $this->actingAs($user)->get(route($role->value.'.dashboard'))
+        foreach ([
+            route('mahasiswa.status.index'),
+            route('mahasiswa.berkas.index'),
+            route('mahasiswa.pengajuan.index', 'kp'),
+        ] as $url) {
+            $this->actingAs($mahasiswa)->get($url)
                 ->assertOk()
-                ->assertDontSee('tema-pasir', false)
-                ->assertDontSee('shell-pasir', false)
-                ->assertSee('id="sidebar"', false);
+                ->assertSee('id="shell-pasir"', false);
         }
+    }
+
+    public function test_halaman_galat_memakai_tema_pasir(): void
+    {
+        $mahasiswa = User::factory()->mahasiswa()->create();
+
+        $this->actingAs($mahasiswa)->get('/admin/pengguna')
+            ->assertForbidden()
+            ->assertSee('tema-pasir', false);
+        $this->get('/halaman-yang-tidak-ada')
+            ->assertNotFound()
+            ->assertSee('tema-pasir', false);
     }
 
     public function test_gambar_tema_tersedia_di_public(): void

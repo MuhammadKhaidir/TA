@@ -5,8 +5,8 @@
 @section('konten')
     <x-page-header judul="Dashboard" sub="Ringkasan pengajuan Kerja Praktik dan Tugas Akhir Anda.">
         <x-slot:aksi>
-            <a href="{{ route('mahasiswa.pengajuan.create', 'kp') }}" class="btn btn-secondary"><x-mhs.icon name="plus" class="h-4 w-4" />Ajukan KP</a>
-            <a href="{{ route('mahasiswa.pengajuan.create', 'ta') }}" class="btn btn-primary"><x-mhs.icon name="plus" class="h-4 w-4" />Ajukan TA</a>
+            <a href="{{ route('mahasiswa.pengajuan.create', 'kp') }}" class="btn btn-secondary"><x-pasir.icon name="plus" class="h-4 w-4" />Ajukan KP</a>
+            <a href="{{ route('mahasiswa.pengajuan.create', 'ta') }}" class="btn btn-primary"><x-pasir.icon name="plus" class="h-4 w-4" />Ajukan TA</a>
         </x-slot:aksi>
     </x-page-header>
 
@@ -18,7 +18,7 @@
             @else
                 <div class="card relative flex items-start gap-4 p-6">
             @endif
-                <span class="ikon-gelembung h-12 w-12"><x-mhs.icon :name="$ikon" class="h-6 w-6" /></span>
+                <span class="ikon-gelembung h-12 w-12"><x-pasir.icon :name="$ikon" class="h-6 w-6" /></span>
                 <div class="min-w-0 flex-1">
                     <p class="sub-label">{{ $judulKartu }}</p>
                     @if ($p)
@@ -42,7 +42,7 @@
                     </div>
                 </div>
                 @if ($p)
-                    <x-mhs.icon name="chevron-right" class="absolute right-5 top-6 h-4 w-4 text-ink-500 transition group-hover:translate-x-0.5" />
+                    <x-pasir.icon name="chevron-right" class="absolute right-5 top-6 h-4 w-4 text-ink-500 transition group-hover:translate-x-0.5" />
                 @endif
             @if ($p)
                 </a>
@@ -52,7 +52,7 @@
         @endforeach
 
         <div class="card flex items-start gap-4 p-6">
-            <span class="ikon-gelembung h-12 w-12"><x-mhs.icon name="history" class="h-6 w-6" /></span>
+            <span class="ikon-gelembung h-12 w-12"><x-pasir.icon name="history" class="h-6 w-6" /></span>
             <div class="min-w-0 flex-1">
                 <p class="sub-label">Informasi Akademik</p>
                 <p class="mt-1.5 truncate text-lg font-semibold text-ink-900">{{ $user->name }}</p>
