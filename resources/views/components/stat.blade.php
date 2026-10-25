@@ -5,7 +5,7 @@
     <div class="card p-5">
 @endif
         <div class="text-sm text-slate-500">{{ $label }}</div>
-        <div class="mt-2 text-3xl font-semibold text-navy-900">{{ $nilai }}</div>
+        <div class="stat-angka">{{ $nilai }}</div>
         @if ($hint)
             <div class="mt-1 text-xs text-slate-500">{{ $hint }}</div>
         @endif
