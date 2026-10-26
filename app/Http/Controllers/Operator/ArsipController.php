@@ -53,7 +53,7 @@ class ArsipController extends Controller
 
         abort_unless($pengajuan->status === StatusPengajuan::Diarsipkan, 404, 'Pengajuan ini belum diarsipkan.');
 
-        $pengajuan->load(['mahasiswa.programStudi', 'pembimbing', 'riwayat.user', 'dokumenResmi.pengunggah', 'arsip.petugas']);
+        $pengajuan->load(['mahasiswa.programStudi', 'pembimbing', 'riwayat.user', 'dokumenResmi.pengunggah', 'suratBalasan.pemeriksa', 'arsip.petugas']);
 
         return view('operator.arsip.show', ['pengajuan' => $pengajuan] + $this->workflow->dataDokumen($pengajuan));
     }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DokumenPengajuan;
 use App\Models\DokumenResmi;
+use App\Models\SuratBalasan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -26,6 +27,13 @@ class BerkasController extends Controller
         $this->authorize('view', $dokumenResmi);
 
         return $this->kirim($dokumenResmi->path, $dokumenResmi->nama_asli, $dokumenResmi->mime, $request->boolean('unduh'));
+    }
+
+    public function balasan(Request $request, SuratBalasan $suratBalasan): StreamedResponse
+    {
+        $this->authorize('view', $suratBalasan);
+
+        return $this->kirim($suratBalasan->path, $suratBalasan->nama_asli, $suratBalasan->mime, $request->boolean('unduh'));
     }
 
     private function kirim(string $path, string $nama, ?string $mime, bool $unduh): StreamedResponse

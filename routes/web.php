@@ -34,6 +34,7 @@ Route::middleware('auth')->group(function () {
     // Berkas privat: akses diperiksa policy (pemilik, dosen pembimbing, operator).
     Route::get('/berkas/dokumen/{dokumen}', [BerkasController::class, 'dokumen'])->name('berkas.dokumen');
     Route::get('/berkas/resmi/{dokumenResmi}', [BerkasController::class, 'resmi'])->name('berkas.resmi');
+    Route::get('/berkas/balasan/{suratBalasan}', [BerkasController::class, 'balasan'])->name('berkas.balasan');
 
     /*
     | Mahasiswa
@@ -54,6 +55,7 @@ Route::middleware('auth')->group(function () {
         });
 
         Route::post('/pengajuan/detail/{pengajuan}/dokumen', [Mahasiswa\DokumenController::class, 'store'])->name('dokumen.store');
+        Route::post('/pengajuan/detail/{pengajuan}/surat-balasan', [Mahasiswa\SuratBalasanController::class, 'store'])->name('surat-balasan.store');
         Route::get('/status', [Mahasiswa\StatusController::class, 'index'])->name('status.index');
         Route::get('/berkas', [Mahasiswa\BerkasSayaController::class, 'index'])->name('berkas.index');
     });
@@ -91,6 +93,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/dokumen-resmi/{pengajuan}', [Operator\DokumenResmiController::class, 'show'])->name('dokumen-resmi.show');
         Route::post('/dokumen-resmi/{pengajuan}', [Operator\DokumenResmiController::class, 'store'])->name('dokumen-resmi.store');
         Route::post('/dokumen-resmi/{pengajuan}/arsipkan', [Operator\DokumenResmiController::class, 'arsipkan'])->name('dokumen-resmi.arsipkan');
+        Route::post('/dokumen-resmi/{pengajuan}/surat-pengantar', [Operator\DokumenResmiController::class, 'suratPengantar'])->name('dokumen-resmi.surat-pengantar');
+        Route::post('/dokumen-resmi/{pengajuan}/surat-balasan', [Operator\SuratBalasanController::class, 'periksa'])->name('dokumen-resmi.surat-balasan');
         Route::delete('/dokumen-resmi/{pengajuan}/{dokumenResmi}', [Operator\DokumenResmiController::class, 'destroy'])->name('dokumen-resmi.destroy');
 
         Route::get('/arsip', [Operator\ArsipController::class, 'index'])->name('arsip.index');

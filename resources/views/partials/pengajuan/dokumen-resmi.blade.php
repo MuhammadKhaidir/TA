@@ -1,19 +1,25 @@
 {{--
     Membutuhkan: $pengajuan (relasi dokumenResmi sudah dimuat)
     Opsional: $hapus (true bila operator boleh menghapus dokumen resmi)
+              $kecuali (kode jenis dokumen yang tidak ditampilkan di sini karena sudah tampil di kartu lain, mis. surat TA)
+              $sembunyikanBilaKosong (true: kartu tidak ditampilkan sama sekali bila tidak ada dokumen untuk ditampilkan)
 --}}
-@php($hapus = $hapus ?? false)
+@php
+    $hapus = $hapus ?? false;
+    $daftarResmi = $pengajuan->dokumenResmi->reject(fn ($resmi) => in_array($resmi->jenis, $kecuali ?? [], true));
+@endphp
 
+@if ($daftarResmi->isNotEmpty() || ! ($sembunyikanBilaKosong ?? false))
 <section class="card">
     <div class="card-header">
         <h2 class="font-semibold text-slate-900">Dokumen Resmi</h2>
     </div>
 
-    @if ($pengajuan->dokumenResmi->isEmpty())
+    @if ($daftarResmi->isEmpty())
         <x-empty pesan="Belum ada dokumen resmi yang diterbitkan." />
     @else
         <div class="divide-y divide-slate-100">
-            @foreach ($pengajuan->dokumenResmi as $resmi)
+            @foreach ($daftarResmi as $resmi)
                 <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                     <div class="min-w-0">
                         <div class="font-medium text-slate-900">{{ $resmi->jenisLabel() }}</div>
@@ -38,3 +44,4 @@
         </div>
     @endif
 </section>
+@endif

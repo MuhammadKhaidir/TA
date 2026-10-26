@@ -12,7 +12,11 @@
 
     <div class="grid gap-6 xl:grid-cols-3">
         <div class="space-y-6 xl:col-span-2">
-            @include('partials.pengajuan.dokumen-resmi')
+            @include('partials.pengajuan.surat-ta')
+            @include('partials.pengajuan.dokumen-resmi', [
+                'kecuali' => $pengajuan->tampilkanSuratTa() ? [\App\Enums\JenisPengajuan::SURAT_PENGANTAR_TA, \App\Enums\JenisPengajuan::SK_TA] : [],
+                'sembunyikanBilaKosong' => true,
+            ])
             @include('partials.pengajuan.dokumen')
         </div>
 

@@ -13,6 +13,9 @@
             @can('prosesDokumenResmi', $pengajuan)
                 <a href="{{ route('operator.dokumen-resmi.show', $pengajuan) }}" class="btn btn-primary">Proses Dokumen Resmi</a>
             @endcan
+            @if ($pengajuan->tahapSuratAktif() && ! auth()->user()->can('prosesDokumenResmi', $pengajuan))
+                <a href="{{ route('operator.dokumen-resmi.show', $pengajuan) }}" class="btn btn-primary">Kelola Surat TA</a>
+            @endif
             @if ($pengajuan->status === \App\Enums\StatusPengajuan::Diarsipkan)
                 <a href="{{ route('operator.arsip.show', $pengajuan) }}" class="btn btn-primary">Lihat di Arsip</a>
             @endif
@@ -96,10 +99,15 @@
                 </section>
             @endcan
 
+            @include('partials.pengajuan.surat-ta')
+
             @include('partials.pengajuan.dokumen')
 
             @if ($pengajuan->dokumenResmi->isNotEmpty())
-                @include('partials.pengajuan.dokumen-resmi')
+                @include('partials.pengajuan.dokumen-resmi', [
+                    'kecuali' => $pengajuan->tampilkanSuratTa() ? [\App\Enums\JenisPengajuan::SURAT_PENGANTAR_TA, \App\Enums\JenisPengajuan::SK_TA] : [],
+                    'sembunyikanBilaKosong' => true,
+                ])
             @endif
         </div>
 

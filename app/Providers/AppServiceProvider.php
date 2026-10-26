@@ -5,9 +5,11 @@ namespace App\Providers;
 use App\Models\DokumenPengajuan;
 use App\Models\DokumenResmi;
 use App\Models\Pengajuan;
+use App\Models\SuratBalasan;
 use App\Policies\DokumenPengajuanPolicy;
 use App\Policies\DokumenResmiPolicy;
 use App\Policies\PengajuanPolicy;
+use App\Policies\SuratBalasanPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -23,5 +25,6 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Pengajuan::class, PengajuanPolicy::class);
         Gate::policy(DokumenPengajuan::class, DokumenPengajuanPolicy::class);
         Gate::policy(DokumenResmi::class, DokumenResmiPolicy::class);
+        Gate::policy(SuratBalasan::class, SuratBalasanPolicy::class);
     }
 }

@@ -7,6 +7,11 @@ enum JenisPengajuan: string
     case Kp = 'kp';
     case Ta = 'ta';
 
+    /** Kode dokumen resmi pada alur surat Tugas Akhir (surat pengantar, lalu SK pembimbing). */
+    public const SURAT_PENGANTAR_TA = 'surat_pengantar_ta';
+
+    public const SK_TA = 'sk_ta';
+
     public function label(): string
     {
         return match ($this) {
@@ -34,7 +39,8 @@ enum JenisPengajuan: string
                 'lainnya' => 'Dokumen Resmi Lainnya',
             ],
             self::Ta => [
-                'sk_ta' => 'SK Tugas Akhir',
+                self::SURAT_PENGANTAR_TA => 'Surat Pengantar TA',
+                self::SK_TA => 'SK Pembimbing Tugas Akhir',
                 'lainnya' => 'Dokumen Resmi Lainnya',
             ],
         };

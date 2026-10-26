@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\JenisPengajuan;
 use App\Enums\Role;
 use App\Enums\StatusDokumen;
 use App\Enums\StatusPengajuan;
@@ -224,6 +225,13 @@ class PengajuanWorkflow
         if (! $pengajuan->dokumenResmi()->exists()) {
             throw ValidationException::withMessages([
                 'dokumen_resmi' => 'Unggah minimal satu dokumen resmi sebelum mengarsipkan.',
+            ]);
+        }
+
+        // TA baru dianggap tuntas bila SK pembimbing sudah terbit (itu hasil akhir alur surat TA).
+        if ($pengajuan->jenis === JenisPengajuan::Ta && $pengajuan->skPembimbing() === null) {
+            throw ValidationException::withMessages([
+                'dokumen_resmi' => 'Terbitkan SK Pembimbing Tugas Akhir sebelum mengarsipkan.',
             ]);
         }
 

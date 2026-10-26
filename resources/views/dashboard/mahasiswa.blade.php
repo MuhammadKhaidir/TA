@@ -40,6 +40,24 @@
                             <p class="mt-1.5 text-xs text-ink-600">{{ $p->keteranganPembimbing() }}</p>
                         @endif
                     </div>
+
+                    {{-- TA: posisi surat pengantar, surat balasan, dan SK pembimbing --}}
+                    @if ($p && $p->tampilkanSuratTa())
+                        <div class="mt-4 border-t border-sand-200 pt-3.5">
+                            <p class="sub-label">Surat TA</p>
+                            <ul class="mt-2.5 space-y-2.5">
+                                @foreach ($p->tahapSurat() as $t)
+                                    <li class="flex items-start gap-2.5 text-sm">
+                                        <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full {{ $t['status']->titik() }}" aria-hidden="true"></span>
+                                        <span class="min-w-0">
+                                            <span class="block font-medium leading-snug text-ink-900">{{ $t['judul'] }}</span>
+                                            <span class="block text-xs text-ink-600">{{ $t['label'] }}</span>
+                                        </span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
                 </div>
                 @if ($p)
                     <x-pasir.icon name="chevron-right" class="absolute right-5 top-6 h-4 w-4 text-ink-500 transition group-hover:translate-x-0.5" />
@@ -71,6 +89,20 @@
         <x-stat label="Perlu Revisi" :nilai="$perluRevisi->count()" hint="Menunggu perbaikan dari Anda" />
         <x-stat label="Selesai" :nilai="$selesai" hint="Sudah diarsipkan" />
     </div>
+
+    @if ($suratPerluTindakan->isNotEmpty())
+        <div class="alert alert-info mt-6">
+            <p class="font-medium">Ada surat Tugas Akhir yang menunggu Anda.</p>
+            <ul class="mt-1 list-disc space-y-0.5 pl-5">
+                @foreach ($suratPerluTindakan as $p)
+                    <li>
+                        <a href="{{ route('mahasiswa.pengajuan.show', $p) }}#surat-ta" class="underline">{{ $p->judul }}</a>:
+                        {{ $p->balasanTerbaru() ? 'surat balasan perlu direvisi dan diunggah ulang' : 'unduh surat pengantar lalu unggah surat balasan' }}
+                    </li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
     @if ($perluRevisi->isNotEmpty())
         <div class="alert alert-peringatan mt-6">

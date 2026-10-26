@@ -32,6 +32,39 @@
         @endif
     </section>
 
+    @if ($balasan->isNotEmpty())
+        <section class="card mb-6">
+            <div class="card-header"><h2 class="font-semibold text-slate-900">Surat Balasan TA yang Diunggah</h2></div>
+            <div class="overflow-x-auto">
+                <table class="tabel">
+                    <thead><tr><th>Berkas</th><th>Pengajuan</th><th>Status</th><th>Diunggah</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach ($balasan as $b)
+                            <tr>
+                                <td>
+                                    {{ $b->nama_asli }}
+                                    <div class="text-xs text-slate-500">
+                                        {{ $b->ukuranManusia() }} &middot; versi {{ $b->versi }}@unless ($b->terbaru) (versi lama)@endunless
+                                    </div>
+                                </td>
+                                <td><a href="{{ route('mahasiswa.pengajuan.show', $b->pengajuan) }}" class="tautan">{{ $b->pengajuan->jenis->singkat() }}</a></td>
+                                <td>
+                                    <span class="badge {{ $b->status->badge() }}">{{ $b->status->label() }}</span>
+                                    @if ($b->catatan)<div class="mt-1 text-xs text-slate-500">{{ $b->catatan }}</div>@endif
+                                </td>
+                                <td class="whitespace-nowrap">{{ $b->created_at->translatedFormat('d M Y') }}</td>
+                                <td class="whitespace-nowrap text-right">
+                                    <a href="{{ route('berkas.balasan', ['suratBalasan' => $b]) }}" target="_blank" rel="noopener" class="tautan">Lihat</a>
+                                    <a href="{{ route('berkas.balasan', ['suratBalasan' => $b, 'unduh' => 1]) }}" class="tautan ml-3">Unduh</a>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    @endif
+
     <section class="card">
         <div class="card-header"><h2 class="font-semibold text-slate-900">Dokumen Persyaratan yang Diunggah</h2></div>
         @if ($dokumen->isEmpty())

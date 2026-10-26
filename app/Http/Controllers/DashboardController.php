@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\JenisPengajuan;
 use App\Enums\StatusPembimbing;
 use App\Enums\StatusPengajuan;
+use App\Enums\StatusTahapSurat;
 use App\Models\LogAktivitas;
 use App\Models\Pemeriksaan;
 use App\Models\Pengajuan;
@@ -26,7 +27,7 @@ class DashboardController extends Controller
     public function mahasiswa(Request $request): View
     {
         $user = $request->user()->load('programStudi');
-        $pengajuan = $user->pengajuan()->with(['pembimbing', 'pembimbingPilihan'])->orderByDesc('updated_at')->get();
+        $pengajuan = $user->pengajuan()->with(['pembimbing', 'pembimbingPilihan', 'dokumenResmi', 'suratBalasan'])->orderByDesc('updated_at')->get();
 
         // Pembimbing per jenis: KP ditetapkan operator dari database dosen, TA berasal dari pilihan mahasiswa.
         $pengajuanKp = $pengajuan->first(fn (Pengajuan $p) => $p->jenis === JenisPengajuan::Kp);
@@ -40,7 +41,12 @@ class DashboardController extends Controller
         ))->count();
         $selesai = $pengajuan->filter(fn (Pengajuan $p) => $p->status === StatusPengajuan::Diarsipkan)->count();
 
-        return view('dashboard.mahasiswa', compact('user', 'pengajuan', 'pengajuanKp', 'pengajuanTa', 'perluRevisi', 'dalamProses', 'selesai'));
+        // Langkah surat TA yang menunggu mahasiswa: mengunggah surat balasan, atau memperbaikinya.
+        $suratPerluTindakan = $pengajuan->filter(fn (Pengajuan $p) => collect($p->tahapSurat())->contains(
+            fn (array $t) => $t['kunci'] === 'balasan' && in_array($t['status'], [StatusTahapSurat::Giliran, StatusTahapSurat::Revisi], true),
+        ));
+
+        return view('dashboard.mahasiswa', compact('user', 'pengajuan', 'pengajuanKp', 'pengajuanTa', 'perluRevisi', 'dalamProses', 'selesai', 'suratPerluTindakan'));
     }
 
     public function dosen(Request $request): View
@@ -81,6 +87,17 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
+        // Alur surat TA: surat pengantar yang belum terbit dan surat balasan yang menunggu diperiksa.
+        $jumlahPerluPengantar = Pengajuan::perluSuratPengantar()->count();
+        $jumlahBalasanMenunggu = Pengajuan::balasanMenunggu()->count();
+        $antreanSurat = Pengajuan::with('mahasiswa.programStudi')->balasanMenunggu()->orderBy('updated_at')->limit(5)->get()
+            ->map(fn (Pengajuan $p) => ['pengajuan' => $p, 'langkah' => 'Periksa surat balasan'])
+            ->concat(
+                Pengajuan::with('mahasiswa.programStudi')->perluSuratPengantar()->orderBy('updated_at')->limit(5)->get()
+                    ->map(fn (Pengajuan $p) => ['pengajuan' => $p, 'langkah' => 'Terbitkan surat pengantar'])
+            )
+            ->take(5);
+
         $jumlahPerluPembimbing = Pengajuan::perluPembimbing()->count();
 
         $perluPembimbing = Pengajuan::with(['mahasiswa.programStudi', 'pembimbingPilihan'])
@@ -91,6 +108,7 @@ class DashboardController extends Controller
 
         return view('dashboard.operator', compact(
             'jumlah', 'antreanVerifikasi', 'perluDokumenResmi', 'jumlahPerluPembimbing', 'perluPembimbing',
+            'jumlahPerluPengantar', 'jumlahBalasanMenunggu', 'antreanSurat',
         ));
     }
 

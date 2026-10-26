@@ -12,6 +12,7 @@ use App\Models\DokumenResmi;
 use App\Models\Pengajuan;
 use App\Models\Persyaratan;
 use App\Models\ProgramStudi;
+use App\Models\SuratBalasan;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -107,6 +108,50 @@ class RenderHalamanTest extends TestCase
                 Arsip::create(['pengajuan_id' => $p->id, 'diarsipkan_oleh' => $operator->id, 'diarsipkan_at' => now(), 'catatan' => 'Lengkap']);
             }
 
+            $semua[] = $p;
+        }
+
+        // Variasi alur surat TA (pengantar, balasan, SK) supaya setiap keadaan tahapnya ikut dirender di semua halaman.
+        $resmi = fn (Pengajuan $p, string $jenis) => DokumenResmi::create([
+            'pengajuan_id' => $p->id, 'jenis' => $jenis, 'nomor' => "{$jenis}/UN9", 'tanggal' => now()->toDateString(),
+            'diunggah_oleh' => $operator->id, 'nama_asli' => "{$jenis}.pdf", 'path' => "resmi/{$p->id}/{$jenis}.pdf",
+            'mime' => 'application/pdf', 'ukuran' => 5000,
+        ]);
+        $balasan = fn (Pengajuan $p, int $versi, bool $terbaru, StatusDokumen $status) => SuratBalasan::create([
+            'pengajuan_id' => $p->id, 'diunggah_oleh' => $mahasiswa->id, 'versi' => $versi, 'terbaru' => $terbaru,
+            'nama_asli' => "balasan-v{$versi}.pdf", 'path' => "surat-balasan/{$p->id}/balasan-v{$versi}.pdf",
+            'mime' => 'application/pdf', 'ukuran' => 3000, 'status' => $status,
+            'catatan' => $status === StatusDokumen::Revisi ? 'Cap instansi belum terlihat.' : null,
+        ]);
+        $varianTa = [
+            [StatusPengajuan::MenungguDosen, false, []],
+            [StatusPengajuan::MenungguDosen, true, []],
+            [StatusPengajuan::RevisiAkademik, true, [[1, false, StatusDokumen::Revisi], [2, true, StatusDokumen::Menunggu]]],
+            [StatusPengajuan::Disetujui, true, [[1, true, StatusDokumen::Diterima]]],
+            [StatusPengajuan::Disetujui, true, [[1, true, StatusDokumen::Revisi]]],
+            [StatusPengajuan::Diarsipkan, true, [[1, true, StatusDokumen::Diterima]], true],
+            [StatusPengajuan::Diarsipkan, false, []],
+        ];
+        foreach ($varianTa as $n => $varian) {
+            [$status, $denganPengantar, $versiBalasan] = $varian;
+            $denganSk = $varian[3] ?? false;
+            $p = Pengajuan::create([
+                'mahasiswa_id' => $mahasiswa->id, 'pembimbing_id' => $dosen->id, 'pembimbing_pilihan_id' => $dosen->id,
+                'status_pembimbing' => StatusPembimbing::Diterima, 'jenis' => JenisPengajuan::Ta,
+                'judul' => "Surat TA varian {$n}", 'instansi' => 'Instansi Contoh', 'status' => $status, 'diajukan_at' => now(),
+            ]);
+            if ($denganPengantar) {
+                $resmi($p, JenisPengajuan::SURAT_PENGANTAR_TA);
+            }
+            foreach ($versiBalasan as [$versi, $terbaru, $statusBalasan]) {
+                $balasan($p, $versi, $terbaru, $statusBalasan);
+            }
+            if ($denganSk) {
+                $resmi($p, JenisPengajuan::SK_TA);
+            }
+            if ($status === StatusPengajuan::Diarsipkan) {
+                Arsip::create(['pengajuan_id' => $p->id, 'diarsipkan_oleh' => $operator->id, 'diarsipkan_at' => now(), 'catatan' => 'Lengkap']);
+            }
             $semua[] = $p;
         }
 

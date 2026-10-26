@@ -1,0 +1,2503 @@
+From 29dc23122d0942b91294705e063017c58e471073 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 26 Oct 2026 07:47:08 +0700
+Subject: [PATCH] Tambah alur surat Tugas Akhir: surat pengantar, surat
+ balasan, SK pembimbing
+
+Khusus TA (KP tidak berubah).
+
+- Operator menerbitkan surat pengantar TA (PDF) setelah pengajuan lolos verifikasi.
+- Mahasiswa mengunduhnya lalu mengunggah surat balasan (PDF/JPG/PNG, berversi).
+- Operator menerima atau meminta revisi surat balasan; keputusan usang ditolak.
+- SK Pembimbing TA baru bisa terbit bila pengantar sudah terbit, balasan terbaru
+  diterima, pembimbing sah, dan pengajuan disetujui dosen (Pengajuan::hambatanSk()).
+- Pengarsipan TA mewajibkan SK sudah terbit.
+- Tampilan: kartu tiga langkah di detail pengajuan, panel terbit/periksa di halaman
+  Dokumen Resmi operator, kartu dan statistik di dashboard, daftar di Berkas Saya dan arsip.
+- Tabel baru surat_balasan, SuratBalasanPolicy, SuratTaService, route berkas.balasan.
+- Tes: SuratTaTest (14 uji) dan variasi surat TA pada RenderHalamanTest.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz6bmzU4tc523QrBXnnDzE
+---
+ README.md                                     |  20 +-
+ app/Enums/JenisPengajuan.php                  |   8 +-
+ app/Enums/StatusTahapSurat.php                |  42 ++
+ app/Http/Controllers/BerkasController.php     |   8 +
+ app/Http/Controllers/DashboardController.php  |  22 +-
+ .../Mahasiswa/BerkasSayaController.php        |   8 +-
+ .../Mahasiswa/PengajuanController.php         |   2 +-
+ .../Mahasiswa/SuratBalasanController.php      |  29 +
+ .../Controllers/Operator/ArsipController.php  |   2 +-
+ .../Operator/DokumenResmiController.php       |  59 +-
+ .../Operator/PengajuanController.php          |   2 +-
+ .../Operator/SuratBalasanController.php       |  47 ++
+ app/Models/Pengajuan.php                      | 176 ++++++
+ app/Models/SuratBalasan.php                   |  51 ++
+ app/Policies/PengajuanPolicy.php              |  55 ++
+ app/Policies/SuratBalasanPolicy.php           |  18 +
+ app/Providers/AppServiceProvider.php          |   3 +
+ app/Services/PengajuanWorkflow.php            |   8 +
+ app/Services/SuratTaService.php               | 148 +++++
+ ...0_26_000001_create_surat_balasan_table.php |  37 ++
+ .../views/components/pasir/icon.blade.php     |   3 +
+ resources/views/dashboard/mahasiswa.blade.php |  32 +
+ resources/views/dashboard/operator.blade.php  |  34 +-
+ .../views/mahasiswa/berkas/index.blade.php    |  33 +
+ .../views/mahasiswa/pengajuan/show.blade.php  |   9 +-
+ resources/views/operator/arsip/show.blade.php |   6 +-
+ .../operator/dokumen-resmi/index.blade.php    |  42 +-
+ .../operator/dokumen-resmi/show.blade.php     | 128 +++-
+ .../views/operator/pengajuan/show.blade.php   |  10 +-
+ .../pengajuan/dokumen-resmi.blade.php         |  13 +-
+ .../partials/pengajuan/surat-ta.blade.php     | 104 +++
+ routes/web.php                                |   4 +
+ tests/Feature/RenderHalamanTest.php           |  45 ++
+ tests/Feature/SuratTaTest.php                 | 596 ++++++++++++++++++
+ 34 files changed, 1770 insertions(+), 34 deletions(-)
+ create mode 100644 app/Enums/StatusTahapSurat.php
+ create mode 100644 app/Http/Controllers/Mahasiswa/SuratBalasanController.php
+ create mode 100644 app/Http/Controllers/Operator/SuratBalasanController.php
+ create mode 100644 app/Models/SuratBalasan.php
+ create mode 100644 app/Policies/SuratBalasanPolicy.php
+ create mode 100644 app/Services/SuratTaService.php
+ create mode 100644 database/migrations/2026_10_26_000001_create_surat_balasan_table.php
+ create mode 100644 resources/views/partials/pengajuan/surat-ta.blade.php
+ create mode 100644 tests/Feature/SuratTaTest.php
+
+diff --git a/README.md b/README.md
+index 2f9a0cb..c11e254 100644
+--- a/README.md
++++ b/README.md
+@@ -85,7 +85,7 @@ ## Alur sistem
+ 2. Setelah semua dokumen wajib lengkap, mahasiswa mengirim pengajuan (Diajukan).
+ 3. Operator memeriksa dokumen yang menjadi tugas operator. Dokumen bisa Diterima atau Perlu Revisi (catatan wajib). Ada revisi: status Revisi Administrasi, mahasiswa memperbaiki hanya dokumen yang diminta, lalu mengirim ulang.
+ 4. Jika semua diterima, pengajuan Menunggu Dosen. Dosen pembimbing memeriksa dokumen akademik dengan cara yang sama (Revisi Akademik atau Disetujui).
+-5. Setelah Disetujui, operator mengunggah dokumen resmi (surat pengantar KP, SK KP, SK TA, dan lain-lain) lalu mengarsipkan pengajuan (Diarsipkan).
++5. Setelah Disetujui, operator mengunggah dokumen resmi (surat pengantar KP, SK KP, dan lain-lain) lalu mengarsipkan pengajuan (Diarsipkan). Untuk TA ada alur surat tersendiri, lihat bagian Alur surat Tugas Akhir.
+ 6. Berkas final tersimpan di Arsip Berkas dan dapat dibuka oleh pihak yang berwenang.
+ 
+ ```
+@@ -99,6 +99,19 @@ ## Alur sistem
+ 
+ Dokumen yang diunggah ulang disimpan sebagai versi baru; versi lama tetap ada sebagai jejak audit.
+ 
++## Alur surat Tugas Akhir
++
++Khusus TA. Alur KP tidak berubah.
++
++1. Mahasiswa mengirim pengajuan TA beserta dokumennya, lalu operator memverifikasinya (status Menunggu Dosen).
++2. Operator menerbitkan **surat pengantar** (nomor, tanggal, dan berkas PDF yang sudah ditandatangani) dari halaman Dokumen Resmi. Mahasiswa mengunduhnya dari halaman detail pengajuan.
++3. Mahasiswa mengunggah **surat balasan** (PDF, JPG, atau PNG, maks. 5 MB). Boleh diunggah ulang selama belum diterima; versi lama tersimpan sebagai jejak.
++4. Operator memeriksa surat balasan: **diterima** atau **revisi** (catatan wajib, tampil di halaman mahasiswa). Keputusan masih bisa diubah selama SK belum terbit.
++5. **SK Pembimbing Tugas Akhir** hanya bisa diterbitkan bila: surat pengantar sudah terbit, surat balasan versi terbaru sudah diterima, dosen pembimbing sudah sah, dan pengajuan sudah disetujui dosen. Aturannya dijaga di server (`Pengajuan::hambatanSk()`), bukan hanya dengan menyembunyikan tombol.
++6. Mahasiswa mengunduh SK, lalu operator mengarsipkan. Pengarsipan TA mewajibkan SK sudah terbit.
++
++Surat pengantar dan SK disimpan sebagai dokumen resmi (jenis `surat_pengantar_ta` dan `sk_ta`), surat balasan di tabel `surat_balasan`. Kode jenis `sk_ta` tidak berubah, hanya labelnya menjadi "SK Pembimbing Tugas Akhir". Pengajuan TA yang sudah berstatus Disetujui sebelum fitur ini ada akan melewati langkah surat pengantar dan surat balasan dulu sebelum SK dapat diterbitkan.
++
+ ## Dosen pembimbing
+ 
+ Pembimbing KP dan TA berasal dari sumber yang berbeda.
+@@ -159,7 +172,7 @@ ## Menjalankan uji otomatis
+ 
+ Uji memakai SQLite in-memory (butuh ekstensi `pdo_sqlite`), jadi tidak menyentuh database MySQL Anda.
+ 
+-Hasil terakhir di lingkungan pengembangan: **52 uji, 1040 assertion, semuanya lulus.** Cakupannya:
++Hasil terakhir di lingkungan pengembangan: **71 uji, 1488 assertion, semuanya lulus.** Cakupannya:
+ 
+ - Login (email atau nomor induk), logout, akun nonaktif, pengalihan dashboard per peran, pencatatan log login.
+ - Matriks akses: setiap peran hanya dapat membuka halamannya sendiri (200) dan ditolak (403) di halaman peran lain, termasuk aksi tulis lintas peran dan ID yang tidak ada.
+@@ -168,7 +181,8 @@ ## Menjalankan uji otomatis
+ - Sinkronisasi data setelah admin mengubah mahasiswa, dosen, program studi, dan persyaratan.
+ - CRUD admin (pengguna, program studi, persyaratan), validasi, perlindungan data yang dipakai, log aktivitas, profil, dan ganti kata sandi.
+ - Alur dosen pembimbing: KP ditetapkan operator, TA dipilih mahasiswa lalu diterima atau ditolak dosen, penetapan pengganti dengan bimbingan paling sedikit, hak akses, dan dashboard mahasiswa.
+-- Render semua halaman untuk setiap peran pada setiap status pengajuan dan status pembimbing.
++- Alur surat TA: surat pengantar hanya setelah verifikasi, surat balasan hanya setelah surat pengantar, SK tertahan sampai balasan diterima dan dosen menyetujui, revisi dan unggah ulang, keputusan usang ditolak, arsip TA mewajibkan SK, hak akses tiap peran, privasi berkas surat balasan, dan KP tidak terpengaruh.
++- Render semua halaman untuk setiap peran pada setiap status pengajuan dan status pembimbing, termasuk tujuh variasi keadaan surat TA.
+ - Migrasi (naik dan rollback) serta seeder, termasuk aman dijalankan ulang.
+ 
+ ## Yang belum diuji
+diff --git a/app/Enums/JenisPengajuan.php b/app/Enums/JenisPengajuan.php
+index 51f210d..98e8094 100644
+--- a/app/Enums/JenisPengajuan.php
++++ b/app/Enums/JenisPengajuan.php
+@@ -7,6 +7,11 @@ enum JenisPengajuan: string
+     case Kp = 'kp';
+     case Ta = 'ta';
+ 
++    /** Kode dokumen resmi pada alur surat Tugas Akhir (surat pengantar, lalu SK pembimbing). */
++    public const SURAT_PENGANTAR_TA = 'surat_pengantar_ta';
++
++    public const SK_TA = 'sk_ta';
++
+     public function label(): string
+     {
+         return match ($this) {
+@@ -34,7 +39,8 @@ public function jenisDokumenResmi(): array
+                 'lainnya' => 'Dokumen Resmi Lainnya',
+             ],
+             self::Ta => [
+-                'sk_ta' => 'SK Tugas Akhir',
++                self::SURAT_PENGANTAR_TA => 'Surat Pengantar TA',
++                self::SK_TA => 'SK Pembimbing Tugas Akhir',
+                 'lainnya' => 'Dokumen Resmi Lainnya',
+             ],
+         };
+diff --git a/app/Enums/StatusTahapSurat.php b/app/Enums/StatusTahapSurat.php
+new file mode 100644
+index 0000000..afc7add
+--- /dev/null
++++ b/app/Enums/StatusTahapSurat.php
+@@ -0,0 +1,42 @@
++<?php
++
++namespace App\Enums;
++
++/**
++ * Keadaan satu tahap pada alur surat Tugas Akhir (surat pengantar, surat balasan, SK pembimbing).
++ * Hanya dipakai untuk tampilan; aturan sebenarnya ada di PengajuanPolicy dan Pengajuan::hambatanSk().
++ */
++enum StatusTahapSurat: string
++{
++    /** Belum bisa dikerjakan karena tahap sebelumnya belum selesai. */
++    case Terkunci = 'terkunci';
++    /** Menunggu tindakan mahasiswa. */
++    case Giliran = 'giliran';
++    /** Menunggu tindakan operator. */
++    case Menunggu = 'menunggu';
++    case Revisi = 'revisi';
++    case Selesai = 'selesai';
++
++    /** Warna titik penanda pada daftar ringkas (dashboard). */
++    public function titik(): string
++    {
++        return match ($this) {
++            self::Terkunci => 'bg-slate-300',
++            self::Giliran => 'bg-sky-500',
++            self::Menunggu => 'bg-amber-400',
++            self::Revisi => 'bg-rose-500',
++            self::Selesai => 'bg-emerald-500',
++        };
++    }
++
++    public function badge(): string
++    {
++        return match ($this) {
++            self::Terkunci => 'bg-slate-100 text-slate-600 ring-slate-300',
++            self::Giliran => 'bg-sky-50 text-sky-700 ring-sky-200',
++            self::Menunggu => 'bg-amber-50 text-amber-800 ring-amber-200',
++            self::Revisi => 'bg-rose-50 text-rose-700 ring-rose-200',
++            self::Selesai => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
++        };
++    }
++}
+diff --git a/app/Http/Controllers/BerkasController.php b/app/Http/Controllers/BerkasController.php
+index c7d4cbb..d83524c 100644
+--- a/app/Http/Controllers/BerkasController.php
++++ b/app/Http/Controllers/BerkasController.php
+@@ -4,6 +4,7 @@
+ 
+ use App\Models\DokumenPengajuan;
+ use App\Models\DokumenResmi;
++use App\Models\SuratBalasan;
+ use Illuminate\Http\Request;
+ use Illuminate\Support\Facades\Storage;
+ use Symfony\Component\HttpFoundation\StreamedResponse;
+@@ -28,6 +29,13 @@ public function resmi(Request $request, DokumenResmi $dokumenResmi): StreamedRes
+         return $this->kirim($dokumenResmi->path, $dokumenResmi->nama_asli, $dokumenResmi->mime, $request->boolean('unduh'));
+     }
+ 
++    public function balasan(Request $request, SuratBalasan $suratBalasan): StreamedResponse
++    {
++        $this->authorize('view', $suratBalasan);
++
++        return $this->kirim($suratBalasan->path, $suratBalasan->nama_asli, $suratBalasan->mime, $request->boolean('unduh'));
++    }
++
+     private function kirim(string $path, string $nama, ?string $mime, bool $unduh): StreamedResponse
+     {
+         $disk = Storage::disk('local');
+diff --git a/app/Http/Controllers/DashboardController.php b/app/Http/Controllers/DashboardController.php
+index 2dd00ba..a6291d9 100644
+--- a/app/Http/Controllers/DashboardController.php
++++ b/app/Http/Controllers/DashboardController.php
+@@ -5,6 +5,7 @@
+ use App\Enums\JenisPengajuan;
+ use App\Enums\StatusPembimbing;
+ use App\Enums\StatusPengajuan;
++use App\Enums\StatusTahapSurat;
+ use App\Models\LogAktivitas;
+ use App\Models\Pemeriksaan;
+ use App\Models\Pengajuan;
+@@ -26,7 +27,7 @@ public function arahkan(Request $request): RedirectResponse
+     public function mahasiswa(Request $request): View
+     {
+         $user = $request->user()->load('programStudi');
+-        $pengajuan = $user->pengajuan()->with(['pembimbing', 'pembimbingPilihan'])->orderByDesc('updated_at')->get();
++        $pengajuan = $user->pengajuan()->with(['pembimbing', 'pembimbingPilihan', 'dokumenResmi', 'suratBalasan'])->orderByDesc('updated_at')->get();
+ 
+         // Pembimbing per jenis: KP ditetapkan operator dari database dosen, TA berasal dari pilihan mahasiswa.
+         $pengajuanKp = $pengajuan->first(fn (Pengajuan $p) => $p->jenis === JenisPengajuan::Kp);
+@@ -40,7 +41,12 @@ public function mahasiswa(Request $request): View
+         ))->count();
+         $selesai = $pengajuan->filter(fn (Pengajuan $p) => $p->status === StatusPengajuan::Diarsipkan)->count();
+ 
+-        return view('dashboard.mahasiswa', compact('user', 'pengajuan', 'pengajuanKp', 'pengajuanTa', 'perluRevisi', 'dalamProses', 'selesai'));
++        // Langkah surat TA yang menunggu mahasiswa: mengunggah surat balasan, atau memperbaikinya.
++        $suratPerluTindakan = $pengajuan->filter(fn (Pengajuan $p) => collect($p->tahapSurat())->contains(
++            fn (array $t) => $t['kunci'] === 'balasan' && in_array($t['status'], [StatusTahapSurat::Giliran, StatusTahapSurat::Revisi], true),
++        ));
++
++        return view('dashboard.mahasiswa', compact('user', 'pengajuan', 'pengajuanKp', 'pengajuanTa', 'perluRevisi', 'dalamProses', 'selesai', 'suratPerluTindakan'));
+     }
+ 
+     public function dosen(Request $request): View
+@@ -81,6 +87,17 @@ public function operator(): View
+             ->limit(5)
+             ->get();
+ 
++        // Alur surat TA: surat pengantar yang belum terbit dan surat balasan yang menunggu diperiksa.
++        $jumlahPerluPengantar = Pengajuan::perluSuratPengantar()->count();
++        $jumlahBalasanMenunggu = Pengajuan::balasanMenunggu()->count();
++        $antreanSurat = Pengajuan::with('mahasiswa.programStudi')->balasanMenunggu()->orderBy('updated_at')->limit(5)->get()
++            ->map(fn (Pengajuan $p) => ['pengajuan' => $p, 'langkah' => 'Periksa surat balasan'])
++            ->concat(
++                Pengajuan::with('mahasiswa.programStudi')->perluSuratPengantar()->orderBy('updated_at')->limit(5)->get()
++                    ->map(fn (Pengajuan $p) => ['pengajuan' => $p, 'langkah' => 'Terbitkan surat pengantar'])
++            )
++            ->take(5);
++
+         $jumlahPerluPembimbing = Pengajuan::perluPembimbing()->count();
+ 
+         $perluPembimbing = Pengajuan::with(['mahasiswa.programStudi', 'pembimbingPilihan'])
+@@ -91,6 +108,7 @@ public function operator(): View
+ 
+         return view('dashboard.operator', compact(
+             'jumlah', 'antreanVerifikasi', 'perluDokumenResmi', 'jumlahPerluPembimbing', 'perluPembimbing',
++            'jumlahPerluPengantar', 'jumlahBalasanMenunggu', 'antreanSurat',
+         ));
+     }
+ 
+diff --git a/app/Http/Controllers/Mahasiswa/BerkasSayaController.php b/app/Http/Controllers/Mahasiswa/BerkasSayaController.php
+index 064c6fd..7f89fbd 100644
+--- a/app/Http/Controllers/Mahasiswa/BerkasSayaController.php
++++ b/app/Http/Controllers/Mahasiswa/BerkasSayaController.php
+@@ -5,6 +5,7 @@
+ use App\Http\Controllers\Controller;
+ use App\Models\DokumenPengajuan;
+ use App\Models\DokumenResmi;
++use App\Models\SuratBalasan;
+ use Illuminate\Http\Request;
+ use Illuminate\View\View;
+ 
+@@ -24,6 +25,11 @@ public function index(Request $request): View
+             ->orderByDesc('id')
+             ->get();
+ 
+-        return view('mahasiswa.berkas.index', compact('dokumen', 'resmi'));
++        $balasan = SuratBalasan::with('pengajuan')
++            ->whereHas('pengajuan', fn ($q) => $q->where('mahasiswa_id', $id))
++            ->orderByDesc('id')
++            ->get();
++
++        return view('mahasiswa.berkas.index', compact('dokumen', 'resmi', 'balasan'));
+     }
+ }
+diff --git a/app/Http/Controllers/Mahasiswa/PengajuanController.php b/app/Http/Controllers/Mahasiswa/PengajuanController.php
+index 8a649bf..9c0cc57 100644
+--- a/app/Http/Controllers/Mahasiswa/PengajuanController.php
++++ b/app/Http/Controllers/Mahasiswa/PengajuanController.php
+@@ -102,7 +102,7 @@ public function show(Pengajuan $pengajuan): View
+ 
+         $pengajuan->load([
+             'mahasiswa.programStudi', 'pembimbing', 'pembimbingPilihan', 'riwayat.user',
+-            'riwayatPembimbing.dosen', 'riwayatPembimbing.oleh', 'dokumenResmi',
++            'riwayatPembimbing.dosen', 'riwayatPembimbing.oleh', 'dokumenResmi', 'suratBalasan',
+         ]);
+ 
+         return view('mahasiswa.pengajuan.show', ['pengajuan' => $pengajuan] + $this->workflow->dataDokumen($pengajuan));
+diff --git a/app/Http/Controllers/Mahasiswa/SuratBalasanController.php b/app/Http/Controllers/Mahasiswa/SuratBalasanController.php
+new file mode 100644
+index 0000000..c3d7c90
+--- /dev/null
++++ b/app/Http/Controllers/Mahasiswa/SuratBalasanController.php
+@@ -0,0 +1,29 @@
++<?php
++
++namespace App\Http\Controllers\Mahasiswa;
++
++use App\Http\Controllers\Controller;
++use App\Models\Pengajuan;
++use App\Services\SuratTaService;
++use Illuminate\Http\RedirectResponse;
++use Illuminate\Http\Request;
++
++class SuratBalasanController extends Controller
++{
++    public function __construct(private SuratTaService $surat) {}
++
++    /** Mahasiswa mengunggah surat balasan atas surat pengantar TA. */
++    public function store(Request $request, Pengajuan $pengajuan): RedirectResponse
++    {
++        $this->authorize('unggahSuratBalasan', $pengajuan);
++
++        $request->validate([
++            'berkas_balasan' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
++        ]);
++
++        $balasan = $this->surat->unggahBalasan($pengajuan, $request->user(), $request->file('berkas_balasan'));
++
++        return redirect()->route('mahasiswa.pengajuan.show', $pengajuan)
++            ->with('sukses', "Surat balasan (versi {$balasan->versi}) berhasil diunggah dan menunggu pemeriksaan operator.");
++    }
++}
+diff --git a/app/Http/Controllers/Operator/ArsipController.php b/app/Http/Controllers/Operator/ArsipController.php
+index 2e74680..2c5bef3 100644
+--- a/app/Http/Controllers/Operator/ArsipController.php
++++ b/app/Http/Controllers/Operator/ArsipController.php
+@@ -53,7 +53,7 @@ public function show(Pengajuan $pengajuan): View
+ 
+         abort_unless($pengajuan->status === StatusPengajuan::Diarsipkan, 404, 'Pengajuan ini belum diarsipkan.');
+ 
+-        $pengajuan->load(['mahasiswa.programStudi', 'pembimbing', 'riwayat.user', 'dokumenResmi.pengunggah', 'arsip.petugas']);
++        $pengajuan->load(['mahasiswa.programStudi', 'pembimbing', 'riwayat.user', 'dokumenResmi.pengunggah', 'suratBalasan.pemeriksa', 'arsip.petugas']);
+ 
+         return view('operator.arsip.show', ['pengajuan' => $pengajuan] + $this->workflow->dataDokumen($pengajuan));
+     }
+diff --git a/app/Http/Controllers/Operator/DokumenResmiController.php b/app/Http/Controllers/Operator/DokumenResmiController.php
+index ed52a43..8963026 100644
+--- a/app/Http/Controllers/Operator/DokumenResmiController.php
++++ b/app/Http/Controllers/Operator/DokumenResmiController.php
+@@ -2,42 +2,49 @@
+ 
+ namespace App\Http\Controllers\Operator;
+ 
++use App\Enums\JenisPengajuan;
+ use App\Enums\StatusPengajuan;
+ use App\Http\Controllers\Controller;
+ use App\Models\DokumenResmi;
+ use App\Models\Pengajuan;
+ use App\Services\PengajuanWorkflow;
++use App\Services\SuratTaService;
+ use App\Support\Aktivitas;
+ use Illuminate\Http\RedirectResponse;
+ use Illuminate\Http\Request;
+ use Illuminate\Support\Facades\Storage;
+ use Illuminate\Support\Str;
+ use Illuminate\Validation\Rule;
++use Illuminate\Validation\ValidationException;
+ use Illuminate\View\View;
+ 
+ class DokumenResmiController extends Controller
+ {
+-    public function __construct(private PengajuanWorkflow $workflow) {}
++    public function __construct(private PengajuanWorkflow $workflow, private SuratTaService $surat) {}
+ 
+     public function index(): View
+     {
+-        $perluDiproses = Pengajuan::with(['mahasiswa.programStudi', 'pembimbing', 'pembimbingPilihan'])
++        $perluDiproses = Pengajuan::with(['mahasiswa.programStudi', 'pembimbing', 'pembimbingPilihan', 'dokumenResmi', 'suratBalasan'])
+             ->status(StatusPengajuan::Disetujui)
+             ->orderBy('updated_at')
+             ->get();
+ 
++        // Pengajuan TA yang menunggu tindakan operator pada alur surat: pengantar belum terbit, atau balasan perlu diperiksa.
++        $perluPengantar = Pengajuan::with(['mahasiswa'])->perluSuratPengantar()->orderBy('updated_at')->get();
++        $perluPeriksaBalasan = Pengajuan::with(['mahasiswa'])->balasanMenunggu()->orderBy('updated_at')->get();
++
+         $terbit = DokumenResmi::with(['pengajuan.mahasiswa', 'pengunggah'])
+             ->orderByDesc('id')
+             ->paginate(10);
+ 
+-        return view('operator.dokumen-resmi.index', compact('perluDiproses', 'terbit'));
++        return view('operator.dokumen-resmi.index', compact('perluDiproses', 'perluPengantar', 'perluPeriksaBalasan', 'terbit'));
+     }
+ 
+     public function show(Pengajuan $pengajuan): View
+     {
+         $this->authorize('view', $pengajuan);
+ 
+-        $pengajuan->load(['mahasiswa.programStudi', 'pembimbing', 'riwayat.user', 'dokumenResmi.pengunggah']);
++        $pengajuan->load(['mahasiswa.programStudi', 'pembimbing', 'riwayat.user', 'dokumenResmi.pengunggah', 'suratBalasan.pemeriksa']);
+ 
+         return view('operator.dokumen-resmi.show', ['pengajuan' => $pengajuan] + $this->workflow->dataDokumen($pengajuan));
+     }
+@@ -46,13 +53,21 @@ public function store(Request $request, Pengajuan $pengajuan): RedirectResponse
+     {
+         $this->authorize('prosesDokumenResmi', $pengajuan);
+ 
++        // Surat pengantar TA punya jalur sendiri (suratPengantar), bukan lewat formulir umum ini.
++        $jenisBoleh = array_values(array_diff(array_keys($pengajuan->jenis->jenisDokumenResmi()), [JenisPengajuan::SURAT_PENGANTAR_TA]));
++
+         $data = $request->validate([
+-            'jenis' => ['required', Rule::in(array_keys($pengajuan->jenis->jenisDokumenResmi()))],
++            'jenis' => ['required', Rule::in($jenisBoleh)],
+             'nomor' => ['required', 'string', 'max:100'],
+             'tanggal' => ['required', 'date'],
+             'berkas' => ['required', 'file', 'mimes:pdf', 'max:10240'],
+         ]);
+ 
++        // SK pembimbing TA baru boleh terbit setelah surat pengantar, surat balasan yang diterima, dan persetujuan dosen.
++        if ($data['jenis'] === JenisPengajuan::SK_TA && ($hambatan = $pengajuan->hambatanSk()) !== null) {
++            throw ValidationException::withMessages(['jenis' => "SK pembimbing belum dapat diterbitkan. {$hambatan}"]);
++        }
++
+         $file = $request->file('berkas');
+         $path = $file->store("dokumen-resmi/{$pengajuan->id}", 'local');
+ 
+@@ -78,12 +93,42 @@ public function store(Request $request, Pengajuan $pengajuan): RedirectResponse
+             ->with('sukses', 'Dokumen resmi berhasil diunggah.');
+     }
+ 
+-    public function destroy(Pengajuan $pengajuan, DokumenResmi $dokumenResmi): RedirectResponse
++    /** Operator menerbitkan surat pengantar TA (PDF yang sudah ditandatangani) untuk diunduh mahasiswa. */
++    public function suratPengantar(Request $request, Pengajuan $pengajuan): RedirectResponse
+     {
+-        $this->authorize('prosesDokumenResmi', $pengajuan);
++        $this->authorize('terbitkanSuratPengantar', $pengajuan);
++
++        $data = $request->validate([
++            'nomor_pengantar' => ['required', 'string', 'max:100'],
++            'tanggal_pengantar' => ['required', 'date'],
++            'berkas_pengantar' => ['required', 'file', 'mimes:pdf', 'max:10240'],
++        ]);
++
++        $this->surat->terbitkanPengantar(
++            $pengajuan,
++            $request->user(),
++            $data['nomor_pengantar'],
++            $data['tanggal_pengantar'],
++            $request->file('berkas_pengantar'),
++        );
+ 
++        return redirect()->route('operator.dokumen-resmi.show', $pengajuan)
++            ->with('sukses', 'Surat pengantar diterbitkan. Mahasiswa kini dapat mengunduhnya dan mengunggah surat balasan.');
++    }
++
++    public function destroy(Pengajuan $pengajuan, DokumenResmi $dokumenResmi): RedirectResponse
++    {
+         abort_unless((int) $dokumenResmi->pengajuan_id === (int) $pengajuan->id, 404);
+ 
++        if ($dokumenResmi->jenis === JenisPengajuan::SURAT_PENGANTAR_TA) {
++            $this->authorize('hapusSuratPengantar', $pengajuan);
++            $this->surat->hapusPengantar($pengajuan, $dokumenResmi, request()->user());
++
++            return back()->with('sukses', 'Surat pengantar ditarik.');
++        }
++
++        $this->authorize('prosesDokumenResmi', $pengajuan);
++
+         Storage::disk('local')->delete($dokumenResmi->path);
+         $dokumenResmi->delete();
+ 
+diff --git a/app/Http/Controllers/Operator/PengajuanController.php b/app/Http/Controllers/Operator/PengajuanController.php
+index 331c7dc..8213844 100644
+--- a/app/Http/Controllers/Operator/PengajuanController.php
++++ b/app/Http/Controllers/Operator/PengajuanController.php
+@@ -64,7 +64,7 @@ public function show(Pengajuan $pengajuan): View
+ 
+         $pengajuan->load([
+             'mahasiswa.programStudi', 'pembimbing', 'pembimbingPilihan', 'riwayat.user',
+-            'riwayatPembimbing.dosen', 'riwayatPembimbing.oleh', 'dokumenResmi', 'arsip',
++            'riwayatPembimbing.dosen', 'riwayatPembimbing.oleh', 'dokumenResmi', 'suratBalasan.pemeriksa', 'arsip',
+         ]);
+ 
+         return view('operator.pengajuan.show', [
+diff --git a/app/Http/Controllers/Operator/SuratBalasanController.php b/app/Http/Controllers/Operator/SuratBalasanController.php
+new file mode 100644
+index 0000000..335dc6d
+--- /dev/null
++++ b/app/Http/Controllers/Operator/SuratBalasanController.php
+@@ -0,0 +1,47 @@
++<?php
++
++namespace App\Http\Controllers\Operator;
++
++use App\Enums\StatusDokumen;
++use App\Http\Controllers\Controller;
++use App\Models\Pengajuan;
++use App\Services\SuratTaService;
++use Illuminate\Http\RedirectResponse;
++use Illuminate\Http\Request;
++use Illuminate\Validation\Rule;
++
++class SuratBalasanController extends Controller
++{
++    public function __construct(private SuratTaService $surat) {}
++
++    /** Operator menerima atau meminta revisi surat balasan TA. */
++    public function periksa(Request $request, Pengajuan $pengajuan): RedirectResponse
++    {
++        $this->authorize('periksaSuratBalasan', $pengajuan);
++
++        $data = $request->validate([
++            'balasan_id' => ['required', 'integer'],
++            'keputusan' => ['required', Rule::in([StatusDokumen::Diterima->value, StatusDokumen::Revisi->value])],
++            'catatan_balasan' => ['nullable', 'string', 'max:2000'],
++        ]);
++
++        $balasan = $this->surat->periksaBalasan(
++            $pengajuan,
++            $request->user(),
++            (int) $data['balasan_id'],
++            StatusDokumen::from($data['keputusan']),
++            $data['catatan_balasan'] ?? null,
++        );
++
++        if ($balasan->status === StatusDokumen::Revisi) {
++            $pesan = 'Permintaan revisi surat balasan dikirim ke mahasiswa.';
++        } else {
++            $hambatan = $pengajuan->hambatanSk();
++            $pesan = $hambatan === null
++                ? 'Surat balasan diterima. SK pembimbing kini dapat diterbitkan.'
++                : "Surat balasan diterima. SK pembimbing belum dapat diterbitkan: {$hambatan}";
++        }
++
++        return redirect()->route('operator.dokumen-resmi.show', $pengajuan)->with('sukses', $pesan);
++    }
++}
+diff --git a/app/Models/Pengajuan.php b/app/Models/Pengajuan.php
+index e6b1cb2..c2c7f4a 100644
+--- a/app/Models/Pengajuan.php
++++ b/app/Models/Pengajuan.php
+@@ -3,8 +3,10 @@
+ namespace App\Models;
+ 
+ use App\Enums\JenisPengajuan;
++use App\Enums\StatusDokumen;
+ use App\Enums\StatusPembimbing;
+ use App\Enums\StatusPengajuan;
++use App\Enums\StatusTahapSurat;
+ use Illuminate\Database\Eloquent\Builder;
+ use Illuminate\Database\Eloquent\Model;
+ use Illuminate\Database\Eloquent\Relations\BelongsTo;
+@@ -82,6 +84,12 @@ public function dokumenResmi(): HasMany
+         return $this->hasMany(DokumenResmi::class, 'pengajuan_id');
+     }
+ 
++    /** Surat balasan TA (semua versi, dari yang pertama). */
++    public function suratBalasan(): HasMany
++    {
++        return $this->hasMany(SuratBalasan::class, 'pengajuan_id')->orderBy('versi');
++    }
++
+     public function arsip(): HasOne
+     {
+         return $this->hasOne(Arsip::class, 'pengajuan_id');
+@@ -114,6 +122,174 @@ public function scopePerluPembimbing(Builder $query): Builder
+             });
+     }
+ 
++    /** Status ketika alur surat TA (pengantar, balasan, SK) dapat dikerjakan: setelah operator memverifikasi, sampai diarsipkan. */
++    private const STATUS_SURAT_AKTIF = [
++        StatusPengajuan::MenungguDosen,
++        StatusPengajuan::RevisiAkademik,
++        StatusPengajuan::Disetujui,
++    ];
++
++    /**
++     * Pengajuan TA yang sudah lolos verifikasi operator dan belum diarsipkan:
++     * pada masa inilah surat pengantar, surat balasan, dan SK pembimbing diproses.
++     */
++    public function tahapSuratAktif(): bool
++    {
++        return $this->jenis === JenisPengajuan::Ta && in_array($this->status, self::STATUS_SURAT_AKTIF, true);
++    }
++
++    /** Alur surat ditampilkan untuk TA yang sudah melewati verifikasi (termasuk yang sudah diarsipkan). */
++    public function tampilkanSuratTa(): bool
++    {
++        return $this->tahapSuratAktif()
++            || ($this->jenis === JenisPengajuan::Ta && $this->status === StatusPengajuan::Diarsipkan);
++    }
++
++    public function suratPengantarTa(): ?DokumenResmi
++    {
++        return $this->dokumenResmi->firstWhere('jenis', JenisPengajuan::SURAT_PENGANTAR_TA);
++    }
++
++    public function skPembimbing(): ?DokumenResmi
++    {
++        return $this->dokumenResmi->firstWhere('jenis', JenisPengajuan::SK_TA);
++    }
++
++    /** Surat balasan versi terbaru, atau null bila belum pernah diunggah. */
++    public function balasanTerbaru(): ?SuratBalasan
++    {
++        return $this->suratBalasan->firstWhere('terbaru', true);
++    }
++
++    public function suratBalasanDiterima(): bool
++    {
++        return $this->balasanTerbaru()?->status === StatusDokumen::Diterima;
++    }
++
++    /**
++     * Alasan SK pembimbing belum boleh diterbitkan, atau null bila semua syarat terpenuhi.
++     * Satu-satunya tempat aturan ini; policy, controller, dan tampilan semuanya memakainya.
++     */
++    public function hambatanSk(): ?string
++    {
++        if ($this->jenis !== JenisPengajuan::Ta) {
++            return 'SK pembimbing hanya untuk Tugas Akhir.';
++        }
++
++        if ($this->skPembimbing() !== null) {
++            return 'SK pembimbing sudah diterbitkan. Hapus yang lama bila ingin menggantinya.';
++        }
++
++        if ($this->status === StatusPengajuan::Diarsipkan) {
++            return 'Pengajuan sudah diarsipkan.';
++        }
++
++        if ($this->suratPengantarTa() === null) {
++            return 'Surat pengantar belum diterbitkan.';
++        }
++
++        $balasan = $this->balasanTerbaru();
++        if ($balasan === null) {
++            return 'Surat balasan belum diunggah mahasiswa.';
++        }
++
++        if ($balasan->status === StatusDokumen::Menunggu) {
++            return 'Surat balasan belum diperiksa operator.';
++        }
++
++        if ($balasan->status === StatusDokumen::Revisi) {
++            return 'Surat balasan perlu direvisi dan diunggah ulang oleh mahasiswa.';
++        }
++
++        if (! $this->status_pembimbing->aktif() || $this->pembimbing_id === null) {
++            return 'Dosen pembimbing belum ditetapkan.';
++        }
++
++        if ($this->status !== StatusPengajuan::Disetujui) {
++            return 'Pengajuan belum disetujui dosen pembimbing.';
++        }
++
++        return null;
++    }
++
++    /**
++     * Tiga tahap alur surat TA beserta keadaannya, untuk tampilan (mahasiswa maupun operator).
++     * Kosong untuk pengajuan yang bukan TA atau belum lolos verifikasi.
++     *
++     * @return list<array{kunci: string, judul: string, status: StatusTahapSurat, label: string, keterangan: string, dokumen: ?DokumenResmi, balasan: ?SuratBalasan}>
++     */
++    public function tahapSurat(): array
++    {
++        if (! $this->tampilkanSuratTa()) {
++            return [];
++        }
++
++        $arsip = $this->status === StatusPengajuan::Diarsipkan;
++        $pengantar = $this->suratPengantarTa();
++        $balasan = $this->balasanTerbaru();
++        $sk = $this->skPembimbing();
++
++        // 1. Surat pengantar (operator)
++        if ($pengantar) {
++            $t1 = [StatusTahapSurat::Selesai, 'Sudah terbit', 'Nomor '.$pengantar->nomor.', tanggal '.$pengantar->tanggal->translatedFormat('d M Y').'.'];
++        } elseif ($arsip) {
++            $t1 = [StatusTahapSurat::Terkunci, 'Tidak tercatat', 'Tidak ada surat pengantar pada pengajuan ini.'];
++        } else {
++            $t1 = [StatusTahapSurat::Menunggu, 'Menunggu operator', 'Operator akademik akan menerbitkan surat pengantar.'];
++        }
++
++        // 2. Surat balasan (mahasiswa mengunggah, operator memeriksa)
++        if ($balasan === null) {
++            $t2 = match (true) {
++                $pengantar === null => [StatusTahapSurat::Terkunci, 'Belum tersedia', 'Dapat diunggah setelah surat pengantar terbit.'],
++                $arsip => [StatusTahapSurat::Terkunci, 'Tidak tercatat', 'Tidak ada surat balasan pada pengajuan ini.'],
++                default => [StatusTahapSurat::Giliran, 'Menunggu unggahan Anda', 'Unduh surat pengantar, mintakan balasan dari instansi, lalu unggah surat balasannya.'],
++            };
++        } else {
++            $t2 = match ($balasan->status) {
++                StatusDokumen::Menunggu => [StatusTahapSurat::Menunggu, 'Menunggu pemeriksaan', "Surat balasan versi {$balasan->versi} sedang diperiksa operator."],
++                StatusDokumen::Diterima => [StatusTahapSurat::Selesai, 'Diterima', "Surat balasan versi {$balasan->versi} diterima operator."],
++                StatusDokumen::Revisi => [StatusTahapSurat::Revisi, 'Perlu revisi', $balasan->catatan ?: 'Unggah ulang surat balasan yang sudah diperbaiki.'],
++            };
++        }
++
++        // 3. SK pembimbing (operator)
++        if ($sk) {
++            $t3 = [StatusTahapSurat::Selesai, 'Sudah terbit', 'Nomor '.$sk->nomor.', tanggal '.$sk->tanggal->translatedFormat('d M Y').'.'];
++        } elseif (($hambatan = $this->hambatanSk()) === null) {
++            $t3 = [StatusTahapSurat::Menunggu, 'Menunggu operator', 'Semua syarat terpenuhi. Operator akademik akan menerbitkan SK pembimbing.'];
++        } else {
++            $t3 = [StatusTahapSurat::Terkunci, 'Belum tersedia', $hambatan];
++        }
++
++        $susun = fn (string $kunci, string $judul, array $t, ?DokumenResmi $dokumen = null, ?SuratBalasan $b = null) => [
++            'kunci' => $kunci, 'judul' => $judul, 'status' => $t[0], 'label' => $t[1], 'keterangan' => $t[2],
++            'dokumen' => $dokumen, 'balasan' => $b,
++        ];
++
++        return [
++            $susun('pengantar', 'Surat Pengantar', $t1, $pengantar),
++            $susun('balasan', 'Surat Balasan', $t2, null, $balasan),
++            $susun('sk', 'SK Pembimbing', $t3, $sk),
++        ];
++    }
++
++    /** TA yang menunggu operator menerbitkan surat pengantar. */
++    public function scopePerluSuratPengantar(Builder $query): Builder
++    {
++        return $query->where('jenis', JenisPengajuan::Ta->value)
++            ->whereIn('status', array_map(fn (StatusPengajuan $s) => $s->value, self::STATUS_SURAT_AKTIF))
++            ->whereDoesntHave('dokumenResmi', fn (Builder $q) => $q->where('jenis', JenisPengajuan::SURAT_PENGANTAR_TA));
++    }
++
++    /** TA yang surat balasannya (versi terbaru) menunggu diperiksa operator. */
++    public function scopeBalasanMenunggu(Builder $query): Builder
++    {
++        return $query->where('jenis', JenisPengajuan::Ta->value)
++            ->whereIn('status', array_map(fn (StatusPengajuan $s) => $s->value, self::STATUS_SURAT_AKTIF))
++            ->whereHas('suratBalasan', fn (Builder $q) => $q->where('terbaru', true)->where('status', StatusDokumen::Menunggu->value));
++    }
++
+     /** Teks singkat pembimbing untuk tabel: nama dosen sah, atau keadaan terkini bila belum ada. */
+     public function ringkasanPembimbing(): string
+     {
+diff --git a/app/Models/SuratBalasan.php b/app/Models/SuratBalasan.php
+new file mode 100644
+index 0000000..4c3e97d
+--- /dev/null
++++ b/app/Models/SuratBalasan.php
+@@ -0,0 +1,51 @@
++<?php
++
++namespace App\Models;
++
++use App\Enums\StatusDokumen;
++use App\Models\Concerns\PunyaBerkas;
++use Illuminate\Database\Eloquent\Model;
++use Illuminate\Database\Eloquent\Relations\BelongsTo;
++
++/**
++ * Surat balasan Tugas Akhir yang diunggah mahasiswa. Memakai StatusDokumen
++ * (menunggu / diterima / revisi) seperti dokumen persyaratan.
++ */
++class SuratBalasan extends Model
++{
++    use PunyaBerkas;
++
++    protected $table = 'surat_balasan';
++
++    protected $fillable = [
++        'pengajuan_id', 'diunggah_oleh', 'versi', 'terbaru',
++        'nama_asli', 'path', 'mime', 'ukuran', 'status',
++        'diperiksa_oleh', 'diperiksa_at', 'catatan',
++    ];
++
++    protected function casts(): array
++    {
++        return [
++            'terbaru' => 'boolean',
++            'versi' => 'integer',
++            'ukuran' => 'integer',
++            'status' => StatusDokumen::class,
++            'diperiksa_at' => 'datetime',
++        ];
++    }
++
++    public function pengajuan(): BelongsTo
++    {
++        return $this->belongsTo(Pengajuan::class, 'pengajuan_id');
++    }
++
++    public function pengunggah(): BelongsTo
++    {
++        return $this->belongsTo(User::class, 'diunggah_oleh');
++    }
++
++    public function pemeriksa(): BelongsTo
++    {
++        return $this->belongsTo(User::class, 'diperiksa_oleh');
++    }
++}
+diff --git a/app/Policies/PengajuanPolicy.php b/app/Policies/PengajuanPolicy.php
+index afc4086..e680153 100644
+--- a/app/Policies/PengajuanPolicy.php
++++ b/app/Policies/PengajuanPolicy.php
+@@ -4,6 +4,7 @@
+ 
+ use App\Enums\JenisPengajuan;
+ use App\Enums\Role;
++use App\Enums\StatusDokumen;
+ use App\Enums\StatusPembimbing;
+ use App\Enums\StatusPengajuan;
+ use App\Models\Pengajuan;
+@@ -80,4 +81,58 @@ public function prosesDokumenResmi(User $user, Pengajuan $pengajuan): bool
+     {
+         return $user->role === Role::Operator && $pengajuan->status === StatusPengajuan::Disetujui;
+     }
++
++    /*
++    | Alur surat Tugas Akhir: surat pengantar (operator) -> surat balasan (mahasiswa, diperiksa operator)
++    | -> SK pembimbing (operator, hanya bila balasan diterima; lihat Pengajuan::hambatanSk()).
++    */
++
++    /** Operator menerbitkan surat pengantar TA, satu kali, setelah pengajuan lolos verifikasi. */
++    public function terbitkanSuratPengantar(User $user, Pengajuan $pengajuan): bool
++    {
++        return $user->role === Role::Operator
++            && $pengajuan->tahapSuratAktif()
++            && $pengajuan->suratPengantarTa() === null;
++    }
++
++    /** Surat pengantar boleh ditarik selama mahasiswa belum mengunggah surat balasan. */
++    public function hapusSuratPengantar(User $user, Pengajuan $pengajuan): bool
++    {
++        return $user->role === Role::Operator
++            && $pengajuan->tahapSuratAktif()
++            && $pengajuan->suratPengantarTa() !== null
++            && $pengajuan->suratBalasan->isEmpty();
++    }
++
++    /**
++     * Mahasiswa pemilik mengunggah surat balasan setelah surat pengantar terbit. Boleh mengunggah ulang
++     * selama belum diterima (menggantikan yang menunggu, atau memperbaiki yang diminta revisi).
++     */
++    public function unggahSuratBalasan(User $user, Pengajuan $pengajuan): bool
++    {
++        if ($user->role !== Role::Mahasiswa || (int) $pengajuan->mahasiswa_id !== (int) $user->id) {
++            return false;
++        }
++
++        if (! $pengajuan->tahapSuratAktif() || $pengajuan->suratPengantarTa() === null || $pengajuan->skPembimbing() !== null) {
++            return false;
++        }
++
++        return $pengajuan->balasanTerbaru()?->status !== StatusDokumen::Diterima;
++    }
++
++    /**
++     * Operator memeriksa surat balasan. Keputusan masih bisa diubah (mis. salah menerima)
++     * selama SK pembimbing belum terbit, sebab SK bergantung pada surat balasan yang diterima.
++     */
++    public function periksaSuratBalasan(User $user, Pengajuan $pengajuan): bool
++    {
++        if ($user->role !== Role::Operator || ! $pengajuan->tahapSuratAktif() || $pengajuan->skPembimbing() !== null) {
++            return false;
++        }
++
++        $balasan = $pengajuan->balasanTerbaru();
++
++        return $balasan !== null && $balasan->status !== StatusDokumen::Revisi;
++    }
+ }
+diff --git a/app/Policies/SuratBalasanPolicy.php b/app/Policies/SuratBalasanPolicy.php
+new file mode 100644
+index 0000000..6709c8c
+--- /dev/null
++++ b/app/Policies/SuratBalasanPolicy.php
+@@ -0,0 +1,18 @@
++<?php
++
++namespace App\Policies;
++
++use App\Models\Pengajuan;
++use App\Models\SuratBalasan;
++use App\Models\User;
++
++class SuratBalasanPolicy
++{
++    /** Mengikuti hak lihat pengajuan: mahasiswa pemilik, dosen pembimbing, operator. Admin tidak. */
++    public function view(User $user, SuratBalasan $balasan): bool
++    {
++        $pengajuan = $balasan->pengajuan;
++
++        return $pengajuan instanceof Pengajuan && $user->can('view', $pengajuan);
++    }
++}
+diff --git a/app/Providers/AppServiceProvider.php b/app/Providers/AppServiceProvider.php
+index a3a7c9b..3353a3f 100644
+--- a/app/Providers/AppServiceProvider.php
++++ b/app/Providers/AppServiceProvider.php
+@@ -5,9 +5,11 @@
+ use App\Models\DokumenPengajuan;
+ use App\Models\DokumenResmi;
+ use App\Models\Pengajuan;
++use App\Models\SuratBalasan;
+ use App\Policies\DokumenPengajuanPolicy;
+ use App\Policies\DokumenResmiPolicy;
+ use App\Policies\PengajuanPolicy;
++use App\Policies\SuratBalasanPolicy;
+ use Illuminate\Support\Facades\Gate;
+ use Illuminate\Support\ServiceProvider;
+ 
+@@ -23,5 +25,6 @@ public function boot(): void
+         Gate::policy(Pengajuan::class, PengajuanPolicy::class);
+         Gate::policy(DokumenPengajuan::class, DokumenPengajuanPolicy::class);
+         Gate::policy(DokumenResmi::class, DokumenResmiPolicy::class);
++        Gate::policy(SuratBalasan::class, SuratBalasanPolicy::class);
+     }
+ }
+diff --git a/app/Services/PengajuanWorkflow.php b/app/Services/PengajuanWorkflow.php
+index 5e54acb..d3cf1a2 100644
+--- a/app/Services/PengajuanWorkflow.php
++++ b/app/Services/PengajuanWorkflow.php
+@@ -2,6 +2,7 @@
+ 
+ namespace App\Services;
+ 
++use App\Enums\JenisPengajuan;
+ use App\Enums\Role;
+ use App\Enums\StatusDokumen;
+ use App\Enums\StatusPengajuan;
+@@ -227,6 +228,13 @@ public function arsipkan(Pengajuan $pengajuan, User $oleh, ?string $catatan = nu
+             ]);
+         }
+ 
++        // TA baru dianggap tuntas bila SK pembimbing sudah terbit (itu hasil akhir alur surat TA).
++        if ($pengajuan->jenis === JenisPengajuan::Ta && $pengajuan->skPembimbing() === null) {
++            throw ValidationException::withMessages([
++                'dokumen_resmi' => 'Terbitkan SK Pembimbing Tugas Akhir sebelum mengarsipkan.',
++            ]);
++        }
++
+         DB::transaction(function () use ($pengajuan, $oleh, $catatan) {
+             Arsip::create([
+                 'pengajuan_id' => $pengajuan->id,
+diff --git a/app/Services/SuratTaService.php b/app/Services/SuratTaService.php
+new file mode 100644
+index 0000000..81cee5b
+--- /dev/null
++++ b/app/Services/SuratTaService.php
+@@ -0,0 +1,148 @@
++<?php
++
++namespace App\Services;
++
++use App\Enums\JenisPengajuan;
++use App\Enums\StatusDokumen;
++use App\Models\DokumenResmi;
++use App\Models\Pengajuan;
++use App\Models\SuratBalasan;
++use App\Models\User;
++use App\Support\Aktivitas;
++use Carbon\CarbonInterface;
++use Illuminate\Http\UploadedFile;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Storage;
++use Illuminate\Support\Str;
++use Illuminate\Validation\ValidationException;
++
++/**
++ * Alur surat Tugas Akhir. Hak melakukan tiap langkah diputuskan PengajuanPolicy sebelum
++ * kelas ini dipanggil; kelas ini mengerjakan penyimpanan berkas, pencatatan, dan log.
++ *
++ *   surat pengantar (operator) -> surat balasan (mahasiswa) -> pemeriksaan operator -> SK pembimbing
++ */
++class SuratTaService
++{
++    /** Operator menerbitkan surat pengantar TA sebagai dokumen resmi. */
++    public function terbitkanPengantar(Pengajuan $pengajuan, User $operator, string $nomor, string|CarbonInterface $tanggal, UploadedFile $berkas): DokumenResmi
++    {
++        $path = $berkas->store("dokumen-resmi/{$pengajuan->id}", 'local');
++
++        $dokumen = DokumenResmi::create([
++            'pengajuan_id' => $pengajuan->id,
++            'diunggah_oleh' => $operator->id,
++            'jenis' => JenisPengajuan::SURAT_PENGANTAR_TA,
++            'nomor' => $nomor,
++            'tanggal' => $tanggal,
++            'nama_asli' => Str::limit(basename($berkas->getClientOriginalName()), 200, ''),
++            'path' => $path,
++            'mime' => $berkas->getMimeType(),
++            'ukuran' => $berkas->getSize(),
++        ]);
++
++        $pengajuan->unsetRelation('dokumenResmi');
++
++        Aktivitas::catat(
++            'surat-pengantar.terbit',
++            "Menerbitkan surat pengantar TA nomor {$nomor} untuk pengajuan TA #{$pengajuan->id}",
++            $dokumen,
++            $operator,
++        );
++
++        return $dokumen;
++    }
++
++    /** Menarik surat pengantar (hanya selama belum ada surat balasan; dijaga policy). */
++    public function hapusPengantar(Pengajuan $pengajuan, DokumenResmi $pengantar, User $operator): void
++    {
++        Storage::disk('local')->delete($pengantar->path);
++        $pengantar->delete();
++        $pengajuan->unsetRelation('dokumenResmi');
++
++        Aktivitas::catat(
++            'surat-pengantar.hapus',
++            "Menarik surat pengantar TA nomor {$pengantar->nomor} dari pengajuan TA #{$pengajuan->id}",
++            $pengajuan,
++            $operator,
++        );
++    }
++
++    /**
++     * Mahasiswa mengunggah surat balasan. Berkas lama tidak dihapus: versi baru menjadi versi terbaru
++     * dan yang lama tersimpan sebagai jejak.
++     */
++    public function unggahBalasan(Pengajuan $pengajuan, User $mahasiswa, UploadedFile $berkas): SuratBalasan
++    {
++        $path = $berkas->store("surat-balasan/{$pengajuan->id}", 'local');
++
++        $balasan = DB::transaction(function () use ($pengajuan, $mahasiswa, $berkas, $path) {
++            $versi = (int) SuratBalasan::where('pengajuan_id', $pengajuan->id)->max('versi') + 1;
++
++            SuratBalasan::where('pengajuan_id', $pengajuan->id)->update(['terbaru' => false]);
++
++            return SuratBalasan::create([
++                'pengajuan_id' => $pengajuan->id,
++                'diunggah_oleh' => $mahasiswa->id,
++                'versi' => $versi,
++                'terbaru' => true,
++                'nama_asli' => Str::limit(basename($berkas->getClientOriginalName()), 200, ''),
++                'path' => $path,
++                'mime' => $berkas->getMimeType(),
++                'ukuran' => $berkas->getSize(),
++                'status' => StatusDokumen::Menunggu,
++            ]);
++        });
++
++        $pengajuan->unsetRelation('suratBalasan');
++
++        Aktivitas::catat(
++            'surat-balasan.unggah',
++            "Mengunggah surat balasan TA (versi {$balasan->versi}) untuk pengajuan TA #{$pengajuan->id}",
++            $balasan,
++            $mahasiswa,
++        );
++
++        return $balasan;
++    }
++
++    /**
++     * Operator menerima atau meminta revisi surat balasan.
++     *
++     * @param  int  $balasanId  id surat balasan yang sedang dilihat operator; ditolak bila mahasiswa sudah menggantinya
++     */
++    public function periksaBalasan(Pengajuan $pengajuan, User $operator, int $balasanId, StatusDokumen $keputusan, ?string $catatan): SuratBalasan
++    {
++        $balasan = $pengajuan->balasanTerbaru();
++
++        if ($balasan === null || (int) $balasan->id !== $balasanId) {
++            throw ValidationException::withMessages([
++                'keputusan' => 'Surat balasan sudah berubah (mahasiswa mengunggah versi baru). Muat ulang halaman lalu periksa lagi.',
++            ]);
++        }
++
++        if ($keputusan === StatusDokumen::Revisi && blank($catatan)) {
++            throw ValidationException::withMessages([
++                'catatan_balasan' => 'Catatan revisi wajib diisi.',
++            ]);
++        }
++
++        $balasan->update([
++            'status' => $keputusan,
++            'diperiksa_oleh' => $operator->id,
++            'diperiksa_at' => now(),
++            'catatan' => $keputusan === StatusDokumen::Revisi ? $catatan : null,
++        ]);
++
++        $pengajuan->unsetRelation('suratBalasan');
++
++        Aktivitas::catat(
++            'surat-balasan.periksa',
++            "Surat balasan TA (versi {$balasan->versi}) pengajuan TA #{$pengajuan->id}: {$keputusan->label()}",
++            $balasan,
++            $operator,
++        );
++
++        return $balasan;
++    }
++}
+diff --git a/database/migrations/2026_10_26_000001_create_surat_balasan_table.php b/database/migrations/2026_10_26_000001_create_surat_balasan_table.php
+new file mode 100644
+index 0000000..2818ae4
+--- /dev/null
++++ b/database/migrations/2026_10_26_000001_create_surat_balasan_table.php
+@@ -0,0 +1,37 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\Schema;
++
++return new class extends Migration
++{
++    public function up(): void
++    {
++        // Surat balasan Tugas Akhir: diunggah mahasiswa setelah surat pengantar terbit, diperiksa operator.
++        Schema::create('surat_balasan', function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('pengajuan_id')->constrained('pengajuan')->cascadeOnDelete();
++            $table->foreignId('diunggah_oleh')->constrained('users')->restrictOnDelete();
++            $table->unsignedInteger('versi')->default(1);
++            // Hanya versi terbaru yang bernilai true; versi lama disimpan sebagai jejak.
++            $table->boolean('terbaru')->default(true);
++            $table->string('nama_asli');
++            $table->string('path');
++            $table->string('mime', 100)->nullable();
++            $table->unsignedBigInteger('ukuran')->default(0);
++            $table->string('status', 20)->default('menunggu');
++            $table->foreignId('diperiksa_oleh')->nullable()->constrained('users')->nullOnDelete();
++            $table->timestamp('diperiksa_at')->nullable();
++            $table->text('catatan')->nullable();
++            $table->timestamps();
++
++            $table->index(['pengajuan_id', 'terbaru'], 'surat_balasan_terbaru_index');
++        });
++    }
++
++    public function down(): void
++    {
++        Schema::dropIfExists('surat_balasan');
++    }
++};
+diff --git a/resources/views/components/pasir/icon.blade.php b/resources/views/components/pasir/icon.blade.php
+index 6596a51..e521c33 100644
+--- a/resources/views/components/pasir/icon.blade.php
++++ b/resources/views/components/pasir/icon.blade.php
+@@ -96,6 +96,9 @@
+         @case('chevron-down')
+             <path d="m6 9 6 6 6-6" />
+             @break
++        @case('check')
++            <path d="m5 12.5 4.5 4.5L19 7.5" />
++            @break
+         @case('logout')
+             <path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 8l-4 4 4 4M6 12h9" />
+             @break
+diff --git a/resources/views/dashboard/mahasiswa.blade.php b/resources/views/dashboard/mahasiswa.blade.php
+index e4fa6eb..2acd065 100644
+--- a/resources/views/dashboard/mahasiswa.blade.php
++++ b/resources/views/dashboard/mahasiswa.blade.php
+@@ -40,6 +40,24 @@
+                             <p class="mt-1.5 text-xs text-ink-600">{{ $p->keteranganPembimbing() }}</p>
+                         @endif
+                     </div>
++
++                    {{-- TA: posisi surat pengantar, surat balasan, dan SK pembimbing --}}
++                    @if ($p && $p->tampilkanSuratTa())
++                        <div class="mt-4 border-t border-sand-200 pt-3.5">
++                            <p class="sub-label">Surat TA</p>
++                            <ul class="mt-2.5 space-y-2.5">
++                                @foreach ($p->tahapSurat() as $t)
++                                    <li class="flex items-start gap-2.5 text-sm">
++                                        <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full {{ $t['status']->titik() }}" aria-hidden="true"></span>
++                                        <span class="min-w-0">
++                                            <span class="block font-medium leading-snug text-ink-900">{{ $t['judul'] }}</span>
++                                            <span class="block text-xs text-ink-600">{{ $t['label'] }}</span>
++                                        </span>
++                                    </li>
++                                @endforeach
++                            </ul>
++                        </div>
++                    @endif
+                 </div>
+                 @if ($p)
+                     <x-pasir.icon name="chevron-right" class="absolute right-5 top-6 h-4 w-4 text-ink-500 transition group-hover:translate-x-0.5" />
+@@ -72,6 +90,20 @@
+         <x-stat label="Selesai" :nilai="$selesai" hint="Sudah diarsipkan" />
+     </div>
+ 
++    @if ($suratPerluTindakan->isNotEmpty())
++        <div class="alert alert-info mt-6">
++            <p class="font-medium">Ada surat Tugas Akhir yang menunggu Anda.</p>
++            <ul class="mt-1 list-disc space-y-0.5 pl-5">
++                @foreach ($suratPerluTindakan as $p)
++                    <li>
++                        <a href="{{ route('mahasiswa.pengajuan.show', $p) }}#surat-ta" class="underline">{{ $p->judul }}</a>:
++                        {{ $p->balasanTerbaru() ? 'surat balasan perlu direvisi dan diunggah ulang' : 'unduh surat pengantar lalu unggah surat balasan' }}
++                    </li>
++                @endforeach
++            </ul>
++        </div>
++    @endif
++
+     @if ($perluRevisi->isNotEmpty())
+         <div class="alert alert-peringatan mt-6">
+             <p class="font-medium">Ada pengajuan yang perlu diperbaiki.</p>
+diff --git a/resources/views/dashboard/operator.blade.php b/resources/views/dashboard/operator.blade.php
+index a54b7ae..1267b5a 100644
+--- a/resources/views/dashboard/operator.blade.php
++++ b/resources/views/dashboard/operator.blade.php
+@@ -9,9 +9,11 @@
+ 
+     <x-page-header judul="Dashboard" sub="Ringkasan proses administrasi KP dan TA." />
+ 
+-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
++    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+         <x-stat label="Perlu Pembimbing" :nilai="$jumlahPerluPembimbing" hint="Belum ada dosen pembimbing atau ditolak dosen" :href="route('operator.pengajuan.index', ['pembimbing' => 'perlu'])" />
+         <x-stat label="Perlu Verifikasi" :nilai="$hitung('diajukan')" hint="Menunggu pemeriksaan administrasi" :href="route('operator.verifikasi.index')" />
++        <x-stat label="Surat Pengantar TA" :nilai="$jumlahPerluPengantar" hint="TA terverifikasi yang belum diterbitkan suratnya" :href="route('operator.dokumen-resmi.index')" />
++        <x-stat label="Surat Balasan TA" :nilai="$jumlahBalasanMenunggu" hint="Diunggah mahasiswa, menunggu diperiksa" :href="route('operator.dokumen-resmi.index')" />
+         <x-stat label="Diperiksa Dosen" :nilai="$hitung('menunggu_dosen')" />
+         <x-stat label="Dalam Revisi" :nilai="$hitung('revisi_administrasi') + $hitung('revisi_akademik')" hint="Menunggu perbaikan mahasiswa" />
+         <x-stat label="Perlu Dokumen Resmi" :nilai="$hitung('disetujui')" hint="Sudah disetujui dosen" :href="route('operator.dokumen-resmi.index')" />
+@@ -48,6 +50,34 @@
+             @endif
+         </section>
+ 
++        <section class="card">
++            <div class="card-header">
++                <h2 class="font-semibold text-slate-900">Surat TA Perlu Diproses</h2>
++                <a href="{{ route('operator.dokumen-resmi.index') }}" class="tautan text-sm">Lihat semua</a>
++            </div>
++            @if ($antreanSurat->isEmpty())
++                <x-empty pesan="Tidak ada surat pengantar atau surat balasan TA yang menunggu." />
++            @else
++                <div class="overflow-x-auto">
++                    <table class="tabel">
++                        <thead><tr><th>Mahasiswa</th><th>Langkah</th><th></th></tr></thead>
++                        <tbody>
++                            @foreach ($antreanSurat as $butir)
++                                <tr>
++                                    <td>
++                                        <div class="font-medium text-slate-900">{{ $butir['pengajuan']->mahasiswa->name }}</div>
++                                        <div class="text-xs text-slate-500">{{ $butir['pengajuan']->mahasiswa->nomor_induk }} &middot; {{ $butir['pengajuan']->mahasiswa->programStudi?->nama ?? '-' }}</div>
++                                    </td>
++                                    <td>{{ $butir['langkah'] }}</td>
++                                    <td class="text-right"><a href="{{ route('operator.dokumen-resmi.show', $butir['pengajuan']) }}" class="btn btn-primary btn-sm">Buka</a></td>
++                                </tr>
++                            @endforeach
++                        </tbody>
++                    </table>
++                </div>
++            @endif
++        </section>
++
+         <section class="card">
+             <div class="card-header">
+                 <h2 class="font-semibold text-slate-900">Menunggu Dokumen Resmi</h2>
+@@ -77,7 +107,7 @@
+             @endif
+         </section>
+ 
+-        <section class="card xl:col-span-2">
++        <section class="card">
+             <div class="card-header">
+                 <h2 class="font-semibold text-slate-900">Perlu Penetapan Dosen Pembimbing</h2>
+                 <a href="{{ route('operator.pengajuan.index', ['pembimbing' => 'perlu']) }}" class="tautan text-sm">Lihat semua</a>
+diff --git a/resources/views/mahasiswa/berkas/index.blade.php b/resources/views/mahasiswa/berkas/index.blade.php
+index eb59dbd..9f56130 100644
+--- a/resources/views/mahasiswa/berkas/index.blade.php
++++ b/resources/views/mahasiswa/berkas/index.blade.php
+@@ -32,6 +32,39 @@
+         @endif
+     </section>
+ 
++    @if ($balasan->isNotEmpty())
++        <section class="card mb-6">
++            <div class="card-header"><h2 class="font-semibold text-slate-900">Surat Balasan TA yang Diunggah</h2></div>
++            <div class="overflow-x-auto">
++                <table class="tabel">
++                    <thead><tr><th>Berkas</th><th>Pengajuan</th><th>Status</th><th>Diunggah</th><th></th></tr></thead>
++                    <tbody>
++                        @foreach ($balasan as $b)
++                            <tr>
++                                <td>
++                                    {{ $b->nama_asli }}
++                                    <div class="text-xs text-slate-500">
++                                        {{ $b->ukuranManusia() }} &middot; versi {{ $b->versi }}@unless ($b->terbaru) (versi lama)@endunless
++                                    </div>
++                                </td>
++                                <td><a href="{{ route('mahasiswa.pengajuan.show', $b->pengajuan) }}" class="tautan">{{ $b->pengajuan->jenis->singkat() }}</a></td>
++                                <td>
++                                    <span class="badge {{ $b->status->badge() }}">{{ $b->status->label() }}</span>
++                                    @if ($b->catatan)<div class="mt-1 text-xs text-slate-500">{{ $b->catatan }}</div>@endif
++                                </td>
++                                <td class="whitespace-nowrap">{{ $b->created_at->translatedFormat('d M Y') }}</td>
++                                <td class="whitespace-nowrap text-right">
++                                    <a href="{{ route('berkas.balasan', ['suratBalasan' => $b]) }}" target="_blank" rel="noopener" class="tautan">Lihat</a>
++                                    <a href="{{ route('berkas.balasan', ['suratBalasan' => $b, 'unduh' => 1]) }}" class="tautan ml-3">Unduh</a>
++                                </td>
++                            </tr>
++                        @endforeach
++                    </tbody>
++                </table>
++            </div>
++        </section>
++    @endif
++
+     <section class="card">
+         <div class="card-header"><h2 class="font-semibold text-slate-900">Dokumen Persyaratan yang Diunggah</h2></div>
+         @if ($dokumen->isEmpty())
+diff --git a/resources/views/mahasiswa/pengajuan/show.blade.php b/resources/views/mahasiswa/pengajuan/show.blade.php
+index a49fe61..a9e785f 100644
+--- a/resources/views/mahasiswa/pengajuan/show.blade.php
++++ b/resources/views/mahasiswa/pengajuan/show.blade.php
+@@ -20,6 +20,9 @@
+ 
+     <div class="grid gap-6 xl:grid-cols-3">
+         <div class="space-y-6 xl:col-span-2">
++            {{-- TA: surat pengantar, surat balasan, dan SK pembimbing (kosong untuk KP dan untuk TA yang belum diverifikasi) --}}
++            @include('partials.pengajuan.surat-ta')
++
+             @include('partials.pengajuan.dokumen', ['unggah' => $bolehUbah])
+ 
+             @if ($bolehUbah)
+@@ -50,7 +53,11 @@
+             @endif
+ 
+             @if ($pengajuan->dokumenResmi->isNotEmpty())
+-                @include('partials.pengajuan.dokumen-resmi')
++                {{-- Surat pengantar dan SK TA sudah tampil di kartu "Surat Tugas Akhir" di atas. --}}
++                @include('partials.pengajuan.dokumen-resmi', [
++                    'kecuali' => $pengajuan->tampilkanSuratTa() ? [\App\Enums\JenisPengajuan::SURAT_PENGANTAR_TA, \App\Enums\JenisPengajuan::SK_TA] : [],
++                    'sembunyikanBilaKosong' => true,
++                ])
+             @endif
+         </div>
+ 
+diff --git a/resources/views/operator/arsip/show.blade.php b/resources/views/operator/arsip/show.blade.php
+index 29f4949..9fd70b1 100644
+--- a/resources/views/operator/arsip/show.blade.php
++++ b/resources/views/operator/arsip/show.blade.php
+@@ -12,7 +12,11 @@
+ 
+     <div class="grid gap-6 xl:grid-cols-3">
+         <div class="space-y-6 xl:col-span-2">
+-            @include('partials.pengajuan.dokumen-resmi')
++            @include('partials.pengajuan.surat-ta')
++            @include('partials.pengajuan.dokumen-resmi', [
++                'kecuali' => $pengajuan->tampilkanSuratTa() ? [\App\Enums\JenisPengajuan::SURAT_PENGANTAR_TA, \App\Enums\JenisPengajuan::SK_TA] : [],
++                'sembunyikanBilaKosong' => true,
++            ])
+             @include('partials.pengajuan.dokumen')
+         </div>
+ 
+diff --git a/resources/views/operator/dokumen-resmi/index.blade.php b/resources/views/operator/dokumen-resmi/index.blade.php
+index b044025..0bc9042 100644
+--- a/resources/views/operator/dokumen-resmi/index.blade.php
++++ b/resources/views/operator/dokumen-resmi/index.blade.php
+@@ -3,7 +3,44 @@
+ @section('judul', 'Dokumen Resmi')
+ 
+ @section('konten')
+-    <x-page-header judul="Dokumen Resmi" sub="Proses dokumen resmi (misalnya SK TA) untuk pengajuan yang sudah disetujui, lalu arsipkan." />
++    <x-page-header judul="Dokumen Resmi" sub="Surat pengantar dan surat balasan TA, SK pembimbing, dan dokumen resmi lain untuk pengajuan yang sudah disetujui, lalu arsipkan." />
++
++    <section class="card mb-6">
++        <div class="card-header"><h2 class="font-semibold text-slate-900">Surat TA Perlu Diproses</h2></div>
++        @if ($perluPengantar->isEmpty() && $perluPeriksaBalasan->isEmpty())
++            <x-empty pesan="Tidak ada surat pengantar yang perlu diterbitkan atau surat balasan yang perlu diperiksa." />
++        @else
++            <div class="overflow-x-auto">
++                <table class="tabel">
++                    <thead><tr><th>Mahasiswa</th><th>Judul</th><th>Langkah</th><th></th></tr></thead>
++                    <tbody>
++                        @foreach ($perluPeriksaBalasan as $p)
++                            <tr>
++                                <td>
++                                    <div class="font-medium text-slate-900">{{ $p->mahasiswa->name }}</div>
++                                    <div class="text-xs text-slate-500">{{ $p->mahasiswa->nomor_induk }}</div>
++                                </td>
++                                <td>{{ $p->judul }}</td>
++                                <td><span class="badge bg-amber-50 text-amber-800 ring-amber-200">Periksa surat balasan</span></td>
++                                <td class="text-right"><a href="{{ route('operator.dokumen-resmi.show', $p) }}" class="btn btn-primary btn-sm">Periksa</a></td>
++                            </tr>
++                        @endforeach
++                        @foreach ($perluPengantar as $p)
++                            <tr>
++                                <td>
++                                    <div class="font-medium text-slate-900">{{ $p->mahasiswa->name }}</div>
++                                    <div class="text-xs text-slate-500">{{ $p->mahasiswa->nomor_induk }}</div>
++                                </td>
++                                <td>{{ $p->judul }}</td>
++                                <td><span class="badge bg-sky-50 text-sky-700 ring-sky-200">Terbitkan surat pengantar</span></td>
++                                <td class="text-right"><a href="{{ route('operator.dokumen-resmi.show', $p) }}" class="btn btn-primary btn-sm">Terbitkan</a></td>
++                            </tr>
++                        @endforeach
++                    </tbody>
++                </table>
++            </div>
++        @endif
++    </section>
+ 
+     <section class="card mb-6">
+         <div class="card-header"><h2 class="font-semibold text-slate-900">Perlu Diproses</h2></div>
+@@ -12,7 +49,7 @@
+         @else
+             <div class="overflow-x-auto">
+                 <table class="tabel">
+-                    <thead><tr><th>Mahasiswa</th><th>Jenis</th><th>Judul</th><th>Pembimbing</th><th></th></tr></thead>
++                    <thead><tr><th>Mahasiswa</th><th>Jenis</th><th>Judul</th><th>Pembimbing</th><th>Keterangan</th><th></th></tr></thead>
+                     <tbody>
+                         @foreach ($perluDiproses as $p)
+                             <tr>
+@@ -23,6 +60,7 @@
+                                 <td>{{ $p->jenis->singkat() }}</td>
+                                 <td>{{ $p->judul }}</td>
+                                 <td>{{ $p->ringkasanPembimbing() }}</td>
++                                <td class="text-xs text-slate-500">{{ $p->jenis === \App\Enums\JenisPengajuan::Ta ? ($p->hambatanSk() ?? 'SK pembimbing siap diterbitkan.') : 'Siap diproses.' }}</td>
+                                 <td class="text-right"><a href="{{ route('operator.dokumen-resmi.show', $p) }}" class="btn btn-primary btn-sm">Proses</a></td>
+                             </tr>
+                         @endforeach
+diff --git a/resources/views/operator/dokumen-resmi/show.blade.php b/resources/views/operator/dokumen-resmi/show.blade.php
+index 181c24e..d6c7dcf 100644
+--- a/resources/views/operator/dokumen-resmi/show.blade.php
++++ b/resources/views/operator/dokumen-resmi/show.blade.php
+@@ -3,7 +3,17 @@
+ @section('judul', 'Dokumen Resmi')
+ 
+ @section('konten')
+-    @php($bisaProses = auth()->user()->can('prosesDokumenResmi', $pengajuan))
++    @php
++        $pengguna = auth()->user();
++        $bisaProses = $pengguna->can('prosesDokumenResmi', $pengajuan);
++        $ta = $pengajuan->jenis === \App\Enums\JenisPengajuan::Ta;
++        $suratTa = $pengajuan->tampilkanSuratTa();
++        // Alasan SK pembimbing belum boleh terbit (null bila boleh). Hanya relevan untuk TA.
++        $hambatanSk = $ta ? $pengajuan->hambatanSk() : null;
++        $balasan = $pengajuan->balasanTerbaru();
++        // Pada TA, surat pengantar diurus di kartu tersendiri dan tidak lewat formulir umum.
++        $kecuali = $ta ? [\App\Enums\JenisPengajuan::SURAT_PENGANTAR_TA] : [];
++    @endphp
+ 
+     <x-page-header :judul="'Dokumen Resmi: '.$pengajuan->judul"
+                    :sub="$pengajuan->mahasiswa->name.' ('.($pengajuan->mahasiswa->nomor_induk ?? '-').')'">
+@@ -14,21 +24,117 @@
+ 
+     <div class="grid gap-6 xl:grid-cols-3">
+         <div class="space-y-6 xl:col-span-2">
+-            @include('partials.pengajuan.dokumen-resmi', ['hapus' => $bisaProses])
++            {{-- Alur surat TA: ringkasan tiga langkah, lalu tindakan operator di setiap langkah --}}
++            @include('partials.pengajuan.surat-ta')
++
++            @can('terbitkanSuratPengantar', $pengajuan)
++                <section class="card">
++                    <div class="card-header"><h2 class="font-semibold text-slate-900">Terbitkan Surat Pengantar TA</h2></div>
++                    <form method="POST" action="{{ route('operator.dokumen-resmi.surat-pengantar', $pengajuan) }}" enctype="multipart/form-data" class="card-body grid gap-4 sm:grid-cols-2">
++                        @csrf
++                        <p class="text-sm text-slate-600 sm:col-span-2">
++                            Unggah surat pengantar yang sudah ditandatangani (PDF). Setelah terbit, mahasiswa dapat mengunduhnya dan mengunggah surat balasan dari instansi.
++                        </p>
++                        <div>
++                            <label for="nomor_pengantar" class="label">Nomor surat</label>
++                            <input id="nomor_pengantar" name="nomor_pengantar" type="text" value="{{ old('nomor_pengantar') }}" required class="input">
++                            @error('nomor_pengantar')<p class="galat">{{ $message }}</p>@enderror
++                        </div>
++                        <div>
++                            <label for="tanggal_pengantar" class="label">Tanggal surat</label>
++                            <input id="tanggal_pengantar" name="tanggal_pengantar" type="date" value="{{ old('tanggal_pengantar', now()->toDateString()) }}" required class="input">
++                            @error('tanggal_pengantar')<p class="galat">{{ $message }}</p>@enderror
++                        </div>
++                        <div class="sm:col-span-2">
++                            <label for="berkas_pengantar" class="label">Berkas (PDF, maks. 10 MB)</label>
++                            <input id="berkas_pengantar" name="berkas_pengantar" type="file" accept=".pdf" required
++                                   class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-sand-200 file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink-800 hover:file:bg-sand-300">
++                            @error('berkas_pengantar')<p class="galat">{{ $message }}</p>@enderror
++                        </div>
++                        <div class="sm:col-span-2">
++                            <button type="submit" class="btn btn-primary"><x-icon name="upload" class="h-4 w-4" />Terbitkan surat pengantar</button>
++                        </div>
++                    </form>
++                </section>
++            @endcan
++
++            @can('hapusSuratPengantar', $pengajuan)
++                <section class="card">
++                    <div class="card-body flex flex-wrap items-center justify-between gap-3">
++                        <p class="max-w-xl text-sm text-slate-600">
++                            Salah unggah atau salah nomor? Surat pengantar dapat ditarik selama mahasiswa belum mengunggah surat balasan.
++                        </p>
++                        <form method="POST" action="{{ route('operator.dokumen-resmi.destroy', [$pengajuan, $pengajuan->suratPengantarTa()]) }}" data-konfirmasi="Tarik surat pengantar ini? Anda dapat menerbitkan yang baru sesudahnya.">
++                            @csrf
++                            @method('DELETE')
++                            <button type="submit" class="btn btn-secondary">Tarik surat pengantar</button>
++                        </form>
++                    </div>
++                </section>
++            @endcan
++
++            @can('periksaSuratBalasan', $pengajuan)
++                <section class="card" id="periksa-balasan">
++                    <div class="card-header"><h2 class="font-semibold text-slate-900">Periksa Surat Balasan</h2></div>
++                    <form method="POST" action="{{ route('operator.dokumen-resmi.surat-balasan', $pengajuan) }}" class="card-body space-y-4">
++                        @csrf
++                        <input type="hidden" name="balasan_id" value="{{ $balasan->id }}">
++
++                        <p class="text-sm text-slate-600">
++                            Versi {{ $balasan->versi }}, diunggah {{ $balasan->created_at->translatedFormat('d M Y H:i') }}:
++                            <a href="{{ route('berkas.balasan', ['suratBalasan' => $balasan]) }}" target="_blank" rel="noopener" class="tautan">{{ $balasan->nama_asli }}</a>.
++                            SK pembimbing baru dapat diterbitkan setelah surat balasan diterima.
++                        </p>
++                        @if ($balasan->status === \App\Enums\StatusDokumen::Diterima)
++                            <p class="text-sm text-emerald-700">Surat balasan ini sudah diterima. Keputusan masih dapat diubah selama SK pembimbing belum terbit.</p>
++                        @endif
++
++                        <fieldset>
++                            <legend class="label">Keputusan</legend>
++                            <div class="flex flex-wrap gap-5 text-sm">
++                                <label class="inline-flex items-center gap-2">
++                                    <input type="radio" name="keputusan" value="diterima" @checked(old('keputusan') === 'diterima') required class="h-4 w-4 accent-ink-800">
++                                    Terima
++                                </label>
++                                <label class="inline-flex items-center gap-2">
++                                    <input type="radio" name="keputusan" value="revisi" @checked(old('keputusan') === 'revisi') required class="h-4 w-4 accent-ink-800">
++                                    Minta revisi
++                                </label>
++                            </div>
++                            @error('keputusan')<p class="galat">{{ $message }}</p>@enderror
++                        </fieldset>
++
++                        <div>
++                            <label for="catatan_balasan" class="label">Catatan untuk mahasiswa (wajib bila meminta revisi)</label>
++                            <textarea id="catatan_balasan" name="catatan_balasan" rows="2" class="input">{{ old('catatan_balasan') }}</textarea>
++                            @error('catatan_balasan')<p class="galat">{{ $message }}</p>@enderror
++                        </div>
++
++                        <button type="submit" class="btn btn-primary">Simpan keputusan</button>
++                    </form>
++                </section>
++            @endcan
++
++            @include('partials.pengajuan.dokumen-resmi', ['hapus' => $bisaProses, 'kecuali' => $kecuali, 'sembunyikanBilaKosong' => $ta && $suratTa])
+ 
+             @if ($bisaProses)
+                 <section class="card">
+-                    <div class="card-header"><h2 class="font-semibold text-slate-900">Unggah Dokumen Resmi</h2></div>
++                    <div class="card-header"><h2 class="font-semibold text-slate-900">{{ $ta ? 'Terbitkan SK Pembimbing / Dokumen Lain' : 'Unggah Dokumen Resmi' }}</h2></div>
+                     <form method="POST" action="{{ route('operator.dokumen-resmi.store', $pengajuan) }}" enctype="multipart/form-data" class="card-body grid gap-4 sm:grid-cols-2">
+                         @csrf
+                         <div>
+                             <label for="jenis" class="label">Jenis dokumen</label>
+                             <select id="jenis" name="jenis" required class="input">
+                                 @foreach ($pengajuan->jenis->jenisDokumenResmi() as $kode => $label)
+-                                    <option value="{{ $kode }}" @selected(old('jenis') === $kode)>{{ $label }}</option>
++                                    @continue(in_array($kode, $kecuali, true))
++                                    @php($terkunci = $kode === \App\Enums\JenisPengajuan::SK_TA && $hambatanSk !== null)
++                                    <option value="{{ $kode }}" @disabled($terkunci) @selected(old('jenis') === $kode)>{{ $label }}{{ $terkunci ? ' (belum dapat diterbitkan)' : '' }}</option>
+                                 @endforeach
+                             </select>
+                             @error('jenis')<p class="galat">{{ $message }}</p>@enderror
++                            @if ($hambatanSk !== null)
++                                <p class="hint">SK pembimbing belum dapat diterbitkan. {{ $hambatanSk }}</p>
++                            @endif
+                         </div>
+                         <div>
+                             <label for="nomor" class="label">Nomor dokumen</label>
+@@ -43,7 +149,7 @@
+                         <div>
+                             <label for="berkas" class="label">Berkas (PDF, maks. 10 MB)</label>
+                             <input id="berkas" name="berkas" type="file" accept=".pdf" required
+-                                   class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-navy-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-navy-700 hover:file:bg-navy-100">
++                                   class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-sand-200 file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink-800 hover:file:bg-sand-300">
+                             @error('berkas')<p class="galat">{{ $message }}</p>@enderror
+                         </div>
+                         <div class="sm:col-span-2">
+@@ -52,6 +158,7 @@ class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border
+                     </form>
+                 </section>
+ 
++                @php($belumBisaArsip = $pengajuan->dokumenResmi->isEmpty() || ($ta && $pengajuan->skPembimbing() === null))
+                 <section class="card">
+                     <div class="card-header"><h2 class="font-semibold text-slate-900">Arsipkan Berkas Final</h2></div>
+                     <form method="POST" action="{{ route('operator.dokumen-resmi.arsipkan', $pengajuan) }}" class="card-body space-y-4"
+@@ -64,10 +171,12 @@ class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border
+                             <label for="catatan" class="label">Catatan arsip (opsional)</label>
+                             <textarea id="catatan" name="catatan" rows="2" class="input">{{ old('catatan') }}</textarea>
+                         </div>
+-                        <button type="submit" class="btn btn-primary" @disabled($pengajuan->dokumenResmi->isEmpty())>
++                        <button type="submit" class="btn btn-primary" @disabled($belumBisaArsip)>
+                             <x-icon name="archive" class="h-4 w-4" />Arsipkan
+                         </button>
+-                        @if ($pengajuan->dokumenResmi->isEmpty())
++                        @if ($ta && $pengajuan->skPembimbing() === null)
++                            <p class="hint">Terbitkan SK Pembimbing Tugas Akhir terlebih dahulu.</p>
++                        @elseif ($pengajuan->dokumenResmi->isEmpty())
+                             <p class="hint">Unggah minimal satu dokumen resmi terlebih dahulu.</p>
+                         @endif
+                     </form>
+@@ -76,6 +185,11 @@ class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border
+                 <div class="alert alert-info">
+                     Pengajuan ini sudah diarsipkan. <a href="{{ route('operator.arsip.show', $pengajuan) }}" class="underline">Buka di arsip</a>.
+                 </div>
++            @elseif ($ta && $suratTa)
++                <div class="alert alert-info">
++                    SK pembimbing dan arsip baru dapat diproses setelah pengajuan disetujui dosen (status saat ini: {{ $pengajuan->status->label() }}).
++                    Surat pengantar dan surat balasan sudah bisa dikerjakan sekarang.
++                </div>
+             @else
+                 <div class="alert alert-info">
+                     Dokumen resmi baru dapat diproses setelah pengajuan disetujui dosen (status saat ini: {{ $pengajuan->status->label() }}).
+diff --git a/resources/views/operator/pengajuan/show.blade.php b/resources/views/operator/pengajuan/show.blade.php
+index 520e026..bb3a9f8 100644
+--- a/resources/views/operator/pengajuan/show.blade.php
++++ b/resources/views/operator/pengajuan/show.blade.php
+@@ -13,6 +13,9 @@
+             @can('prosesDokumenResmi', $pengajuan)
+                 <a href="{{ route('operator.dokumen-resmi.show', $pengajuan) }}" class="btn btn-primary">Proses Dokumen Resmi</a>
+             @endcan
++            @if ($pengajuan->tahapSuratAktif() && ! auth()->user()->can('prosesDokumenResmi', $pengajuan))
++                <a href="{{ route('operator.dokumen-resmi.show', $pengajuan) }}" class="btn btn-primary">Kelola Surat TA</a>
++            @endif
+             @if ($pengajuan->status === \App\Enums\StatusPengajuan::Diarsipkan)
+                 <a href="{{ route('operator.arsip.show', $pengajuan) }}" class="btn btn-primary">Lihat di Arsip</a>
+             @endif
+@@ -96,10 +99,15 @@ class="h-4 w-4 accent-navy-700">
+                 </section>
+             @endcan
+ 
++            @include('partials.pengajuan.surat-ta')
++
+             @include('partials.pengajuan.dokumen')
+ 
+             @if ($pengajuan->dokumenResmi->isNotEmpty())
+-                @include('partials.pengajuan.dokumen-resmi')
++                @include('partials.pengajuan.dokumen-resmi', [
++                    'kecuali' => $pengajuan->tampilkanSuratTa() ? [\App\Enums\JenisPengajuan::SURAT_PENGANTAR_TA, \App\Enums\JenisPengajuan::SK_TA] : [],
++                    'sembunyikanBilaKosong' => true,
++                ])
+             @endif
+         </div>
+ 
+diff --git a/resources/views/partials/pengajuan/dokumen-resmi.blade.php b/resources/views/partials/pengajuan/dokumen-resmi.blade.php
+index abdac6f..edb6ccf 100644
+--- a/resources/views/partials/pengajuan/dokumen-resmi.blade.php
++++ b/resources/views/partials/pengajuan/dokumen-resmi.blade.php
+@@ -1,19 +1,25 @@
+ {{--
+     Membutuhkan: $pengajuan (relasi dokumenResmi sudah dimuat)
+     Opsional: $hapus (true bila operator boleh menghapus dokumen resmi)
++              $kecuali (kode jenis dokumen yang tidak ditampilkan di sini karena sudah tampil di kartu lain, mis. surat TA)
++              $sembunyikanBilaKosong (true: kartu tidak ditampilkan sama sekali bila tidak ada dokumen untuk ditampilkan)
+ --}}
+-@php($hapus = $hapus ?? false)
++@php
++    $hapus = $hapus ?? false;
++    $daftarResmi = $pengajuan->dokumenResmi->reject(fn ($resmi) => in_array($resmi->jenis, $kecuali ?? [], true));
++@endphp
+ 
++@if ($daftarResmi->isNotEmpty() || ! ($sembunyikanBilaKosong ?? false))
+ <section class="card">
+     <div class="card-header">
+         <h2 class="font-semibold text-slate-900">Dokumen Resmi</h2>
+     </div>
+ 
+-    @if ($pengajuan->dokumenResmi->isEmpty())
++    @if ($daftarResmi->isEmpty())
+         <x-empty pesan="Belum ada dokumen resmi yang diterbitkan." />
+     @else
+         <div class="divide-y divide-slate-100">
+-            @foreach ($pengajuan->dokumenResmi as $resmi)
++            @foreach ($daftarResmi as $resmi)
+                 <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                     <div class="min-w-0">
+                         <div class="font-medium text-slate-900">{{ $resmi->jenisLabel() }}</div>
+@@ -38,3 +44,4 @@
+         </div>
+     @endif
+ </section>
++@endif
+diff --git a/resources/views/partials/pengajuan/surat-ta.blade.php b/resources/views/partials/pengajuan/surat-ta.blade.php
+new file mode 100644
+index 0000000..9033705
+--- /dev/null
++++ b/resources/views/partials/pengajuan/surat-ta.blade.php
+@@ -0,0 +1,104 @@
++{{--
++    Alur surat Tugas Akhir dalam tiga langkah: surat pengantar -> surat balasan -> SK pembimbing.
++    Membutuhkan: $pengajuan (relasi dokumenResmi dan suratBalasan sudah dimuat)
++    Dipakai halaman mahasiswa (ada formulir unggah surat balasan bila berhak) dan halaman operator (hanya status).
++    Tidak menampilkan apa pun untuk pengajuan yang bukan TA atau yang belum lolos verifikasi operator.
++--}}
++@php
++    $tahap = $pengajuan->tahapSurat();
++    $bolehUnggah = $tahap !== [] && auth()->user()->can('unggahSuratBalasan', $pengajuan);
++    $balasanTerbaru = $pengajuan->balasanTerbaru();
++    $balasanLama = $pengajuan->suratBalasan->where('terbaru', false)->sortByDesc('versi');
++@endphp
++
++@if ($tahap !== [])
++    <section class="card" id="surat-ta">
++        <div class="card-header">
++            <div>
++                <h2 class="font-semibold text-slate-900">Surat Tugas Akhir</h2>
++                <p class="mt-0.5 text-sm text-slate-500">Surat pengantar, lalu surat balasan, lalu SK pembimbing.</p>
++            </div>
++        </div>
++
++        <ol class="grid divide-y divide-slate-200 md:grid-cols-3 md:divide-x md:divide-y-0">
++            @foreach ($tahap as $i => $t)
++                <li class="flex flex-col gap-3 p-5" data-tahap="{{ $t['kunci'] }}" data-status="{{ $t['status']->value }}">
++                    <div class="flex items-center gap-3">
++                        <span class="ikon-gelembung h-9 w-9 text-sm font-semibold {{ $t['status'] === \App\Enums\StatusTahapSurat::Terkunci ? 'opacity-60' : '' }}">
++                            @if ($t['status'] === \App\Enums\StatusTahapSurat::Selesai)
++                                <x-pasir.icon name="check" class="h-5 w-5" />
++                            @else
++                                {{ $i + 1 }}
++                            @endif
++                        </span>
++                        <div class="min-w-0">
++                            <h3 class="font-medium text-slate-900">{{ $t['judul'] }}</h3>
++                            <span class="badge mt-1 {{ $t['status']->badge() }}">{{ $t['label'] }}</span>
++                        </div>
++                    </div>
++
++                    <p class="text-sm text-slate-600">{{ $t['keterangan'] }}</p>
++
++                    @if ($t['dokumen'])
++                        <div class="mt-auto text-xs text-slate-500">{{ $t['dokumen']->nama_asli }} ({{ $t['dokumen']->ukuranManusia() }})</div>
++                        <div class="flex flex-wrap items-center gap-2">
++                            <a href="{{ route('berkas.resmi', ['dokumenResmi' => $t['dokumen'], 'unduh' => 1]) }}" class="btn btn-secondary btn-sm"><x-icon name="download" class="h-4 w-4" />Unduh</a>
++                            <a href="{{ route('berkas.resmi', ['dokumenResmi' => $t['dokumen']]) }}" target="_blank" rel="noopener" class="tautan text-sm">Lihat</a>
++                        </div>
++                    @elseif ($t['balasan'])
++                        <div class="mt-auto text-xs text-slate-500">
++                            {{ $t['balasan']->nama_asli }} ({{ $t['balasan']->ukuranManusia() }}), diunggah {{ $t['balasan']->created_at->translatedFormat('d M Y H:i') }}
++                        </div>
++                        <div class="flex flex-wrap items-center gap-2">
++                            <a href="{{ route('berkas.balasan', ['suratBalasan' => $t['balasan'], 'unduh' => 1]) }}" class="btn btn-secondary btn-sm"><x-icon name="download" class="h-4 w-4" />Unduh</a>
++                            <a href="{{ route('berkas.balasan', ['suratBalasan' => $t['balasan']]) }}" target="_blank" rel="noopener" class="tautan text-sm">Lihat</a>
++                        </div>
++                    @endif
++                </li>
++            @endforeach
++        </ol>
++
++        @if ($bolehUnggah)
++            <form method="POST" action="{{ route('mahasiswa.surat-balasan.store', $pengajuan) }}" enctype="multipart/form-data" class="space-y-4 border-t border-slate-200 p-5">
++                @csrf
++                @if ($balasanTerbaru?->status === \App\Enums\StatusDokumen::Revisi)
++                    <div class="alert alert-peringatan !mb-0">
++                        <p class="font-medium">Surat balasan perlu direvisi.</p>
++                        <p class="mt-0.5">{{ $balasanTerbaru->catatan ?: 'Unggah ulang surat balasan yang sudah diperbaiki.' }}</p>
++                    </div>
++                @endif
++
++                <div>
++                    <label for="berkas_balasan" class="label">
++                        {{ $balasanTerbaru ? 'Unggah ulang surat balasan' : 'Unggah surat balasan' }} (PDF, JPG, atau PNG, maks. 5 MB)
++                    </label>
++                    <input id="berkas_balasan" name="berkas_balasan" type="file" accept=".pdf,.jpg,.jpeg,.png" required
++                           class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-sand-200 file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink-800 hover:file:bg-sand-300">
++                    @error('berkas_balasan')<p class="galat">{{ $message }}</p>@enderror
++                    @if ($balasanTerbaru?->status === \App\Enums\StatusDokumen::Menunggu)
++                        <p class="hint">Surat balasan Anda sedang menunggu pemeriksaan. Mengunggah lagi akan menggantikannya.</p>
++                    @endif
++                </div>
++                <button type="submit" class="btn btn-primary"><x-icon name="upload" class="h-4 w-4" />Unggah surat balasan</button>
++            </form>
++        @endif
++
++        @if ($balasanLama->isNotEmpty())
++            <details class="border-t border-slate-200 px-5 py-3 text-sm">
++                <summary class="cursor-pointer font-medium text-slate-700">Versi surat balasan sebelumnya ({{ $balasanLama->count() }})</summary>
++                <ul class="mt-3 space-y-2">
++                    @foreach ($balasanLama as $lama)
++                        <li class="flex flex-wrap items-center justify-between gap-2">
++                            <span class="min-w-0 text-slate-600">
++                                Versi {{ $lama->versi }}: {{ $lama->nama_asli }}
++                                <span class="badge ml-1 {{ $lama->status->badge() }}">{{ $lama->status->label() }}</span>
++                                @if ($lama->catatan)<span class="block text-xs text-slate-500">Catatan: {{ $lama->catatan }}</span>@endif
++                            </span>
++                            <a href="{{ route('berkas.balasan', ['suratBalasan' => $lama]) }}" target="_blank" rel="noopener" class="tautan">Lihat</a>
++                        </li>
++                    @endforeach
++                </ul>
++            </details>
++        @endif
++    </section>
++@endif
+diff --git a/routes/web.php b/routes/web.php
+index 2e1b83c..8636c34 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -34,6 +34,7 @@
+     // Berkas privat: akses diperiksa policy (pemilik, dosen pembimbing, operator).
+     Route::get('/berkas/dokumen/{dokumen}', [BerkasController::class, 'dokumen'])->name('berkas.dokumen');
+     Route::get('/berkas/resmi/{dokumenResmi}', [BerkasController::class, 'resmi'])->name('berkas.resmi');
++    Route::get('/berkas/balasan/{suratBalasan}', [BerkasController::class, 'balasan'])->name('berkas.balasan');
+ 
+     /*
+     | Mahasiswa
+@@ -54,6 +55,7 @@
+         });
+ 
+         Route::post('/pengajuan/detail/{pengajuan}/dokumen', [Mahasiswa\DokumenController::class, 'store'])->name('dokumen.store');
++        Route::post('/pengajuan/detail/{pengajuan}/surat-balasan', [Mahasiswa\SuratBalasanController::class, 'store'])->name('surat-balasan.store');
+         Route::get('/status', [Mahasiswa\StatusController::class, 'index'])->name('status.index');
+         Route::get('/berkas', [Mahasiswa\BerkasSayaController::class, 'index'])->name('berkas.index');
+     });
+@@ -91,6 +93,8 @@
+         Route::get('/dokumen-resmi/{pengajuan}', [Operator\DokumenResmiController::class, 'show'])->name('dokumen-resmi.show');
+         Route::post('/dokumen-resmi/{pengajuan}', [Operator\DokumenResmiController::class, 'store'])->name('dokumen-resmi.store');
+         Route::post('/dokumen-resmi/{pengajuan}/arsipkan', [Operator\DokumenResmiController::class, 'arsipkan'])->name('dokumen-resmi.arsipkan');
++        Route::post('/dokumen-resmi/{pengajuan}/surat-pengantar', [Operator\DokumenResmiController::class, 'suratPengantar'])->name('dokumen-resmi.surat-pengantar');
++        Route::post('/dokumen-resmi/{pengajuan}/surat-balasan', [Operator\SuratBalasanController::class, 'periksa'])->name('dokumen-resmi.surat-balasan');
+         Route::delete('/dokumen-resmi/{pengajuan}/{dokumenResmi}', [Operator\DokumenResmiController::class, 'destroy'])->name('dokumen-resmi.destroy');
+ 
+         Route::get('/arsip', [Operator\ArsipController::class, 'index'])->name('arsip.index');
+diff --git a/tests/Feature/RenderHalamanTest.php b/tests/Feature/RenderHalamanTest.php
+index 128ea05..13f9229 100644
+--- a/tests/Feature/RenderHalamanTest.php
++++ b/tests/Feature/RenderHalamanTest.php
+@@ -12,6 +12,7 @@
+ use App\Models\Pengajuan;
+ use App\Models\Persyaratan;
+ use App\Models\ProgramStudi;
++use App\Models\SuratBalasan;
+ use App\Models\User;
+ use Database\Seeders\DatabaseSeeder;
+ use Illuminate\Foundation\Testing\RefreshDatabase;
+@@ -110,6 +111,50 @@ public function test_semua_halaman_tampil_untuk_setiap_role_pada_semua_status():
+             $semua[] = $p;
+         }
+ 
++        // Variasi alur surat TA (pengantar, balasan, SK) supaya setiap keadaan tahapnya ikut dirender di semua halaman.
++        $resmi = fn (Pengajuan $p, string $jenis) => DokumenResmi::create([
++            'pengajuan_id' => $p->id, 'jenis' => $jenis, 'nomor' => "{$jenis}/UN9", 'tanggal' => now()->toDateString(),
++            'diunggah_oleh' => $operator->id, 'nama_asli' => "{$jenis}.pdf", 'path' => "resmi/{$p->id}/{$jenis}.pdf",
++            'mime' => 'application/pdf', 'ukuran' => 5000,
++        ]);
++        $balasan = fn (Pengajuan $p, int $versi, bool $terbaru, StatusDokumen $status) => SuratBalasan::create([
++            'pengajuan_id' => $p->id, 'diunggah_oleh' => $mahasiswa->id, 'versi' => $versi, 'terbaru' => $terbaru,
++            'nama_asli' => "balasan-v{$versi}.pdf", 'path' => "surat-balasan/{$p->id}/balasan-v{$versi}.pdf",
++            'mime' => 'application/pdf', 'ukuran' => 3000, 'status' => $status,
++            'catatan' => $status === StatusDokumen::Revisi ? 'Cap instansi belum terlihat.' : null,
++        ]);
++        $varianTa = [
++            [StatusPengajuan::MenungguDosen, false, []],
++            [StatusPengajuan::MenungguDosen, true, []],
++            [StatusPengajuan::RevisiAkademik, true, [[1, false, StatusDokumen::Revisi], [2, true, StatusDokumen::Menunggu]]],
++            [StatusPengajuan::Disetujui, true, [[1, true, StatusDokumen::Diterima]]],
++            [StatusPengajuan::Disetujui, true, [[1, true, StatusDokumen::Revisi]]],
++            [StatusPengajuan::Diarsipkan, true, [[1, true, StatusDokumen::Diterima]], true],
++            [StatusPengajuan::Diarsipkan, false, []],
++        ];
++        foreach ($varianTa as $n => $varian) {
++            [$status, $denganPengantar, $versiBalasan] = $varian;
++            $denganSk = $varian[3] ?? false;
++            $p = Pengajuan::create([
++                'mahasiswa_id' => $mahasiswa->id, 'pembimbing_id' => $dosen->id, 'pembimbing_pilihan_id' => $dosen->id,
++                'status_pembimbing' => StatusPembimbing::Diterima, 'jenis' => JenisPengajuan::Ta,
++                'judul' => "Surat TA varian {$n}", 'instansi' => 'Instansi Contoh', 'status' => $status, 'diajukan_at' => now(),
++            ]);
++            if ($denganPengantar) {
++                $resmi($p, JenisPengajuan::SURAT_PENGANTAR_TA);
++            }
++            foreach ($versiBalasan as [$versi, $terbaru, $statusBalasan]) {
++                $balasan($p, $versi, $terbaru, $statusBalasan);
++            }
++            if ($denganSk) {
++                $resmi($p, JenisPengajuan::SK_TA);
++            }
++            if ($status === StatusPengajuan::Diarsipkan) {
++                Arsip::create(['pengajuan_id' => $p->id, 'diarsipkan_oleh' => $operator->id, 'diarsipkan_at' => now(), 'catatan' => 'Lengkap']);
++            }
++            $semua[] = $p;
++        }
++
+         $prodi = ProgramStudi::firstOrFail();
+         $syarat = Persyaratan::firstOrFail();
+ 
+diff --git a/tests/Feature/SuratTaTest.php b/tests/Feature/SuratTaTest.php
+new file mode 100644
+index 0000000..dffc6c7
+--- /dev/null
++++ b/tests/Feature/SuratTaTest.php
+@@ -0,0 +1,596 @@
++<?php
++
++namespace Tests\Feature;
++
++use App\Enums\JenisPengajuan;
++use App\Enums\StatusDokumen;
++use App\Enums\StatusPembimbing;
++use App\Enums\StatusPengajuan;
++use App\Models\DokumenPengajuan;
++use App\Models\DokumenResmi;
++use App\Models\LogAktivitas;
++use App\Models\Pengajuan;
++use App\Models\Persyaratan;
++use App\Models\ProgramStudi;
++use App\Models\SuratBalasan;
++use App\Models\User;
++use Illuminate\Foundation\Testing\RefreshDatabase;
++use Illuminate\Http\UploadedFile;
++use Illuminate\Support\Facades\Storage;
++use Tests\Concerns\SiapkanData;
++use Tests\TestCase;
++
++/**
++ * Alur surat Tugas Akhir: surat pengantar (operator) -> surat balasan (mahasiswa, diperiksa operator)
++ * -> SK pembimbing (operator, hanya setelah balasan diterima dan dosen menyetujui). Hanya untuk TA.
++ */
++class SuratTaTest extends TestCase
++{
++    use RefreshDatabase, SiapkanData;
++
++    private User $mahasiswa;
++
++    private User $mahasiswaLain;
++
++    private User $dosen;
++
++    private User $dosenLain;
++
++    private User $operator;
++
++    private User $admin;
++
++    protected function setUp(): void
++    {
++        parent::setUp();
++
++        Storage::fake('local');
++        $this->siapkanMaster();
++
++        $prodi = ProgramStudi::first()->id;
++        $this->mahasiswa = User::factory()->mahasiswa()->create(['program_studi_id' => $prodi]);
++        $this->mahasiswaLain = User::factory()->mahasiswa()->create(['program_studi_id' => $prodi]);
++        $this->dosen = User::factory()->dosen()->create();
++        $this->dosenLain = User::factory()->dosen()->create();
++        $this->operator = User::factory()->operator()->create();
++        $this->admin = User::factory()->admin()->create();
++    }
++
++    // ---------------------------------------------------------------- pembantu
++
++    private function ta(StatusPengajuan $status, ?User $dosen = null, ?User $mahasiswa = null): Pengajuan
++    {
++        return $this->buatPengajuan($mahasiswa ?? $this->mahasiswa, $dosen ?? $this->dosen, $status, JenisPengajuan::Ta);
++    }
++
++    /** TA yang sudah dikirim, dengan semua dokumen persyaratan versi pertama (menunggu diperiksa). */
++    private function taDiajukan(): Pengajuan
++    {
++        $p = $this->ta(StatusPengajuan::Diajukan);
++
++        foreach (Persyaratan::aktif()->untuk(JenisPengajuan::Ta)->get() as $syarat) {
++            DokumenPengajuan::create([
++                'pengajuan_id' => $p->id, 'persyaratan_id' => $syarat->id, 'diunggah_oleh' => $this->mahasiswa->id,
++                'versi' => 1, 'terbaru' => true, 'nama_asli' => "syarat-{$syarat->id}.pdf",
++                'path' => "pengajuan/{$p->id}/syarat-{$syarat->id}.pdf", 'mime' => 'application/pdf', 'ukuran' => 1000,
++                'status' => StatusDokumen::Menunggu,
++            ]);
++        }
++
++        return $p;
++    }
++
++    /** Memeriksa semua dokumen milik $peran (operator|dosen) dengan keputusan diterima lewat HTTP. */
++    private function terimaSemua(User $pemeriksa, string $rute, Pengajuan $p, string $peran): void
++    {
++        $keputusan = $p->dokumenTerbaru()
++            ->whereHas('persyaratan', fn ($q) => $q->where('pemeriksa', $peran))
++            ->pluck('id')
++            ->mapWithKeys(fn ($id) => [$id => 'diterima'])
++            ->all();
++
++        $this->actingAs($pemeriksa)->post(route($rute, $p), ['keputusan' => $keputusan])->assertSessionHasNoErrors();
++    }
++
++    private function pengantar(Pengajuan $p): DokumenResmi
++    {
++        return DokumenResmi::create([
++            'pengajuan_id' => $p->id, 'diunggah_oleh' => $this->operator->id, 'jenis' => JenisPengajuan::SURAT_PENGANTAR_TA,
++            'nomor' => '010/UN9/2026', 'tanggal' => now()->toDateString(),
++            'nama_asli' => 'pengantar.pdf', 'path' => "dokumen-resmi/{$p->id}/pengantar.pdf", 'mime' => 'application/pdf', 'ukuran' => 2000,
++        ]);
++    }
++
++    private function balasan(Pengajuan $p, StatusDokumen $status, int $versi = 1, bool $terbaru = true, ?string $catatan = null): SuratBalasan
++    {
++        return SuratBalasan::create([
++            'pengajuan_id' => $p->id, 'diunggah_oleh' => $p->mahasiswa_id, 'versi' => $versi, 'terbaru' => $terbaru,
++            'nama_asli' => "balasan-v{$versi}.pdf", 'path' => "surat-balasan/{$p->id}/balasan-v{$versi}.pdf",
++            'mime' => 'application/pdf', 'ukuran' => 3000, 'status' => $status, 'catatan' => $catatan,
++        ]);
++    }
++
++    /** Menulis berkas contoh ke disk palsu agar bisa diunduh. */
++    private function isiBerkas(string $path): void
++    {
++        Storage::disk('local')->put($path, '%PDF-1.4 contoh');
++    }
++
++    private function terbitkanPengantar(Pengajuan $p, ?UploadedFile $berkas = null)
++    {
++        return $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.surat-pengantar', $p), [
++            'nomor_pengantar' => '010/UN9.FASILKOM/2026',
++            'tanggal_pengantar' => '2026-10-20',
++            'berkas_pengantar' => $berkas ?? $this->pdf('pengantar.pdf'),
++        ]);
++    }
++
++    private function unggahBalasan(Pengajuan $p, ?UploadedFile $berkas = null, ?User $oleh = null)
++    {
++        return $this->actingAs($oleh ?? $this->mahasiswa)->post(route('mahasiswa.surat-balasan.store', $p), [
++            'berkas_balasan' => $berkas ?? $this->pdf('balasan.pdf'),
++        ]);
++    }
++
++    private function periksaBalasan(Pengajuan $p, SuratBalasan $b, string $keputusan, ?string $catatan = null)
++    {
++        return $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.surat-balasan', $p), [
++            'balasan_id' => $b->id, 'keputusan' => $keputusan, 'catatan_balasan' => $catatan,
++        ]);
++    }
++
++    private function terbitkanSk(Pengajuan $p)
++    {
++        return $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.store', $p), [
++            'jenis' => JenisPengajuan::SK_TA, 'nomor' => '055/UN9/SK/2026', 'tanggal' => '2026-10-25', 'berkas' => $this->pdf('sk.pdf'),
++        ]);
++    }
++
++    private function adaSk(Pengajuan $p): bool
++    {
++        return $p->dokumenResmi()->where('jenis', JenisPengajuan::SK_TA)->exists();
++    }
++
++    // ---------------------------------------------------------------- alur lengkap
++
++    public function test_alur_lengkap_ta_dari_verifikasi_sampai_sk_dan_arsip(): void
++    {
++        $p = $this->taDiajukan();
++
++        // Sebelum diverifikasi: tidak ada surat yang bisa diterbitkan.
++        $this->terbitkanPengantar($p)->assertForbidden();
++
++        // Operator memverifikasi, pengajuan lanjut ke dosen.
++        $this->terimaSemua($this->operator, 'operator.verifikasi.store', $p, 'operator');
++        $this->assertSame(StatusPengajuan::MenungguDosen, $p->fresh()->status);
++
++        // Surat balasan belum bisa diunggah sebelum surat pengantar terbit.
++        $this->unggahBalasan($p)->assertForbidden();
++        $this->assertSame(0, SuratBalasan::count());
++
++        // Operator menerbitkan surat pengantar: berkas hanya PDF, lalu tersimpan sebagai dokumen resmi.
++        $this->terbitkanPengantar($p, UploadedFile::fake()->create('pengantar.jpg', 50, 'image/jpeg'))
++            ->assertSessionHasErrors('berkas_pengantar');
++        $this->assertSame(0, DokumenResmi::count());
++
++        $this->terbitkanPengantar($p)->assertSessionHasNoErrors()->assertRedirect(route('operator.dokumen-resmi.show', $p));
++        $pengantar = $p->fresh()->dokumenResmi()->where('jenis', JenisPengajuan::SURAT_PENGANTAR_TA)->firstOrFail();
++        $this->assertSame('010/UN9.FASILKOM/2026', $pengantar->nomor);
++        Storage::disk('local')->assertExists($pengantar->path);
++        $this->assertStringStartsWith("dokumen-resmi/{$p->id}/", $pengantar->path);
++        $this->assertDatabaseHas('log_aktivitas', ['aksi' => 'surat-pengantar.terbit']);
++
++        // Surat pengantar hanya satu.
++        $this->terbitkanPengantar($p)->assertForbidden();
++
++        // Mahasiswa melihat tahapnya dan mengunduh surat pengantar.
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.pengajuan.show', $p))
++            ->assertOk()
++            ->assertSee('Surat Tugas Akhir')
++            ->assertSee('Menunggu unggahan Anda')
++            ->assertSee('name="berkas_balasan"', false);
++        $this->actingAs($this->mahasiswa)->get(route('berkas.resmi', ['dokumenResmi' => $pengantar, 'unduh' => 1]))->assertOk();
++
++        // Surat balasan: format salah ditolak; PDF diterima sebagai versi 1 (menunggu).
++        $this->unggahBalasan($p, UploadedFile::fake()->create('balasan.docx', 50, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'))
++            ->assertSessionHasErrors('berkas_balasan');
++        $this->unggahBalasan($p, $this->pdf('balasan.pdf', 6000))->assertSessionHasErrors('berkas_balasan');
++        $this->assertSame(0, SuratBalasan::count());
++
++        $this->unggahBalasan($p)->assertSessionHasNoErrors();
++        $b1 = $p->fresh()->balasanTerbaru();
++        $this->assertSame(1, $b1->versi);
++        $this->assertSame(StatusDokumen::Menunggu, $b1->status);
++        $this->assertStringStartsWith("surat-balasan/{$p->id}/", $b1->path);
++        Storage::disk('local')->assertExists($b1->path);
++
++        // Dosen menyetujui pengajuan (paralel dengan pemeriksaan surat). SK tetap tertahan karena balasan belum diterima.
++        $this->terimaSemua($this->dosen, 'dosen.pemeriksaan.store', $p, 'dosen');
++        $this->assertSame(StatusPengajuan::Disetujui, $p->fresh()->status);
++
++        $this->terbitkanSk($p)->assertSessionHasErrors('jenis');
++        $this->assertFalse($this->adaSk($p));
++        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.arsipkan', $p))->assertSessionHasErrors('dokumen_resmi');
++        $this->assertSame(StatusPengajuan::Disetujui, $p->fresh()->status);
++
++        // Operator meminta revisi (catatan wajib).
++        $this->periksaBalasan($p, $b1, 'revisi')->assertSessionHasErrors('catatan_balasan');
++        $this->assertSame(StatusDokumen::Menunggu, $b1->fresh()->status);
++        $this->periksaBalasan($p, $b1, 'revisi', 'Cap instansi belum terlihat.')->assertSessionHasNoErrors();
++        $this->assertSame(StatusDokumen::Revisi, $b1->fresh()->status);
++        $this->assertSame($this->operator->id, (int) $b1->fresh()->diperiksa_oleh);
++        $this->assertNotNull($b1->fresh()->diperiksa_at);
++
++        $this->terbitkanSk($p)->assertSessionHasErrors('jenis');
++
++        // Mahasiswa melihat catatan revisi dan mengunggah ulang; versi lama menjadi jejak.
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.pengajuan.show', $p))
++            ->assertOk()->assertSee('Perlu revisi')->assertSee('Cap instansi belum terlihat.');
++        $this->unggahBalasan($p)->assertSessionHasNoErrors();
++        $b2 = $p->fresh()->balasanTerbaru();
++        $this->assertSame(2, $b2->versi);
++        $this->assertFalse($b1->fresh()->terbaru);
++        $this->assertSame(StatusDokumen::Menunggu, $b2->status);
++        $this->assertSame(2, $p->suratBalasan()->count());
++        $this->terbitkanSk($p)->assertSessionHasErrors('jenis');
++
++        // Operator memeriksa versi yang sudah usang: ditolak, tidak ada yang berubah.
++        $this->periksaBalasan($p, $b1, 'diterima')->assertSessionHasErrors('keputusan');
++        $this->assertSame(StatusDokumen::Menunggu, $b2->fresh()->status);
++
++        // Versi terbaru diterima: sekarang SK boleh terbit.
++        $this->periksaBalasan($p, $b2, 'diterima')->assertSessionHasNoErrors();
++        $this->assertSame(StatusDokumen::Diterima, $b2->fresh()->status);
++        $this->assertNull($b2->fresh()->catatan);
++
++        $this->actingAs($this->operator)->get(route('operator.dokumen-resmi.show', $p))
++            ->assertOk()->assertSee('Terbitkan SK Pembimbing');
++
++        $this->terbitkanSk($p)->assertSessionHasNoErrors();
++        $sk = $p->fresh()->dokumenResmi()->where('jenis', JenisPengajuan::SK_TA)->firstOrFail();
++        Storage::disk('local')->assertExists($sk->path);
++
++        // SK hanya satu; setelah SK terbit keputusan balasan tidak bisa diubah lagi.
++        $this->terbitkanSk($p)->assertSessionHasErrors('jenis');
++        $this->assertSame(1, $p->dokumenResmi()->where('jenis', JenisPengajuan::SK_TA)->count());
++        $this->periksaBalasan($p, $b2, 'revisi', 'Eh.')->assertForbidden();
++        $this->unggahBalasan($p)->assertForbidden();
++
++        // Mahasiswa mengunduh SK, lalu operator mengarsipkan.
++        $this->actingAs($this->mahasiswa)->get(route('berkas.resmi', ['dokumenResmi' => $sk, 'unduh' => 1]))->assertOk();
++        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.arsipkan', $p), ['catatan' => 'Lengkap.'])
++            ->assertSessionHasNoErrors()->assertRedirect(route('operator.arsip.show', $p));
++        $this->assertSame(StatusPengajuan::Diarsipkan, $p->fresh()->status);
++
++        // Setelah diarsipkan semua langkah surat tertutup, tetapi riwayatnya tetap terlihat.
++        $this->unggahBalasan($p)->assertForbidden();
++        $this->periksaBalasan($p, $b2, 'revisi', 'Eh.')->assertForbidden();
++        $this->actingAs($this->operator)->get(route('operator.arsip.show', $p))
++            ->assertOk()->assertSee('Surat Pengantar')->assertSee('SK Pembimbing')->assertSee('Versi surat balasan sebelumnya');
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.berkas.index'))
++            ->assertOk()->assertSee('Surat Balasan TA yang Diunggah')->assertSee('010/UN9.FASILKOM/2026')->assertSee('055/UN9/SK/2026');
++
++        foreach (['surat-pengantar.terbit', 'surat-balasan.unggah', 'surat-balasan.periksa'] as $aksi) {
++            $this->assertTrue(LogAktivitas::where('aksi', $aksi)->exists(), "log {$aksi}");
++        }
++        $this->assertSame(2, LogAktivitas::where('aksi', 'surat-balasan.unggah')->count());
++    }
++
++    // ---------------------------------------------------------------- pintu SK
++
++    public function test_sk_hanya_terbit_bila_pengantar_balasan_diterima_pembimbing_dan_disetujui(): void
++    {
++        $p = $this->ta(StatusPengajuan::Disetujui);
++
++        // 1. Belum ada surat pengantar.
++        $this->assertSame('Surat pengantar belum diterbitkan.', $p->hambatanSk());
++        $this->terbitkanSk($p)->assertSessionHasErrors('jenis');
++        $this->assertFalse($this->adaSk($p));
++
++        // 2. Ada pengantar, belum ada balasan.
++        $this->pengantar($p);
++        $p = $p->fresh();
++        $this->assertSame('Surat balasan belum diunggah mahasiswa.', $p->hambatanSk());
++        $this->terbitkanSk($p)->assertSessionHasErrors('jenis');
++
++        // 3. Balasan menunggu pemeriksaan.
++        $b = $this->balasan($p, StatusDokumen::Menunggu);
++        $this->assertSame('Surat balasan belum diperiksa operator.', $p->fresh()->hambatanSk());
++        $this->terbitkanSk($p)->assertSessionHasErrors('jenis');
++
++        // 4. Balasan perlu revisi.
++        $b->update(['status' => StatusDokumen::Revisi]);
++        $this->assertStringContainsString('perlu direvisi', $p->fresh()->hambatanSk());
++        $this->terbitkanSk($p)->assertSessionHasErrors('jenis');
++
++        // Balasan diterima tetapi pembimbing hilang: tetap tertahan.
++        $b->update(['status' => StatusDokumen::Diterima]);
++        $p->update(['pembimbing_id' => null, 'status_pembimbing' => StatusPembimbing::Belum]);
++        $this->assertSame('Dosen pembimbing belum ditetapkan.', $p->fresh()->hambatanSk());
++        $this->terbitkanSk($p)->assertSessionHasErrors('jenis');
++        $this->assertFalse($this->adaSk($p));
++
++        // Semua syarat terpenuhi: SK terbit.
++        $p->update(['pembimbing_id' => $this->dosen->id, 'status_pembimbing' => StatusPembimbing::Diterima]);
++        $this->assertNull($p->fresh()->hambatanSk());
++        $this->terbitkanSk($p)->assertSessionHasNoErrors();
++        $this->assertTrue($this->adaSk($p));
++    }
++
++    public function test_sk_tidak_bisa_diterbitkan_sebelum_dosen_menyetujui_walau_balasan_diterima(): void
++    {
++        $p = $this->ta(StatusPengajuan::MenungguDosen);
++        $this->pengantar($p);
++        $this->balasan($p, StatusDokumen::Diterima);
++
++        $this->assertSame('Pengajuan belum disetujui dosen pembimbing.', $p->fresh()->hambatanSk());
++        // Dokumen resmi baru bisa diproses setelah disetujui dosen.
++        $this->terbitkanSk($p)->assertForbidden();
++        $this->assertFalse($this->adaSk($p));
++
++        $p->update(['status' => StatusPengajuan::Disetujui]);
++        $this->terbitkanSk($p)->assertSessionHasNoErrors();
++        $this->assertTrue($this->adaSk($p));
++    }
++
++    public function test_surat_pengantar_tidak_bisa_diterbitkan_lewat_formulir_dokumen_resmi_umum(): void
++    {
++        $p = $this->ta(StatusPengajuan::Disetujui);
++
++        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.store', $p), [
++            'jenis' => JenisPengajuan::SURAT_PENGANTAR_TA, 'nomor' => '1/X', 'tanggal' => '2026-10-25', 'berkas' => $this->pdf(),
++        ])->assertSessionHasErrors('jenis');
++        $this->assertSame(0, DokumenResmi::count());
++
++        // Dokumen lain (lainnya) tetap bisa diunggah tanpa syarat surat balasan.
++        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.store', $p), [
++            'jenis' => 'lainnya', 'nomor' => '2/X', 'tanggal' => '2026-10-25', 'berkas' => $this->pdf(),
++        ])->assertSessionHasNoErrors();
++        $this->assertSame(1, DokumenResmi::count());
++    }
++
++    public function test_arsip_ta_mewajibkan_sk_pembimbing(): void
++    {
++        $p = $this->ta(StatusPengajuan::Disetujui);
++        $this->pengantar($p);
++
++        // Sudah ada dokumen resmi (surat pengantar), tetapi SK belum terbit.
++        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.arsipkan', $p))->assertSessionHasErrors('dokumen_resmi');
++        $this->assertSame(StatusPengajuan::Disetujui, $p->fresh()->status);
++
++        $this->actingAs($this->operator)->get(route('operator.dokumen-resmi.show', $p))
++            ->assertOk()->assertSee('Terbitkan SK Pembimbing Tugas Akhir terlebih dahulu.');
++
++        $this->balasan($p, StatusDokumen::Diterima);
++        $this->terbitkanSk($p)->assertSessionHasNoErrors();
++        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.arsipkan', $p))->assertSessionHasNoErrors();
++        $this->assertSame(StatusPengajuan::Diarsipkan, $p->fresh()->status);
++    }
++
++    // ---------------------------------------------------------------- keputusan dan penarikan
++
++    public function test_keputusan_balasan_dapat_diubah_selama_sk_belum_terbit(): void
++    {
++        $p = $this->ta(StatusPengajuan::Disetujui);
++        $this->pengantar($p);
++        $b = $this->balasan($p, StatusDokumen::Menunggu);
++
++        $this->periksaBalasan($p, $b, 'diterima')->assertSessionHasNoErrors();
++        $this->assertNull($p->fresh()->hambatanSk());
++
++        // Salah menerima: operator membatalkan dengan meminta revisi, SK kembali tertahan.
++        $this->periksaBalasan($p, $b, 'revisi', 'Salah berkas.')->assertSessionHasNoErrors();
++        $this->assertSame(StatusDokumen::Revisi, $b->fresh()->status);
++        $this->assertNotNull($p->fresh()->hambatanSk());
++
++        // Setelah status revisi, tidak ada lagi yang diperiksa sampai mahasiswa mengunggah ulang.
++        $this->periksaBalasan($p, $b, 'diterima')->assertForbidden();
++
++        // Keputusan selain diterima/revisi ditolak.
++        $this->unggahBalasan($p)->assertSessionHasNoErrors();
++        $baru = $p->fresh()->balasanTerbaru();
++        $this->periksaBalasan($p, $baru, 'menunggu')->assertSessionHasErrors('keputusan');
++        $this->assertSame(StatusDokumen::Menunggu, $baru->fresh()->status);
++    }
++
++    public function test_mahasiswa_dapat_mengganti_balasan_yang_masih_menunggu_tetapi_tidak_yang_sudah_diterima(): void
++    {
++        $p = $this->ta(StatusPengajuan::MenungguDosen);
++        $this->pengantar($p);
++
++        $this->unggahBalasan($p)->assertSessionHasNoErrors();
++        $this->unggahBalasan($p)->assertSessionHasNoErrors();
++        $this->assertSame(2, $p->suratBalasan()->count());
++        $this->assertSame(1, $p->suratBalasan()->where('terbaru', true)->count());
++        $this->assertSame(2, $p->fresh()->balasanTerbaru()->versi);
++
++        $p->fresh()->balasanTerbaru()->update(['status' => StatusDokumen::Diterima]);
++        $this->unggahBalasan($p)->assertForbidden();
++        $this->assertSame(2, $p->suratBalasan()->count());
++    }
++
++    public function test_surat_pengantar_dapat_ditarik_hanya_selama_belum_ada_balasan(): void
++    {
++        $p = $this->ta(StatusPengajuan::MenungguDosen);
++        $this->terbitkanPengantar($p)->assertSessionHasNoErrors();
++        $pengantar = $p->fresh()->suratPengantarTa();
++        Storage::disk('local')->assertExists($pengantar->path);
++
++        // Mahasiswa dan dosen tidak berwenang menarik.
++        $this->actingAs($this->mahasiswa)->delete(route('operator.dokumen-resmi.destroy', [$p, $pengantar]))->assertForbidden();
++        $this->actingAs($this->dosen)->delete(route('operator.dokumen-resmi.destroy', [$p, $pengantar]))->assertForbidden();
++
++        $this->actingAs($this->operator)->delete(route('operator.dokumen-resmi.destroy', [$p, $pengantar]))->assertSessionHasNoErrors();
++        $this->assertNull($p->fresh()->suratPengantarTa());
++        Storage::disk('local')->assertMissing($pengantar->path);
++        $this->assertDatabaseHas('log_aktivitas', ['aksi' => 'surat-pengantar.hapus']);
++
++        // Boleh menerbitkan yang baru; setelah mahasiswa mengunggah balasan, tidak bisa ditarik lagi.
++        $this->terbitkanPengantar($p)->assertSessionHasNoErrors();
++        $this->unggahBalasan($p)->assertSessionHasNoErrors();
++        $baru = $p->fresh()->suratPengantarTa();
++        $this->actingAs($this->operator)->delete(route('operator.dokumen-resmi.destroy', [$p, $baru]))->assertForbidden();
++        $this->assertNotNull($p->fresh()->suratPengantarTa());
++    }
++
++    // ---------------------------------------------------------------- hak akses
++
++    public function test_hak_akses_langkah_surat_per_role(): void
++    {
++        $p = $this->ta(StatusPengajuan::MenungguDosen);
++
++        // Hanya operator yang menerbitkan surat pengantar.
++        foreach ([$this->mahasiswa, $this->dosen, $this->admin] as $bukanOperator) {
++            $this->actingAs($bukanOperator)->post(route('operator.dokumen-resmi.surat-pengantar', $p), [
++                'nomor_pengantar' => '1', 'tanggal_pengantar' => '2026-10-20', 'berkas_pengantar' => $this->pdf(),
++            ])->assertForbidden();
++        }
++        $this->assertSame(0, DokumenResmi::count());
++
++        $this->pengantar($p);
++
++        // Hanya mahasiswa pemilik yang mengunggah surat balasan.
++        $this->unggahBalasan($p, null, $this->mahasiswaLain)->assertForbidden();
++        $this->unggahBalasan($p, null, $this->dosen)->assertForbidden();
++        $this->unggahBalasan($p, null, $this->operator)->assertForbidden();
++        $this->unggahBalasan($p, null, $this->admin)->assertForbidden();
++        $this->assertSame(0, SuratBalasan::count());
++        $this->unggahBalasan($p)->assertSessionHasNoErrors();
++        $b = $p->fresh()->balasanTerbaru();
++
++        // Hanya operator yang memeriksa.
++        foreach ([$this->mahasiswa, $this->dosen, $this->admin] as $bukanOperator) {
++            $this->actingAs($bukanOperator)->post(route('operator.dokumen-resmi.surat-balasan', $p), [
++                'balasan_id' => $b->id, 'keputusan' => 'diterima',
++            ])->assertForbidden();
++        }
++        $this->assertSame(StatusDokumen::Menunggu, $b->fresh()->status);
++
++        // Halaman operator tertutup untuk role lain.
++        $this->actingAs($this->mahasiswa)->get(route('operator.dokumen-resmi.show', $p))->assertForbidden();
++        $this->actingAs($this->dosen)->get(route('operator.dokumen-resmi.show', $p))->assertForbidden();
++    }
++
++    public function test_unggah_balasan_butuh_login_dan_tidak_berlaku_untuk_kp(): void
++    {
++        $p = $this->ta(StatusPengajuan::MenungguDosen);
++        $this->pengantar($p);
++
++        auth()->logout();
++        $this->post(route('mahasiswa.surat-balasan.store', $p), ['berkas_balasan' => $this->pdf()])->assertRedirect(route('login'));
++
++        $kp = $this->buatPengajuan($this->mahasiswaLain, $this->dosen, StatusPengajuan::MenungguDosen, JenisPengajuan::Kp);
++        DokumenResmi::create([
++            'pengajuan_id' => $kp->id, 'diunggah_oleh' => $this->operator->id, 'jenis' => JenisPengajuan::SURAT_PENGANTAR_TA,
++            'nomor' => '1', 'tanggal' => now()->toDateString(), 'nama_asli' => 'x.pdf', 'path' => 'x.pdf', 'ukuran' => 1,
++        ]);
++        $this->unggahBalasan($kp, null, $this->mahasiswaLain)->assertForbidden();
++        $this->terbitkanPengantar($kp)->assertForbidden();
++    }
++
++    // ---------------------------------------------------------------- berkas
++
++    public function test_berkas_balasan_hanya_dapat_dibuka_pihak_yang_berwenang(): void
++    {
++        $p = $this->ta(StatusPengajuan::MenungguDosen);
++        $this->pengantar($p);
++        $b = $this->balasan($p, StatusDokumen::Menunggu);
++        $this->isiBerkas($b->path);
++
++        $url = route('berkas.balasan', ['suratBalasan' => $b, 'unduh' => 1]);
++
++        $this->actingAs($this->mahasiswa)->get($url)->assertOk();
++        $this->actingAs($this->operator)->get($url)->assertOk();
++        $this->actingAs($this->dosen)->get($url)->assertOk();
++
++        $this->actingAs($this->mahasiswaLain)->get($url)->assertForbidden();
++        $this->actingAs($this->dosenLain)->get($url)->assertForbidden();
++        $this->actingAs($this->admin)->get($url)->assertForbidden();
++
++        auth()->logout();
++        $this->get($url)->assertRedirect(route('login'));
++
++        // Berkas tidak punya URL publik.
++        $this->assertStringNotContainsString('storage/surat-balasan', route('berkas.balasan', $b));
++    }
++
++    // ---------------------------------------------------------------- tampilan
++
++    public function test_tahap_surat_tampil_sesuai_keadaan_untuk_mahasiswa(): void
++    {
++        $p = $this->ta(StatusPengajuan::Diajukan);
++
++        // Belum diverifikasi: kartu surat belum tampil.
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.pengajuan.show', $p))
++            ->assertOk()->assertDontSee('id="surat-ta"', false);
++
++        $p->update(['status' => StatusPengajuan::MenungguDosen]);
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.pengajuan.show', $p))
++            ->assertOk()->assertSee('id="surat-ta"', false)->assertSee('Menunggu operator')
++            ->assertSee('Dapat diunggah setelah surat pengantar terbit.')
++            ->assertDontSee('name="berkas_balasan"', false);
++
++        $this->pengantar($p);
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.dashboard'))
++            ->assertOk()->assertSee('Ada surat Tugas Akhir yang menunggu Anda')->assertSee('Menunggu unggahan Anda');
++
++        $b = $this->balasan($p, StatusDokumen::Menunggu);
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.dashboard'))
++            ->assertOk()->assertDontSee('Ada surat Tugas Akhir yang menunggu Anda');
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.pengajuan.show', $p))
++            ->assertOk()->assertSee('Menunggu pemeriksaan')->assertSee('Mengunggah lagi akan menggantikannya.');
++
++        // Pengantar dan SK tidak ditampilkan dua kali di kartu "Dokumen Resmi".
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.pengajuan.show', $p))
++            ->assertDontSee('Belum ada dokumen resmi yang diterbitkan.');
++    }
++
++    public function test_dashboard_dan_daftar_operator_menampilkan_surat_ta_yang_perlu_diproses(): void
++    {
++        $perluPengantar = $this->ta(StatusPengajuan::MenungguDosen);
++        $perluPeriksa = $this->ta(StatusPengajuan::MenungguDosen, null, $this->mahasiswaLain);
++        $this->pengantar($perluPeriksa);
++        $this->balasan($perluPeriksa, StatusDokumen::Menunggu);
++
++        $this->assertTrue(Pengajuan::perluSuratPengantar()->whereKey($perluPengantar->id)->exists());
++        $this->assertFalse(Pengajuan::perluSuratPengantar()->whereKey($perluPeriksa->id)->exists());
++        $this->assertTrue(Pengajuan::balasanMenunggu()->whereKey($perluPeriksa->id)->exists());
++        $this->assertFalse(Pengajuan::balasanMenunggu()->whereKey($perluPengantar->id)->exists());
++
++        $this->actingAs($this->operator)->get(route('operator.dashboard'))
++            ->assertOk()->assertSee('Surat Pengantar TA')->assertSee('Surat Balasan TA')
++            ->assertSee('Terbitkan surat pengantar')->assertSee('Periksa surat balasan');
++
++        $this->actingAs($this->operator)->get(route('operator.dokumen-resmi.index'))
++            ->assertOk()->assertSee('Surat TA Perlu Diproses')->assertSee($this->mahasiswa->name)->assertSee($this->mahasiswaLain->name);
++
++        // Operator melihat formulir terbitkan untuk yang pertama dan formulir periksa untuk yang kedua.
++        $this->actingAs($this->operator)->get(route('operator.dokumen-resmi.show', $perluPengantar))
++            ->assertOk()->assertSee('name="berkas_pengantar"', false)->assertDontSee('id="periksa-balasan"', false);
++        $this->actingAs($this->operator)->get(route('operator.dokumen-resmi.show', $perluPeriksa))
++            ->assertOk()->assertSee('id="periksa-balasan"', false)->assertDontSee('name="berkas_pengantar"', false);
++    }
++
++    // ---------------------------------------------------------------- KP tidak berubah
++
++    public function test_alur_kp_tidak_terpengaruh_surat_ta(): void
++    {
++        $kp = $this->buatPengajuan($this->mahasiswa, $this->dosen, StatusPengajuan::Disetujui, JenisPengajuan::Kp);
++
++        $this->assertSame([], $kp->tahapSurat());
++        $this->assertFalse($kp->tampilkanSuratTa());
++
++        $this->actingAs($this->mahasiswa)->get(route('mahasiswa.pengajuan.show', $kp))
++            ->assertOk()->assertDontSee('id="surat-ta"', false);
++
++        // KP tetap memakai surat pengantar KP dan SK KP tanpa syarat surat balasan, dan tidak menerima kode jenis TA.
++        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.store', $kp), [
++            'jenis' => JenisPengajuan::SK_TA, 'nomor' => '1', 'tanggal' => '2026-10-25', 'berkas' => $this->pdf(),
++        ])->assertSessionHasErrors('jenis');
++        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.store', $kp), [
++            'jenis' => 'sk_kp', 'nomor' => '2', 'tanggal' => '2026-10-25', 'berkas' => $this->pdf(),
++        ])->assertSessionHasNoErrors();
++        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.arsipkan', $kp))->assertSessionHasNoErrors();
++        $this->assertSame(StatusPengajuan::Diarsipkan, $kp->fresh()->status);
++    }
++}
+-- 
+2.43.0
+

@@ -9,9 +9,11 @@
 
     <x-page-header judul="Dashboard" sub="Ringkasan proses administrasi KP dan TA." />
 
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <x-stat label="Perlu Pembimbing" :nilai="$jumlahPerluPembimbing" hint="Belum ada dosen pembimbing atau ditolak dosen" :href="route('operator.pengajuan.index', ['pembimbing' => 'perlu'])" />
         <x-stat label="Perlu Verifikasi" :nilai="$hitung('diajukan')" hint="Menunggu pemeriksaan administrasi" :href="route('operator.verifikasi.index')" />
+        <x-stat label="Surat Pengantar TA" :nilai="$jumlahPerluPengantar" hint="TA terverifikasi yang belum diterbitkan suratnya" :href="route('operator.dokumen-resmi.index')" />
+        <x-stat label="Surat Balasan TA" :nilai="$jumlahBalasanMenunggu" hint="Diunggah mahasiswa, menunggu diperiksa" :href="route('operator.dokumen-resmi.index')" />
         <x-stat label="Diperiksa Dosen" :nilai="$hitung('menunggu_dosen')" />
         <x-stat label="Dalam Revisi" :nilai="$hitung('revisi_administrasi') + $hitung('revisi_akademik')" hint="Menunggu perbaikan mahasiswa" />
         <x-stat label="Perlu Dokumen Resmi" :nilai="$hitung('disetujui')" hint="Sudah disetujui dosen" :href="route('operator.dokumen-resmi.index')" />
@@ -50,6 +52,34 @@
 
         <section class="card">
             <div class="card-header">
+                <h2 class="font-semibold text-slate-900">Surat TA Perlu Diproses</h2>
+                <a href="{{ route('operator.dokumen-resmi.index') }}" class="tautan text-sm">Lihat semua</a>
+            </div>
+            @if ($antreanSurat->isEmpty())
+                <x-empty pesan="Tidak ada surat pengantar atau surat balasan TA yang menunggu." />
+            @else
+                <div class="overflow-x-auto">
+                    <table class="tabel">
+                        <thead><tr><th>Mahasiswa</th><th>Langkah</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach ($antreanSurat as $butir)
+                                <tr>
+                                    <td>
+                                        <div class="font-medium text-slate-900">{{ $butir['pengajuan']->mahasiswa->name }}</div>
+                                        <div class="text-xs text-slate-500">{{ $butir['pengajuan']->mahasiswa->nomor_induk }} &middot; {{ $butir['pengajuan']->mahasiswa->programStudi?->nama ?? '-' }}</div>
+                                    </td>
+                                    <td>{{ $butir['langkah'] }}</td>
+                                    <td class="text-right"><a href="{{ route('operator.dokumen-resmi.show', $butir['pengajuan']) }}" class="btn btn-primary btn-sm">Buka</a></td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </section>
+
+        <section class="card">
+            <div class="card-header">
                 <h2 class="font-semibold text-slate-900">Menunggu Dokumen Resmi</h2>
                 <a href="{{ route('operator.dokumen-resmi.index') }}" class="tautan text-sm">Lihat semua</a>
             </div>
@@ -77,7 +107,7 @@
             @endif
         </section>
 
-        <section class="card xl:col-span-2">
+        <section class="card">
             <div class="card-header">
                 <h2 class="font-semibold text-slate-900">Perlu Penetapan Dosen Pembimbing</h2>
                 <a href="{{ route('operator.pengajuan.index', ['pembimbing' => 'perlu']) }}" class="tautan text-sm">Lihat semua</a>

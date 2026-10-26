@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Mahasiswa;
 use App\Http\Controllers\Controller;
 use App\Models\DokumenPengajuan;
 use App\Models\DokumenResmi;
+use App\Models\SuratBalasan;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -24,6 +25,11 @@ class BerkasSayaController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        return view('mahasiswa.berkas.index', compact('dokumen', 'resmi'));
+        $balasan = SuratBalasan::with('pengajuan')
+            ->whereHas('pengajuan', fn ($q) => $q->where('mahasiswa_id', $id))
+            ->orderByDesc('id')
+            ->get();
+
+        return view('mahasiswa.berkas.index', compact('dokumen', 'resmi', 'balasan'));
     }
 }

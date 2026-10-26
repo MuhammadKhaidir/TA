@@ -64,7 +64,7 @@ class PengajuanController extends Controller
 
         $pengajuan->load([
             'mahasiswa.programStudi', 'pembimbing', 'pembimbingPilihan', 'riwayat.user',
-            'riwayatPembimbing.dosen', 'riwayatPembimbing.oleh', 'dokumenResmi', 'arsip',
+            'riwayatPembimbing.dosen', 'riwayatPembimbing.oleh', 'dokumenResmi', 'suratBalasan.pemeriksa', 'arsip',
         ]);
 
         return view('operator.pengajuan.show', [

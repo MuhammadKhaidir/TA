@@ -85,7 +85,7 @@ Seeder memakai `firstOrCreate`, jadi aman dijalankan ulang dan tidak menimpa dat
 2. Setelah semua dokumen wajib lengkap, mahasiswa mengirim pengajuan (Diajukan).
 3. Operator memeriksa dokumen yang menjadi tugas operator. Dokumen bisa Diterima atau Perlu Revisi (catatan wajib). Ada revisi: status Revisi Administrasi, mahasiswa memperbaiki hanya dokumen yang diminta, lalu mengirim ulang.
 4. Jika semua diterima, pengajuan Menunggu Dosen. Dosen pembimbing memeriksa dokumen akademik dengan cara yang sama (Revisi Akademik atau Disetujui).
-5. Setelah Disetujui, operator mengunggah dokumen resmi (surat pengantar KP, SK KP, SK TA, dan lain-lain) lalu mengarsipkan pengajuan (Diarsipkan).
+5. Setelah Disetujui, operator mengunggah dokumen resmi (surat pengantar KP, SK KP, dan lain-lain) lalu mengarsipkan pengajuan (Diarsipkan). Untuk TA ada alur surat tersendiri, lihat bagian Alur surat Tugas Akhir.
 6. Berkas final tersimpan di Arsip Berkas dan dapat dibuka oleh pihak yang berwenang.
 
 ```
@@ -98,6 +98,19 @@ draft -> diajukan -> menunggu_dosen -> disetujui -> diarsipkan
 Setiap perubahan status disimpan di tabel `riwayat_status` (siapa, kapan, catatan) dan tampil sebagai riwayat di halaman detail. Tindakan penting juga masuk ke Log Aktivitas.
 
 Dokumen yang diunggah ulang disimpan sebagai versi baru; versi lama tetap ada sebagai jejak audit.
+
+## Alur surat Tugas Akhir
+
+Khusus TA. Alur KP tidak berubah.
+
+1. Mahasiswa mengirim pengajuan TA beserta dokumennya, lalu operator memverifikasinya (status Menunggu Dosen).
+2. Operator menerbitkan **surat pengantar** (nomor, tanggal, dan berkas PDF yang sudah ditandatangani) dari halaman Dokumen Resmi. Mahasiswa mengunduhnya dari halaman detail pengajuan.
+3. Mahasiswa mengunggah **surat balasan** (PDF, JPG, atau PNG, maks. 5 MB). Boleh diunggah ulang selama belum diterima; versi lama tersimpan sebagai jejak.
+4. Operator memeriksa surat balasan: **diterima** atau **revisi** (catatan wajib, tampil di halaman mahasiswa). Keputusan masih bisa diubah selama SK belum terbit.
+5. **SK Pembimbing Tugas Akhir** hanya bisa diterbitkan bila: surat pengantar sudah terbit, surat balasan versi terbaru sudah diterima, dosen pembimbing sudah sah, dan pengajuan sudah disetujui dosen. Aturannya dijaga di server (`Pengajuan::hambatanSk()`), bukan hanya dengan menyembunyikan tombol.
+6. Mahasiswa mengunduh SK, lalu operator mengarsipkan. Pengarsipan TA mewajibkan SK sudah terbit.
+
+Surat pengantar dan SK disimpan sebagai dokumen resmi (jenis `surat_pengantar_ta` dan `sk_ta`), surat balasan di tabel `surat_balasan`. Kode jenis `sk_ta` tidak berubah, hanya labelnya menjadi "SK Pembimbing Tugas Akhir". Pengajuan TA yang sudah berstatus Disetujui sebelum fitur ini ada akan melewati langkah surat pengantar dan surat balasan dulu sebelum SK dapat diterbitkan.
 
 ## Dosen pembimbing
 
@@ -159,7 +172,7 @@ php artisan test
 
 Uji memakai SQLite in-memory (butuh ekstensi `pdo_sqlite`), jadi tidak menyentuh database MySQL Anda.
 
-Hasil terakhir di lingkungan pengembangan: **52 uji, 1040 assertion, semuanya lulus.** Cakupannya:
+Hasil terakhir di lingkungan pengembangan: **71 uji, 1488 assertion, semuanya lulus.** Cakupannya:
 
 - Login (email atau nomor induk), logout, akun nonaktif, pengalihan dashboard per peran, pencatatan log login.
 - Matriks akses: setiap peran hanya dapat membuka halamannya sendiri (200) dan ditolak (403) di halaman peran lain, termasuk aksi tulis lintas peran dan ID yang tidak ada.
@@ -168,7 +181,8 @@ Hasil terakhir di lingkungan pengembangan: **52 uji, 1040 assertion, semuanya lu
 - Sinkronisasi data setelah admin mengubah mahasiswa, dosen, program studi, dan persyaratan.
 - CRUD admin (pengguna, program studi, persyaratan), validasi, perlindungan data yang dipakai, log aktivitas, profil, dan ganti kata sandi.
 - Alur dosen pembimbing: KP ditetapkan operator, TA dipilih mahasiswa lalu diterima atau ditolak dosen, penetapan pengganti dengan bimbingan paling sedikit, hak akses, dan dashboard mahasiswa.
-- Render semua halaman untuk setiap peran pada setiap status pengajuan dan status pembimbing.
+- Alur surat TA: surat pengantar hanya setelah verifikasi, surat balasan hanya setelah surat pengantar, SK tertahan sampai balasan diterima dan dosen menyetujui, revisi dan unggah ulang, keputusan usang ditolak, arsip TA mewajibkan SK, hak akses tiap peran, privasi berkas surat balasan, dan KP tidak terpengaruh.
+- Render semua halaman untuk setiap peran pada setiap status pengajuan dan status pembimbing, termasuk tujuh variasi keadaan surat TA.
 - Migrasi (naik dan rollback) serta seeder, termasuk aman dijalankan ulang.
 
 ## Yang belum diuji

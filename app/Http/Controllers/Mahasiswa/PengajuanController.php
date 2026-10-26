@@ -102,7 +102,7 @@ class PengajuanController extends Controller
 
         $pengajuan->load([
             'mahasiswa.programStudi', 'pembimbing', 'pembimbingPilihan', 'riwayat.user',
-            'riwayatPembimbing.dosen', 'riwayatPembimbing.oleh', 'dokumenResmi',
+            'riwayatPembimbing.dosen', 'riwayatPembimbing.oleh', 'dokumenResmi', 'suratBalasan',
         ]);
 
         return view('mahasiswa.pengajuan.show', ['pengajuan' => $pengajuan] + $this->workflow->dataDokumen($pengajuan));

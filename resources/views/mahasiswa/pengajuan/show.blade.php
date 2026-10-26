@@ -20,6 +20,9 @@
 
     <div class="grid gap-6 xl:grid-cols-3">
         <div class="space-y-6 xl:col-span-2">
+            {{-- TA: surat pengantar, surat balasan, dan SK pembimbing (kosong untuk KP dan untuk TA yang belum diverifikasi) --}}
+            @include('partials.pengajuan.surat-ta')
+
             @include('partials.pengajuan.dokumen', ['unggah' => $bolehUbah])
 
             @if ($bolehUbah)
@@ -50,7 +53,11 @@
             @endif
 
             @if ($pengajuan->dokumenResmi->isNotEmpty())
-                @include('partials.pengajuan.dokumen-resmi')
+                {{-- Surat pengantar dan SK TA sudah tampil di kartu "Surat Tugas Akhir" di atas. --}}
+                @include('partials.pengajuan.dokumen-resmi', [
+                    'kecuali' => $pengajuan->tampilkanSuratTa() ? [\App\Enums\JenisPengajuan::SURAT_PENGANTAR_TA, \App\Enums\JenisPengajuan::SK_TA] : [],
+                    'sembunyikanBilaKosong' => true,
+                ])
             @endif
         </div>
 
