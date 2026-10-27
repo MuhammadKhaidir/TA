@@ -40,6 +40,7 @@ php artisan key:generate
 
 # 4. Buat tabel dan isi data awal
 php artisan migrate --seed
+#    (alternatif tanpa artisan: impor database/sql/arsip_kp_ta.sql, lihat bagian "Berkas SQL database")
 
 # 5. Pasang dan bangun aset Tailwind
 npm install
@@ -98,6 +99,22 @@ draft -> diajukan -> menunggu_dosen -> disetujui -> diarsipkan
 Setiap perubahan status disimpan di tabel `riwayat_status` (siapa, kapan, catatan) dan tampil sebagai riwayat di halaman detail. Tindakan penting juga masuk ke Log Aktivitas.
 
 Dokumen yang diunggah ulang disimpan sebagai versi baru; versi lama tetap ada sebagai jejak audit.
+
+## Berkas SQL database
+
+Seluruh struktur database ada di migrasi (`database/migrations`, file PHP, itu cara Laravel membuat tabel). Untuk yang butuh file `.sql` biasa, tersedia `database/sql/arsip_kp_ta.sql`: struktur 20 tabel beserta data awal (3 program studi, 10 persyaratan, 6 akun contoh dengan kata sandi `password`).
+
+```
+mysql -u root -p < database/sql/arsip_kp_ta.sql
+```
+
+Atau lewat phpMyAdmin: tab Import, pilih file itu. Perhatian: file ini menghapus lalu membuat ulang semua tabel aplikasi di database `arsip_kp_ta`, jadi data yang sudah ada di tabel itu hilang. Tabel `migrations` ikut terisi, sehingga `php artisan migrate` sesudahnya melaporkan "Nothing to migrate".
+
+File ini dibuat dari migrasi dan seeder, dan dijaga oleh `tests/Feature/BerkasSqlTest.php`: tes gagal bila ada tabel, kolom, atau migrasi yang belum ada di file SQL. Setelah menambah migrasi, buat ulang file dari database Anda:
+
+```
+mysqldump -u root -p arsip_kp_ta > database/sql/arsip_kp_ta.sql
+```
 
 ## Alur surat Tugas Akhir
 
@@ -159,6 +176,7 @@ app/Http/Controllers Dipisah per peran: Mahasiswa, Dosen, Operator, Admin
 app/Support          Menu per peran, pencatat log aktivitas
 database/migrations  Skema (migrasi tambahan, tidak mengubah migrasi bawaan Laravel)
 database/seeders     Program studi, persyaratan, dan akun contoh
+database/sql         Dump SQL lengkap (struktur dan data awal) untuk impor langsung ke MySQL
 resources/views      Blade: layouts, partials, components, halaman per peran
 lang/id              Terjemahan validasi dan teks antarmuka
 tests/Feature        Uji otomatis

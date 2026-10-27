@@ -1,0 +1,550 @@
+From cc6f103ff61ae7e5e73fc791aee7a859d2e01000 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 27 Oct 2026 10:19:43 +0700
+Subject: [PATCH] Tambah berkas SQL database (struktur dan data awal) beserta
+ tes penjaganya
+
+- database/sql/arsip_kp_ta.sql: struktur 20 tabel, data awal (3 program studi,
+  10 persyaratan, 6 akun contoh), dan isi tabel migrations supaya
+  "php artisan migrate" sesudah impor melaporkan "Nothing to migrate".
+- Struktur dihasilkan dari migrasi memakai grammar MySQL bawaan Laravel;
+  data awal dari seeder.
+- BerkasSqlTest: gagal bila ada tabel, kolom, atau migrasi yang belum ada di berkas SQL.
+- README: bagian "Berkas SQL database".
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gz6bmzU4tc523QrBXnnDzE
+---
+ README.md                       |  18 ++
+ database/sql/arsip_kp_ta.sql    | 399 ++++++++++++++++++++++++++++++++
+ tests/Feature/BerkasSqlTest.php |  69 ++++++
+ 3 files changed, 486 insertions(+)
+ create mode 100644 database/sql/arsip_kp_ta.sql
+ create mode 100644 tests/Feature/BerkasSqlTest.php
+
+diff --git a/README.md b/README.md
+index c11e254..adbe79f 100644
+--- a/README.md
++++ b/README.md
+@@ -40,6 +40,7 @@ #    lalu sesuaikan DB_USERNAME dan DB_PASSWORD di file .env
+ 
+ # 4. Buat tabel dan isi data awal
+ php artisan migrate --seed
++#    (alternatif tanpa artisan: impor database/sql/arsip_kp_ta.sql, lihat bagian "Berkas SQL database")
+ 
+ # 5. Pasang dan bangun aset Tailwind
+ npm install
+@@ -99,6 +100,22 @@ ## Alur sistem
+ 
+ Dokumen yang diunggah ulang disimpan sebagai versi baru; versi lama tetap ada sebagai jejak audit.
+ 
++## Berkas SQL database
++
++Seluruh struktur database ada di migrasi (`database/migrations`, file PHP, itu cara Laravel membuat tabel). Untuk yang butuh file `.sql` biasa, tersedia `database/sql/arsip_kp_ta.sql`: struktur 20 tabel beserta data awal (3 program studi, 10 persyaratan, 6 akun contoh dengan kata sandi `password`).
++
++```
++mysql -u root -p < database/sql/arsip_kp_ta.sql
++```
++
++Atau lewat phpMyAdmin: tab Import, pilih file itu. Perhatian: file ini menghapus lalu membuat ulang semua tabel aplikasi di database `arsip_kp_ta`, jadi data yang sudah ada di tabel itu hilang. Tabel `migrations` ikut terisi, sehingga `php artisan migrate` sesudahnya melaporkan "Nothing to migrate".
++
++File ini dibuat dari migrasi dan seeder, dan dijaga oleh `tests/Feature/BerkasSqlTest.php`: tes gagal bila ada tabel, kolom, atau migrasi yang belum ada di file SQL. Setelah menambah migrasi, buat ulang file dari database Anda:
++
++```
++mysqldump -u root -p arsip_kp_ta > database/sql/arsip_kp_ta.sql
++```
++
+ ## Alur surat Tugas Akhir
+ 
+ Khusus TA. Alur KP tidak berubah.
+@@ -159,6 +176,7 @@ ## Struktur kode
+ app/Support          Menu per peran, pencatat log aktivitas
+ database/migrations  Skema (migrasi tambahan, tidak mengubah migrasi bawaan Laravel)
+ database/seeders     Program studi, persyaratan, dan akun contoh
++database/sql         Dump SQL lengkap (struktur dan data awal) untuk impor langsung ke MySQL
+ resources/views      Blade: layouts, partials, components, halaman per peran
+ lang/id              Terjemahan validasi dan teks antarmuka
+ tests/Feature        Uji otomatis
+diff --git a/database/sql/arsip_kp_ta.sql b/database/sql/arsip_kp_ta.sql
+new file mode 100644
+index 0000000..c32d2cc
+--- /dev/null
++++ b/database/sql/arsip_kp_ta.sql
+@@ -0,0 +1,399 @@
++-- ============================================================================
++-- Sistem Pengumpulan dan Arsip Digital Berkas KP dan TA (Fasilkom Unsri)
++-- Database MySQL: arsip_kp_ta
++--
++-- Isi file: struktur seluruh tabel + data awal (program studi, persyaratan, akun contoh).
++-- Struktur dibuat dari file di database/migrations (pernyataan SQL yang sama dengan yang
++-- dijalankan "php artisan migrate"), data awal dari database/seeders.
++-- Tabel "migrations" ikut diisi, jadi "php artisan migrate" setelah impor akan melaporkan
++-- "Nothing to migrate" dan migrasi baru di kemudian hari tetap berjalan normal.
++--
++-- PERHATIAN: file ini menghapus (DROP) lalu membuat ulang semua tabel di atas. Data yang
++-- sudah ada di tabel-tabel itu akan hilang. Jangan diimpor ke database yang berisi data penting.
++-- Akun contoh (kata sandi: "password") hanya untuk pengembangan; ganti sebelum dipakai sungguhan.
++--
++-- Cara impor:  mysql -u root -p < database/sql/arsip_kp_ta.sql
++--   atau lewat phpMyAdmin: tab Import, pilih file ini.
++-- ============================================================================
++
++SET NAMES utf8mb4;
++SET FOREIGN_KEY_CHECKS = 0;
++
++CREATE DATABASE IF NOT EXISTS `arsip_kp_ta` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
++USE `arsip_kp_ta`;
++
++-- ----------------------------------------------------------------------------
++-- Hapus tabel lama (urutan terbalik)
++-- ----------------------------------------------------------------------------
++DROP TABLE IF EXISTS `surat_balasan`;
++DROP TABLE IF EXISTS `riwayat_pembimbing`;
++DROP TABLE IF EXISTS `log_aktivitas`;
++DROP TABLE IF EXISTS `arsip`;
++DROP TABLE IF EXISTS `dokumen_resmi`;
++DROP TABLE IF EXISTS `riwayat_status`;
++DROP TABLE IF EXISTS `pemeriksaan`;
++DROP TABLE IF EXISTS `dokumen_pengajuan`;
++DROP TABLE IF EXISTS `pengajuan`;
++DROP TABLE IF EXISTS `persyaratan`;
++DROP TABLE IF EXISTS `program_studi`;
++DROP TABLE IF EXISTS `failed_jobs`;
++DROP TABLE IF EXISTS `job_batches`;
++DROP TABLE IF EXISTS `jobs`;
++DROP TABLE IF EXISTS `cache_locks`;
++DROP TABLE IF EXISTS `cache`;
++DROP TABLE IF EXISTS `sessions`;
++DROP TABLE IF EXISTS `password_reset_tokens`;
++DROP TABLE IF EXISTS `users`;
++DROP TABLE IF EXISTS `migrations`;
++
++-- ----------------------------------------------------------------------------
++-- Struktur tabel
++-- ----------------------------------------------------------------------------
++
++-- Tabel pencatat migrasi Laravel
++create table `migrations` (
++  `id` int unsigned not null auto_increment primary key,
++  `migration` varchar(255) not null,
++  `batch` int not null
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++
++-- Migrasi: 0001_01_01_000000_create_users_table
++create table `users` (
++  `id` bigint unsigned not null auto_increment primary key,
++  `name` varchar(255) not null,
++  `email` varchar(255) not null,
++  `email_verified_at` timestamp null,
++  `password` varchar(255) not null,
++  `remember_token` varchar(100) null,
++  `created_at` timestamp null,
++  `updated_at` timestamp null
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `users` add unique `users_email_unique`(`email`);
++create table `password_reset_tokens` (
++  `email` varchar(255) not null,
++  `token` varchar(255) not null,
++  `created_at` timestamp null,
++  primary key (`email`)
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++create table `sessions` (
++  `id` varchar(255) not null,
++  `user_id` bigint unsigned null,
++  `ip_address` varchar(45) null,
++  `user_agent` text null,
++  `payload` longtext not null,
++  `last_activity` int not null,
++  primary key (`id`)
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `sessions` add index `sessions_user_id_index`(`user_id`);
++alter table `sessions` add index `sessions_last_activity_index`(`last_activity`);
++
++-- Migrasi: 0001_01_01_000001_create_cache_table
++create table `cache` (
++  `key` varchar(255) not null,
++  `value` mediumtext not null,
++  `expiration` bigint not null,
++  primary key (`key`)
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `cache` add index `cache_expiration_index`(`expiration`);
++create table `cache_locks` (
++  `key` varchar(255) not null,
++  `owner` varchar(255) not null,
++  `expiration` bigint not null,
++  primary key (`key`)
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `cache_locks` add index `cache_locks_expiration_index`(`expiration`);
++
++-- Migrasi: 0001_01_01_000002_create_jobs_table
++create table `jobs` (
++  `id` bigint unsigned not null auto_increment primary key,
++  `queue` varchar(255) not null,
++  `payload` longtext not null,
++  `attempts` smallint unsigned not null,
++  `reserved_at` int unsigned null,
++  `available_at` int unsigned not null,
++  `created_at` int unsigned not null
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `jobs` add index `jobs_queue_index`(`queue`);
++create table `job_batches` (
++  `id` varchar(255) not null,
++  `name` varchar(255) not null,
++  `total_jobs` int not null,
++  `pending_jobs` int not null,
++  `failed_jobs` int not null,
++  `failed_job_ids` longtext not null,
++  `options` mediumtext null,
++  `cancelled_at` int null,
++  `created_at` int not null,
++  `finished_at` int null,
++  primary key (`id`)
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++create table `failed_jobs` (
++  `id` bigint unsigned not null auto_increment primary key,
++  `uuid` varchar(255) not null,
++  `connection` varchar(255) not null,
++  `queue` varchar(255) not null,
++  `payload` longtext not null,
++  `exception` longtext not null,
++  `failed_at` timestamp not null default CURRENT_TIMESTAMP
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `failed_jobs` add index `failed_jobs_connection_queue_failed_at_index`(`connection`, `queue`, `failed_at`);
++alter table `failed_jobs` add unique `failed_jobs_uuid_unique`(`uuid`);
++
++-- Migrasi: 2026_10_22_000001_create_program_studi_table
++create table `program_studi` (
++  `id` bigint unsigned not null auto_increment primary key,
++  `kode` varchar(20) not null,
++  `nama` varchar(255) not null,
++  `jenjang` varchar(10) not null default 'S1',
++  `aktif` tinyint(1) not null default '1',
++  `created_at` timestamp null,
++  `updated_at` timestamp null
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `program_studi` add unique `program_studi_kode_unique`(`kode`);
++
++-- Migrasi: 2026_10_22_000002_add_data_akademik_to_users_table
++alter table `users` add `nomor_induk` varchar(30) null;
++alter table `users` add `role` varchar(20) not null default 'mahasiswa';
++alter table `users` add `program_studi_id` bigint unsigned null;
++alter table `users` add constraint `users_program_studi_id_foreign` foreign key (`program_studi_id`) references `program_studi` (`id`) on delete restrict;
++alter table `users` add `angkatan` smallint unsigned null;
++alter table `users` add `no_hp` varchar(20) null;
++alter table `users` add `aktif` tinyint(1) not null default '1';
++alter table `users` add unique `users_nomor_induk_unique`(`nomor_induk`);
++alter table `users` add index `users_role_index`(`role`);
++
++-- Migrasi: 2026_10_22_000003_create_persyaratan_table
++create table `persyaratan` (
++  `id` bigint unsigned not null auto_increment primary key,
++  `jenis_pengajuan` varchar(5) not null,
++  `nama` varchar(255) not null,
++  `deskripsi` text null,
++  `pemeriksa` varchar(10) not null default 'operator',
++  `wajib` tinyint(1) not null default '1',
++  `urutan` smallint unsigned not null default '0',
++  `ukuran_maks_kb` int unsigned not null default '5120',
++  `ekstensi` varchar(100) not null default 'pdf',
++  `aktif` tinyint(1) not null default '1',
++  `created_at` timestamp null,
++  `updated_at` timestamp null
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `persyaratan` add index `persyaratan_jenis_pengajuan_aktif_index`(`jenis_pengajuan`, `aktif`);
++
++-- Migrasi: 2026_10_22_000004_create_pengajuan_table
++create table `pengajuan` (
++  `id` bigint unsigned not null auto_increment primary key,
++  `mahasiswa_id` bigint unsigned not null,
++  `pembimbing_id` bigint unsigned null,
++  `jenis` varchar(5) not null,
++  `judul` varchar(255) not null,
++  `deskripsi` text null,
++  `instansi` varchar(255) null,
++  `status` varchar(30) not null default 'draft',
++  `diajukan_at` timestamp null,
++  `created_at` timestamp null,
++  `updated_at` timestamp null
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `pengajuan` add constraint `pengajuan_mahasiswa_id_foreign` foreign key (`mahasiswa_id`) references `users` (`id`) on delete restrict;
++alter table `pengajuan` add constraint `pengajuan_pembimbing_id_foreign` foreign key (`pembimbing_id`) references `users` (`id`) on delete restrict;
++alter table `pengajuan` add index `pengajuan_mahasiswa_id_jenis_index`(`mahasiswa_id`, `jenis`);
++alter table `pengajuan` add index `pengajuan_status_index`(`status`);
++
++-- Migrasi: 2026_10_22_000005_create_dokumen_pengajuan_table
++create table `dokumen_pengajuan` (
++  `id` bigint unsigned not null auto_increment primary key,
++  `pengajuan_id` bigint unsigned not null,
++  `persyaratan_id` bigint unsigned not null,
++  `diunggah_oleh` bigint unsigned not null,
++  `versi` int unsigned not null default '1',
++  `terbaru` tinyint(1) not null default '1',
++  `nama_asli` varchar(255) not null,
++  `path` varchar(255) not null,
++  `mime` varchar(100) null,
++  `ukuran` bigint unsigned not null default '0',
++  `status` varchar(20) not null default 'menunggu',
++  `created_at` timestamp null,
++  `updated_at` timestamp null
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `dokumen_pengajuan` add constraint `dokumen_pengajuan_pengajuan_id_foreign` foreign key (`pengajuan_id`) references `pengajuan` (`id`) on delete cascade;
++alter table `dokumen_pengajuan` add constraint `dokumen_pengajuan_persyaratan_id_foreign` foreign key (`persyaratan_id`) references `persyaratan` (`id`) on delete restrict;
++alter table `dokumen_pengajuan` add constraint `dokumen_pengajuan_diunggah_oleh_foreign` foreign key (`diunggah_oleh`) references `users` (`id`) on delete restrict;
++alter table `dokumen_pengajuan` add index `dokumen_pengajuan_terbaru_index`(`pengajuan_id`, `persyaratan_id`, `terbaru`);
++
++-- Migrasi: 2026_10_22_000006_create_pemeriksaan_table
++create table `pemeriksaan` (
++  `id` bigint unsigned not null auto_increment primary key,
++  `pengajuan_id` bigint unsigned not null,
++  `dokumen_id` bigint unsigned null,
++  `pemeriksa_id` bigint unsigned not null,
++  `peran` varchar(10) not null,
++  `keputusan` varchar(10) not null,
++  `catatan` text null,
++  `created_at` timestamp null,
++  `updated_at` timestamp null
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `pemeriksaan` add constraint `pemeriksaan_pengajuan_id_foreign` foreign key (`pengajuan_id`) references `pengajuan` (`id`) on delete cascade;
++alter table `pemeriksaan` add constraint `pemeriksaan_dokumen_id_foreign` foreign key (`dokumen_id`) references `dokumen_pengajuan` (`id`) on delete cascade;
++alter table `pemeriksaan` add constraint `pemeriksaan_pemeriksa_id_foreign` foreign key (`pemeriksa_id`) references `users` (`id`) on delete restrict;
++alter table `pemeriksaan` add index `pemeriksaan_pemeriksa_id_created_at_index`(`pemeriksa_id`, `created_at`);
++
++-- Migrasi: 2026_10_22_000007_create_riwayat_status_table
++create table `riwayat_status` (
++  `id` bigint unsigned not null auto_increment primary key,
++  `pengajuan_id` bigint unsigned not null,
++  `user_id` bigint unsigned null,
++  `status_lama` varchar(30) null,
++  `status_baru` varchar(30) not null,
++  `catatan` text null,
++  `created_at` timestamp null,
++  `updated_at` timestamp null
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `riwayat_status` add constraint `riwayat_status_pengajuan_id_foreign` foreign key (`pengajuan_id`) references `pengajuan` (`id`) on delete cascade;
++alter table `riwayat_status` add constraint `riwayat_status_user_id_foreign` foreign key (`user_id`) references `users` (`id`) on delete set null;
++
++-- Migrasi: 2026_10_22_000008_create_dokumen_resmi_table
++create table `dokumen_resmi` (
++  `id` bigint unsigned not null auto_increment primary key,
++  `pengajuan_id` bigint unsigned not null,
++  `diunggah_oleh` bigint unsigned not null,
++  `jenis` varchar(30) not null,
++  `nomor` varchar(100) not null,
++  `tanggal` date not null,
++  `nama_asli` varchar(255) not null,
++  `path` varchar(255) not null,
++  `mime` varchar(100) null,
++  `ukuran` bigint unsigned not null default '0',
++  `created_at` timestamp null,
++  `updated_at` timestamp null
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `dokumen_resmi` add constraint `dokumen_resmi_pengajuan_id_foreign` foreign key (`pengajuan_id`) references `pengajuan` (`id`) on delete cascade;
++alter table `dokumen_resmi` add constraint `dokumen_resmi_diunggah_oleh_foreign` foreign key (`diunggah_oleh`) references `users` (`id`) on delete restrict;
++
++-- Migrasi: 2026_10_22_000009_create_arsip_table
++create table `arsip` (
++  `id` bigint unsigned not null auto_increment primary key,
++  `pengajuan_id` bigint unsigned not null,
++  `diarsipkan_oleh` bigint unsigned not null,
++  `diarsipkan_at` timestamp not null,
++  `catatan` text null,
++  `created_at` timestamp null,
++  `updated_at` timestamp null
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `arsip` add constraint `arsip_pengajuan_id_foreign` foreign key (`pengajuan_id`) references `pengajuan` (`id`) on delete cascade;
++alter table `arsip` add constraint `arsip_diarsipkan_oleh_foreign` foreign key (`diarsipkan_oleh`) references `users` (`id`) on delete restrict;
++alter table `arsip` add unique `arsip_pengajuan_id_unique`(`pengajuan_id`);
++
++-- Migrasi: 2026_10_22_000010_create_log_aktivitas_table
++create table `log_aktivitas` (
++  `id` bigint unsigned not null auto_increment primary key,
++  `user_id` bigint unsigned null,
++  `aksi` varchar(50) not null,
++  `deskripsi` text not null,
++  `subjek_type` varchar(255) null,
++  `subjek_id` bigint unsigned null,
++  `ip_address` varchar(45) null,
++  `created_at` timestamp null,
++  `updated_at` timestamp null
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `log_aktivitas` add constraint `log_aktivitas_user_id_foreign` foreign key (`user_id`) references `users` (`id`) on delete set null;
++alter table `log_aktivitas` add index `log_aktivitas_subjek_type_subjek_id_index`(`subjek_type`, `subjek_id`);
++alter table `log_aktivitas` add index `log_aktivitas_created_at_index`(`created_at`);
++alter table `log_aktivitas` add index `log_aktivitas_aksi_index`(`aksi`);
++
++-- Migrasi: 2026_10_24_000001_add_pembimbing_to_pengajuan_table
++-- (pengisian ulang data pengajuan lama dihilangkan: database baru belum punya data)
++alter table `pengajuan` add `pembimbing_pilihan_id` bigint unsigned null after `pembimbing_id`;
++alter table `pengajuan` add constraint `pengajuan_pembimbing_pilihan_id_foreign` foreign key (`pembimbing_pilihan_id`) references `users` (`id`) on delete restrict;
++alter table `pengajuan` add `status_pembimbing` varchar(20) not null default 'belum' after `pembimbing_pilihan_id`;
++alter table `pengajuan` add index `pengajuan_status_pembimbing_index`(`status_pembimbing`);
++
++-- Migrasi: 2026_10_24_000002_create_riwayat_pembimbing_table
++create table `riwayat_pembimbing` (
++  `id` bigint unsigned not null auto_increment primary key,
++  `pengajuan_id` bigint unsigned not null,
++  `dosen_id` bigint unsigned null,
++  `user_id` bigint unsigned null,
++  `status` varchar(20) not null,
++  `catatan` text null,
++  `created_at` timestamp null,
++  `updated_at` timestamp null
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `riwayat_pembimbing` add constraint `riwayat_pembimbing_pengajuan_id_foreign` foreign key (`pengajuan_id`) references `pengajuan` (`id`) on delete cascade;
++alter table `riwayat_pembimbing` add constraint `riwayat_pembimbing_dosen_id_foreign` foreign key (`dosen_id`) references `users` (`id`) on delete set null;
++alter table `riwayat_pembimbing` add constraint `riwayat_pembimbing_user_id_foreign` foreign key (`user_id`) references `users` (`id`) on delete set null;
++alter table `riwayat_pembimbing` add index `riwayat_pembimbing_pengajuan_id_status_index`(`pengajuan_id`, `status`);
++
++-- Migrasi: 2026_10_26_000001_create_surat_balasan_table
++create table `surat_balasan` (
++  `id` bigint unsigned not null auto_increment primary key,
++  `pengajuan_id` bigint unsigned not null,
++  `diunggah_oleh` bigint unsigned not null,
++  `versi` int unsigned not null default '1',
++  `terbaru` tinyint(1) not null default '1',
++  `nama_asli` varchar(255) not null,
++  `path` varchar(255) not null,
++  `mime` varchar(100) null,
++  `ukuran` bigint unsigned not null default '0',
++  `status` varchar(20) not null default 'menunggu',
++  `diperiksa_oleh` bigint unsigned null,
++  `diperiksa_at` timestamp null,
++  `catatan` text null,
++  `created_at` timestamp null,
++  `updated_at` timestamp null
++) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
++alter table `surat_balasan` add constraint `surat_balasan_pengajuan_id_foreign` foreign key (`pengajuan_id`) references `pengajuan` (`id`) on delete cascade;
++alter table `surat_balasan` add constraint `surat_balasan_diunggah_oleh_foreign` foreign key (`diunggah_oleh`) references `users` (`id`) on delete restrict;
++alter table `surat_balasan` add constraint `surat_balasan_diperiksa_oleh_foreign` foreign key (`diperiksa_oleh`) references `users` (`id`) on delete set null;
++alter table `surat_balasan` add index `surat_balasan_terbaru_index`(`pengajuan_id`, `terbaru`);
++
++-- ----------------------------------------------------------------------------
++-- Data awal
++-- ----------------------------------------------------------------------------
++
++-- program_studi
++INSERT INTO `program_studi` (`id`, `kode`, `nama`, `jenjang`, `aktif`, `created_at`, `updated_at`) VALUES
++(1, 'TI', 'Teknik Informatika', 'S1', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
++(2, 'SI', 'Sistem Informasi', 'S1', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
++(3, 'SK', 'Sistem Komputer', 'S1', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40');
++
++-- persyaratan
++INSERT INTO `persyaratan` (`id`, `jenis_pengajuan`, `nama`, `deskripsi`, `pemeriksa`, `wajib`, `urutan`, `ukuran_maks_kb`, `ekstensi`, `aktif`, `created_at`, `updated_at`) VALUES
++(1, 'kp', 'Surat Permohonan KP', 'Surat permohonan KP bertanda tangan.', 'operator', 1, 1, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
++(2, 'kp', 'Transkrip Nilai Sementara', 'Transkrip nilai terbaru dari sistem akademik.', 'operator', 1, 2, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
++(3, 'kp', 'KRS Semester Berjalan', 'Kartu Rencana Studi semester berjalan.', 'operator', 1, 3, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
++(4, 'kp', 'Surat Penerimaan dari Instansi', 'Surat balasan atau persetujuan dari instansi tujuan KP.', 'operator', 1, 4, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
++(5, 'kp', 'Proposal Kerja Praktik', 'Proposal KP yang akan diperiksa dosen pembimbing.', 'dosen', 1, 5, 5120, 'pdf,doc,docx', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
++(6, 'ta', 'Transkrip Nilai', 'Transkrip nilai terbaru dari sistem akademik.', 'operator', 1, 1, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
++(7, 'ta', 'KRS Semester Berjalan', 'Kartu Rencana Studi semester berjalan.', 'operator', 1, 2, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
++(8, 'ta', 'Bukti Pembayaran UKT', 'Bukti pembayaran UKT semester berjalan.', 'operator', 1, 3, 5120, 'pdf,jpg,jpeg,png', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
++(9, 'ta', 'Proposal Tugas Akhir', 'Proposal TA yang akan diperiksa dosen pembimbing.', 'dosen', 1, 4, 5120, 'pdf,doc,docx', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
++(10, 'ta', 'Lembar Persetujuan Topik', 'Opsional. Lembar persetujuan topik dari calon pembimbing.', 'dosen', 0, 5, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40');
++
++-- users
++INSERT INTO `users` (`id`, `name`, `email`, `email_verified_at`, `password`, `remember_token`, `created_at`, `updated_at`, `nomor_induk`, `role`, `program_studi_id`, `angkatan`, `no_hp`, `aktif`) VALUES
++(1, 'Administrator Sistem', 'admin@fasilkom.test', NULL, '$2y$12$6qpxqcvI34nJDr1RCJpJIegBgPzJUUd847IDT3W/nrze5d9BR5ir6', NULL, '2026-10-27 10:17:41', '2026-10-27 10:17:41', 'ADM0001', 'admin', NULL, NULL, NULL, 1),
++(2, 'Operator Akademik', 'operator@fasilkom.test', NULL, '$2y$12$I1Llz9uv96wcaOhZhqULd.N8fkhBcOUgTbm.9STL9ZRpnJGWqb8Lm', NULL, '2026-10-27 10:17:41', '2026-10-27 10:17:41', 'OPR0001', 'operator', NULL, NULL, NULL, 1),
++(3, 'Dr. Budi Santoso, M.Kom.', 'dosen1@fasilkom.test', NULL, '$2y$12$JdbJrAqPprYnSTbp0fEFAehjuqPjm3SZvcMpDX2AxWhDrxTwdjQiS', NULL, '2026-10-27 10:17:41', '2026-10-27 10:17:41', '198001012005011001', 'dosen', 1, NULL, NULL, 1),
++(4, 'Dr. Siti Rahma, M.T.', 'dosen2@fasilkom.test', NULL, '$2y$12$qS9yps5T9PIgfnOz0lpL8.3iQAo7b3OHSux2e7KyqIRrnogWc3QSS', NULL, '2026-10-27 10:17:41', '2026-10-27 10:17:41', '198203152006042001', 'dosen', 2, NULL, NULL, 1),
++(5, 'Andi Pratama', 'mahasiswa1@fasilkom.test', NULL, '$2y$12$QlXzERmpw8AbuFpCx4lIuuwbz2An9edTxSqkuq9o/wMnGSpxujwJ2', NULL, '2026-10-27 10:17:41', '2026-10-27 10:17:41', '09021282126001', 'mahasiswa', 1, 2021, NULL, 1),
++(6, 'Rina Lestari', 'mahasiswa2@fasilkom.test', NULL, '$2y$12$MpSaEQtDZeugrTqey2m/W.vYFK2RZMMyObF8.HgT3vATCU3crUmsG', NULL, '2026-10-27 10:17:41', '2026-10-27 10:17:41', '09021282227002', 'mahasiswa', 2, 2022, NULL, 1);
++
++-- migrations (semua migrasi dianggap sudah dijalankan, batch 1)
++INSERT INTO `migrations` (`migration`, `batch`) VALUES
++('0001_01_01_000000_create_users_table', 1),
++('0001_01_01_000001_create_cache_table', 1),
++('0001_01_01_000002_create_jobs_table', 1),
++('2026_10_22_000001_create_program_studi_table', 1),
++('2026_10_22_000002_add_data_akademik_to_users_table', 1),
++('2026_10_22_000003_create_persyaratan_table', 1),
++('2026_10_22_000004_create_pengajuan_table', 1),
++('2026_10_22_000005_create_dokumen_pengajuan_table', 1),
++('2026_10_22_000006_create_pemeriksaan_table', 1),
++('2026_10_22_000007_create_riwayat_status_table', 1),
++('2026_10_22_000008_create_dokumen_resmi_table', 1),
++('2026_10_22_000009_create_arsip_table', 1),
++('2026_10_22_000010_create_log_aktivitas_table', 1),
++('2026_10_24_000001_add_pembimbing_to_pengajuan_table', 1),
++('2026_10_24_000002_create_riwayat_pembimbing_table', 1),
++('2026_10_26_000001_create_surat_balasan_table', 1);
++
++SET FOREIGN_KEY_CHECKS = 1;
+diff --git a/tests/Feature/BerkasSqlTest.php b/tests/Feature/BerkasSqlTest.php
+new file mode 100644
+index 0000000..2da01b5
+--- /dev/null
++++ b/tests/Feature/BerkasSqlTest.php
+@@ -0,0 +1,69 @@
++<?php
++
++namespace Tests\Feature;
++
++use App\Models\ProgramStudi;
++use App\Models\User;
++use Illuminate\Foundation\Testing\RefreshDatabase;
++use Illuminate\Support\Facades\Schema;
++use Tests\TestCase;
++
++/**
++ * Penjaga agar database/sql/arsip_kp_ta.sql tidak tertinggal dari migrasi dan seeder.
++ * Bila tes ini gagal setelah Anda menambah migrasi, buat ulang berkas SQL dari database Anda:
++ *   mysqldump -u root -p arsip_kp_ta > database/sql/arsip_kp_ta.sql
++ */
++class BerkasSqlTest extends TestCase
++{
++    use RefreshDatabase;
++
++    private const PETUNJUK = 'Berkas database/sql/arsip_kp_ta.sql tertinggal dari migrasi. Buat ulang dengan: mysqldump -u root -p arsip_kp_ta > database/sql/arsip_kp_ta.sql';
++
++    private function sql(): string
++    {
++        $path = base_path('database/sql/arsip_kp_ta.sql');
++        $this->assertFileExists($path);
++
++        return file_get_contents($path);
++    }
++
++    public function test_berkas_sql_memuat_semua_tabel_dan_kolom_hasil_migrasi(): void
++    {
++        $sql = $this->sql();
++
++        foreach (Schema::getTables() as $tabel) {
++            $nama = $tabel['name'];
++
++            $cocok = preg_match('/create table (?:if not exists )?`'.preg_quote($nama, '/').'` \((.*?)\n\)[ ;]/is', $sql, $m);
++            $this->assertSame(1, $cocok, "Tabel {$nama} tidak ada di berkas SQL. ".self::PETUNJUK);
++
++            foreach (Schema::getColumnListing($nama) as $kolom) {
++                $ada = str_contains($m[1], "`{$kolom}` ") || str_contains($sql, "alter table `{$nama}` add `{$kolom}` ");
++                $this->assertTrue($ada, "Kolom {$nama}.{$kolom} tidak ada di berkas SQL. ".self::PETUNJUK);
++            }
++        }
++    }
++
++    public function test_berkas_sql_mencatat_semua_migrasi_sebagai_sudah_dijalankan(): void
++    {
++        $sql = $this->sql();
++
++        foreach (glob(database_path('migrations/*.php')) as $berkas) {
++            $nama = basename($berkas, '.php');
++            $this->assertStringContainsString("'{$nama}'", $sql, "Migrasi {$nama} belum tercatat di berkas SQL. ".self::PETUNJUK);
++        }
++    }
++
++    public function test_berkas_sql_memuat_data_awal_dan_akun_contoh(): void
++    {
++        $this->seed();
++        $sql = $this->sql();
++
++        foreach (User::pluck('email') as $email) {
++            $this->assertStringContainsString("'{$email}'", $sql, "Akun {$email} tidak ada di berkas SQL.");
++        }
++        foreach (ProgramStudi::pluck('kode') as $kode) {
++            $this->assertStringContainsString("'{$kode}'", $sql, "Program studi {$kode} tidak ada di berkas SQL.");
++        }
++    }
++}
+-- 
+2.43.0
+
