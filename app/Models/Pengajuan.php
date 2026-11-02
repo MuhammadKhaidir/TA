@@ -321,4 +321,46 @@ class Pengajuan extends Model
                 : 'Belum ditentukan.',
         };
     }
+
+    /**
+     * Alasan kartu konsultasi belum bisa diunduh, atau null bila boleh.
+     * Kartu memuat dosen pembimbing, jadi baru tersedia setelah pembimbing sah (diterima atau ditetapkan).
+     * Satu-satunya tempat aturan ini; policy dan tampilan memakainya.
+     */
+    public function hambatanKartuKonsultasi(): ?string
+    {
+        if ($this->pembimbing_id !== null && $this->status_pembimbing->aktif()) {
+            return null;
+        }
+
+        return match ($this->status_pembimbing) {
+            StatusPembimbing::Menunggu => 'Kartu konsultasi tersedia setelah dosen pembimbing menerima permintaan Anda.',
+            StatusPembimbing::Ditolak => 'Kartu konsultasi tersedia setelah operator akademik menetapkan dosen pembimbing pengganti.',
+            default => 'Kartu konsultasi tersedia setelah dosen pembimbing ditetapkan.',
+        };
+    }
+
+    /**
+     * Isi kartu konsultasi (lihat App\Support\Pdf\KartuKonsultasi).
+     * Relasi mahasiswa.programStudi dan pembimbing harus sudah dimuat.
+     *
+     * @return array{jenis: string, nama: string, nim: ?string, prodi: ?string, judul: string, instansi: ?string, pembimbing: ?string, pembimbing_nomor: ?string, dicetak: string}
+     */
+    public function dataKartuKonsultasi(): array
+    {
+        $mahasiswa = $this->mahasiswa;
+        $prodi = $mahasiswa->programStudi?->namaLengkap();
+
+        return [
+            'jenis' => $this->jenis->label(),
+            'nama' => $mahasiswa->name,
+            'nim' => $mahasiswa->nomor_induk,
+            'prodi' => $prodi !== null && $mahasiswa->angkatan ? "{$prodi}, angkatan {$mahasiswa->angkatan}" : $prodi,
+            'judul' => $this->judul,
+            'instansi' => $this->instansi,
+            'pembimbing' => $this->pembimbing?->name,
+            'pembimbing_nomor' => $this->pembimbing?->nomor_induk,
+            'dicetak' => now()->translatedFormat('d F Y'),
+        ];
+    }
 }

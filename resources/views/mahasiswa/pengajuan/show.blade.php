@@ -63,6 +63,7 @@
 
         <div class="space-y-6">
             @include('partials.pengajuan.ringkasan')
+            @include('partials.pengajuan.kartu-konsultasi')
             @include('partials.pengajuan.riwayat')
             @include('partials.pengajuan.riwayat-pembimbing')
         </div>

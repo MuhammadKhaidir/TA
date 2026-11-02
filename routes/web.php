@@ -56,6 +56,7 @@ Route::middleware('auth')->group(function () {
 
         Route::post('/pengajuan/detail/{pengajuan}/dokumen', [Mahasiswa\DokumenController::class, 'store'])->name('dokumen.store');
         Route::post('/pengajuan/detail/{pengajuan}/surat-balasan', [Mahasiswa\SuratBalasanController::class, 'store'])->name('surat-balasan.store');
+        Route::get('/pengajuan/detail/{pengajuan}/kartu-konsultasi', [Mahasiswa\KartuKonsultasiController::class, 'unduh'])->name('kartu-konsultasi.unduh');
         Route::get('/status', [Mahasiswa\StatusController::class, 'index'])->name('status.index');
         Route::get('/berkas', [Mahasiswa\BerkasSayaController::class, 'index'])->name('berkas.index');
     });

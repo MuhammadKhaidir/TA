@@ -70,6 +70,17 @@ class PengajuanPolicy
             && $pengajuan->status !== StatusPengajuan::Draft;
     }
 
+    /**
+     * Mahasiswa pemilik mengunduh kartu konsultasi (PDF) setelah dosen pembimbingnya sah.
+     * Aturan kesiapan ada di Pengajuan::hambatanKartuKonsultasi().
+     */
+    public function unduhKartuKonsultasi(User $user, Pengajuan $pengajuan): bool
+    {
+        return $user->role === Role::Mahasiswa
+            && (int) $pengajuan->mahasiswa_id === (int) $user->id
+            && $pengajuan->hambatanKartuKonsultasi() === null;
+    }
+
     /** Operator menetapkan atau mengganti dosen pembimbing selama belum diarsipkan. */
     public function kelola(User $user, Pengajuan $pengajuan): bool
     {
