@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\HeaderUtils;
 
 /**
  * Kartu konsultasi bimbingan KP/TA dalam bentuk PDF, dibuat saat diminta (tidak disimpan di server)
- * dari data pengajuan yang sama dengan yang dilihat dosen dan operator.
+ * dari data pengajuan yang sama dengan yang dilihat dosen dan admin.
  */
 class KartuKonsultasiController extends Controller
 {

@@ -61,7 +61,7 @@ class BimbinganController extends Controller
             'sukses',
             $terima
                 ? 'Anda menjadi pembimbing TA mahasiswa tersebut.'
-                : 'Permintaan ditolak. Operator akademik akan menetapkan dosen pengganti.',
+                : 'Permintaan ditolak. Admin akan menetapkan dosen pengganti.',
         );
     }
 }

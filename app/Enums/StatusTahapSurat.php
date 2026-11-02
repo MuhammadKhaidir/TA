@@ -12,7 +12,7 @@ enum StatusTahapSurat: string
     case Terkunci = 'terkunci';
     /** Menunggu tindakan mahasiswa. */
     case Giliran = 'giliran';
-    /** Menunggu tindakan operator. */
+    /** Menunggu tindakan admin. */
     case Menunggu = 'menunggu';
     case Revisi = 'revisi';
     case Selesai = 'selesai';

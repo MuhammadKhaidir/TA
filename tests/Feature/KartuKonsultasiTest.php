@@ -15,7 +15,7 @@ use Tests\TestCase;
 
 /**
  * Kartu konsultasi (PDF): hanya mahasiswa pemilik, dan hanya setelah dosen pembimbingnya sah
- * (KP: ditetapkan operator, TA: diterima dosen pilihan atau ditetapkan operator).
+ * (KP: ditetapkan admin, TA: diterima dosen pilihan atau ditetapkan admin).
  */
 class KartuKonsultasiTest extends TestCase
 {
@@ -109,7 +109,6 @@ class KartuKonsultasiTest extends TestCase
 
         $this->unduh(User::factory()->mahasiswa()->create(), $pengajuan)->assertForbidden();
         $this->unduh($this->dosen, $pengajuan)->assertForbidden();
-        $this->unduh(User::factory()->operator()->create(), $pengajuan)->assertForbidden();
         $this->unduh(User::factory()->admin()->create(), $pengajuan)->assertForbidden();
     }
 

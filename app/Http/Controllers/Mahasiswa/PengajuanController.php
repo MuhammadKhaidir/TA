@@ -72,7 +72,7 @@ class PengajuanController extends Controller
             return $this->tolakDuplikat($jenis);
         }
 
-        // KP: pembimbing ditetapkan operator, tidak dipilih mahasiswa. TA: mahasiswa memilih dosen.
+        // KP: pembimbing ditetapkan admin, tidak dipilih mahasiswa. TA: mahasiswa memilih dosen.
         $data = $this->validasi($request, $jenis, $jenis === JenisPengajuan::Ta);
         $pilihan = Arr::pull($data, 'pembimbing_id');
 
@@ -125,7 +125,7 @@ class PengajuanController extends Controller
     {
         $this->authorize('update', $pengajuan);
 
-        // Dosen pilihan TA hanya dapat diganti selama draft. Setelah dikirim, penggantian lewat operator.
+        // Dosen pilihan TA hanya dapat diganti selama draft. Setelah dikirim, penggantian lewat admin.
         $bisaPilih = $this->bisaPilihPembimbing($pengajuan);
         $data = $this->validasi($request, $pengajuan->jenis, $bisaPilih);
         $pilihan = Arr::pull($data, 'pembimbing_id');

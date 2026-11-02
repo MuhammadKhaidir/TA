@@ -32,7 +32,7 @@ class RenderHalamanTest extends TestCase
         $this->seed(DatabaseSeeder::class);
         $jumlah = [User::count(), ProgramStudi::count(), Persyaratan::count()];
 
-        $this->assertSame(6, $jumlah[0]);
+        $this->assertSame(5, $jumlah[0]);
         $this->assertSame(3, $jumlah[1]);
         $this->assertGreaterThan(5, $jumlah[2]);
 
@@ -47,7 +47,7 @@ class RenderHalamanTest extends TestCase
         $this->assertSame('Nama Dosen Diubah', User::where('email', 'dosen1@fasilkom.test')->value('name'));
 
         // Setiap akun contoh dapat login dan diarahkan ke dashboard role masing-masing.
-        foreach (['admin', 'operator', 'dosen1', 'dosen2', 'mahasiswa1', 'mahasiswa2'] as $akun) {
+        foreach (['admin', 'dosen1', 'dosen2', 'mahasiswa1', 'mahasiswa2'] as $akun) {
             $this->post('/login', ['login' => "{$akun}@fasilkom.test", 'password' => 'password'])->assertRedirect(route('dashboard'));
             $this->get('/dashboard')->assertRedirect();
             $this->post('/logout');
@@ -59,7 +59,6 @@ class RenderHalamanTest extends TestCase
         $this->seed(DatabaseSeeder::class);
 
         $admin = User::where('email', 'admin@fasilkom.test')->firstOrFail();
-        $operator = User::where('email', 'operator@fasilkom.test')->firstOrFail();
         $dosen = User::where('email', 'dosen1@fasilkom.test')->firstOrFail();
         $mahasiswa = User::where('email', 'mahasiswa1@fasilkom.test')->firstOrFail();
 
@@ -100,12 +99,12 @@ class RenderHalamanTest extends TestCase
             if (in_array($status, [StatusPengajuan::Disetujui, StatusPengajuan::Diarsipkan], true)) {
                 DokumenResmi::create([
                     'pengajuan_id' => $p->id, 'jenis' => array_key_first($jenis->jenisDokumenResmi()), 'nomor' => "00{$i}/UN9",
-                    'tanggal' => now()->toDateString(), 'diunggah_oleh' => $operator->id,
+                    'tanggal' => now()->toDateString(), 'diunggah_oleh' => $admin->id,
                     'nama_asli' => 'resmi.pdf', 'path' => "resmi/{$p->id}/resmi.pdf", 'mime' => 'application/pdf', 'ukuran' => 5000,
                 ]);
             }
             if ($status === StatusPengajuan::Diarsipkan) {
-                Arsip::create(['pengajuan_id' => $p->id, 'diarsipkan_oleh' => $operator->id, 'diarsipkan_at' => now(), 'catatan' => 'Lengkap']);
+                Arsip::create(['pengajuan_id' => $p->id, 'diarsipkan_oleh' => $admin->id, 'diarsipkan_at' => now(), 'catatan' => 'Lengkap']);
             }
 
             $semua[] = $p;
@@ -114,7 +113,7 @@ class RenderHalamanTest extends TestCase
         // Variasi alur surat TA (pengantar, balasan, SK) supaya setiap keadaan tahapnya ikut dirender di semua halaman.
         $resmi = fn (Pengajuan $p, string $jenis) => DokumenResmi::create([
             'pengajuan_id' => $p->id, 'jenis' => $jenis, 'nomor' => "{$jenis}/UN9", 'tanggal' => now()->toDateString(),
-            'diunggah_oleh' => $operator->id, 'nama_asli' => "{$jenis}.pdf", 'path' => "resmi/{$p->id}/{$jenis}.pdf",
+            'diunggah_oleh' => $admin->id, 'nama_asli' => "{$jenis}.pdf", 'path' => "resmi/{$p->id}/{$jenis}.pdf",
             'mime' => 'application/pdf', 'ukuran' => 5000,
         ]);
         $balasan = fn (Pengajuan $p, int $versi, bool $terbaru, StatusDokumen $status) => SuratBalasan::create([
@@ -150,7 +149,7 @@ class RenderHalamanTest extends TestCase
                 $resmi($p, JenisPengajuan::SK_TA);
             }
             if ($status === StatusPengajuan::Diarsipkan) {
-                Arsip::create(['pengajuan_id' => $p->id, 'diarsipkan_oleh' => $operator->id, 'diarsipkan_at' => now(), 'catatan' => 'Lengkap']);
+                Arsip::create(['pengajuan_id' => $p->id, 'diarsipkan_oleh' => $admin->id, 'diarsipkan_at' => now(), 'catatan' => 'Lengkap']);
             }
             $semua[] = $p;
         }
@@ -168,14 +167,12 @@ class RenderHalamanTest extends TestCase
                 route('dosen.dashboard'), route('dosen.pemeriksaan.index'), route('dosen.bimbingan.index'),
                 route('dosen.riwayat.index'), route('profil.show'),
             ],
-            'operator' => [
-                route('operator.dashboard'), route('operator.verifikasi.index'), route('operator.pengajuan.index'),
-                route('operator.dokumen-resmi.index'), route('operator.arsip.index'), route('profil.show'),
-                route('operator.pengajuan.index', ['q' => 'Judul']), route('operator.pengajuan.index', ['status' => 'diarsipkan']),
-                route('operator.pengajuan.index', ['jenis' => 'ta']), route('operator.arsip.index', ['q' => 'Judul']),
-            ],
             'admin' => [
-                route('admin.dashboard'), route('admin.users.index'), route('admin.users.create'), route('admin.users.edit', $mahasiswa),
+                route('admin.dashboard'), route('admin.verifikasi.index'), route('admin.pengajuan.index'),
+                route('admin.dokumen-resmi.index'), route('admin.arsip.index'),
+                route('admin.pengajuan.index', ['q' => 'Judul']), route('admin.pengajuan.index', ['status' => 'diarsipkan']),
+                route('admin.pengajuan.index', ['jenis' => 'ta']), route('admin.arsip.index', ['q' => 'Judul']),
+                route('admin.users.index'), route('admin.users.create'), route('admin.users.edit', $mahasiswa),
                 route('admin.users.edit', $dosen), route('admin.users.edit', $admin),
                 route('admin.program-studi.index'), route('admin.program-studi.create'), route('admin.program-studi.edit', $prodi),
                 route('admin.persyaratan.index'), route('admin.persyaratan.create'), route('admin.persyaratan.edit', $syarat),
@@ -189,14 +186,14 @@ class RenderHalamanTest extends TestCase
                 $halaman['mahasiswa'][] = route('mahasiswa.pengajuan.edit', $p);
             }
             $halaman['dosen'][] = route('dosen.pemeriksaan.show', $p);
-            $halaman['operator'][] = route('operator.verifikasi.show', $p);
-            $halaman['operator'][] = route('operator.pengajuan.show', $p);
-            $halaman['operator'][] = route('operator.dokumen-resmi.show', $p);
-            $halaman['operator'][] = route('operator.arsip.show', $p);
+            $halaman['admin'][] = route('admin.verifikasi.show', $p);
+            $halaman['admin'][] = route('admin.pengajuan.show', $p);
+            $halaman['admin'][] = route('admin.dokumen-resmi.show', $p);
+            $halaman['admin'][] = route('admin.arsip.show', $p);
         }
         $halaman['mahasiswa'][] = route('mahasiswa.pengajuan.create', 'ta');
 
-        $pengguna = ['mahasiswa' => $mahasiswa, 'dosen' => $dosen, 'operator' => $operator, 'admin' => $admin];
+        $pengguna = ['mahasiswa' => $mahasiswa, 'dosen' => $dosen, 'admin' => $admin];
 
         foreach ($halaman as $role => $daftar) {
             foreach ($daftar as $url) {
@@ -214,7 +211,7 @@ class RenderHalamanTest extends TestCase
         }
 
         // Halaman utama tiap role harus benar-benar 200.
-        foreach (['mahasiswa', 'dosen', 'operator', 'admin'] as $role) {
+        foreach (['mahasiswa', 'dosen', 'admin'] as $role) {
             $this->actingAs($pengguna[$role]->fresh())->get(route("{$role}.dashboard"))->assertOk();
         }
     }

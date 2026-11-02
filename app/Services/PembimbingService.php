@@ -18,9 +18,9 @@ use Illuminate\Validation\ValidationException;
  * Seluruh perubahan dosen pembimbing lewat kelas ini.
  *
  * Aturan:
- *  - KP : mahasiswa tidak memilih. Operator menetapkan dosen dari daftar dosen di database.
+ *  - KP : mahasiswa tidak memilih. Admin menetapkan dosen dari daftar dosen di database.
  *  - TA : mahasiswa memilih dosen saat pengajuan (draft). Dosen tersebut menerima atau menolak
- *         (alasan wajib). Bila ditolak, operator menetapkan dosen pengganti, sebaiknya yang
+ *         (alasan wajib). Bila ditolak, admin menetapkan dosen pengganti, sebaiknya yang
  *         beban bimbingannya paling sedikit.
  *  - pembimbing_id hanya terisi bila pembimbing sudah sah (diterima atau ditetapkan).
  */
@@ -30,7 +30,7 @@ class PembimbingService
     public function pilih(Pengajuan $pengajuan, User $dosen, User $oleh): void
     {
         if ($pengajuan->jenis !== JenisPengajuan::Ta) {
-            throw ValidationException::withMessages(['pembimbing_id' => 'Dosen pembimbing KP ditetapkan oleh operator akademik.']);
+            throw ValidationException::withMessages(['pembimbing_id' => 'Dosen pembimbing KP ditetapkan oleh admin.']);
         }
 
         if ($pengajuan->status !== StatusPengajuan::Draft) {
@@ -71,7 +71,7 @@ class PembimbingService
         }
 
         if (! $terima && $catatan === null) {
-            throw ValidationException::withMessages(['catatan' => 'Alasan penolakan wajib diisi agar mahasiswa dan operator mengetahuinya.']);
+            throw ValidationException::withMessages(['catatan' => 'Alasan penolakan wajib diisi agar mahasiswa dan admin mengetahuinya.']);
         }
 
         DB::transaction(function () use ($pengajuan, $dosen, $terima, $catatan) {
@@ -92,10 +92,10 @@ class PembimbingService
     }
 
     /**
-     * Operator menetapkan (atau mengganti) dosen pembimbing, untuk KP maupun TA.
-     * Catatan wajib bila operator menggantikan permintaan yang masih menunggu atau pembimbing yang sudah diterima.
+     * Admin menetapkan (atau mengganti) dosen pembimbing, untuk KP maupun TA.
+     * Catatan wajib bila admin menggantikan permintaan yang masih menunggu atau pembimbing yang sudah diterima.
      */
-    public function tetapkan(Pengajuan $pengajuan, User $dosen, User $operator, ?string $catatan = null): void
+    public function tetapkan(Pengajuan $pengajuan, User $dosen, User $admin, ?string $catatan = null): void
     {
         $catatan = filled($catatan) ? trim($catatan) : null;
 
@@ -121,13 +121,13 @@ class PembimbingService
             throw ValidationException::withMessages(['catatan' => 'Catatan wajib diisi karena Anda menggantikan pembimbing yang dipilih atau sudah diterima.']);
         }
 
-        DB::transaction(function () use ($pengajuan, $dosen, $operator, $catatan) {
+        DB::transaction(function () use ($pengajuan, $dosen, $admin, $catatan) {
             $pengajuan->forceFill([
                 'pembimbing_id' => $dosen->id,
                 'status_pembimbing' => StatusPembimbing::Ditetapkan,
             ])->save();
 
-            $this->catat($pengajuan, $dosen, $operator, StatusPembimbing::Ditetapkan, $catatan,
+            $this->catat($pengajuan, $dosen, $admin, StatusPembimbing::Ditetapkan, $catatan,
                 "Menetapkan {$dosen->name} sebagai pembimbing {$pengajuan->jenis->singkat()} #{$pengajuan->id}");
         });
     }

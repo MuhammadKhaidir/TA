@@ -345,6 +345,11 @@ alter table `surat_balasan` add constraint `surat_balasan_diunggah_oleh_foreign`
 alter table `surat_balasan` add constraint `surat_balasan_diperiksa_oleh_foreign` foreign key (`diperiksa_oleh`) references `users` (`id`) on delete set null;
 alter table `surat_balasan` add index `surat_balasan_terbaru_index`(`pengajuan_id`, `terbaru`);
 
+-- Migrasi: 2026_11_02_000001_gabungkan_operator_ke_admin
+-- (pengalihan nilai 'operator' menjadi 'admin' pada users, persyaratan, dan pemeriksaan dihilangkan:
+--  database baru belum punya data lama; data awal di bawah sudah memakai 'admin')
+alter table `persyaratan` modify `pemeriksa` varchar(10) not null default 'admin';
+
 -- ----------------------------------------------------------------------------
 -- Data awal
 -- ----------------------------------------------------------------------------
@@ -357,25 +362,24 @@ INSERT INTO `program_studi` (`id`, `kode`, `nama`, `jenjang`, `aktif`, `created_
 
 -- persyaratan
 INSERT INTO `persyaratan` (`id`, `jenis_pengajuan`, `nama`, `deskripsi`, `pemeriksa`, `wajib`, `urutan`, `ukuran_maks_kb`, `ekstensi`, `aktif`, `created_at`, `updated_at`) VALUES
-(1, 'kp', 'Surat Permohonan KP', 'Surat permohonan KP bertanda tangan.', 'operator', 1, 1, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
-(2, 'kp', 'Transkrip Nilai Sementara', 'Transkrip nilai terbaru dari sistem akademik.', 'operator', 1, 2, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
-(3, 'kp', 'KRS Semester Berjalan', 'Kartu Rencana Studi semester berjalan.', 'operator', 1, 3, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
-(4, 'kp', 'Surat Penerimaan dari Instansi', 'Surat balasan atau persetujuan dari instansi tujuan KP.', 'operator', 1, 4, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
+(1, 'kp', 'Surat Permohonan KP', 'Surat permohonan KP bertanda tangan.', 'admin', 1, 1, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
+(2, 'kp', 'Transkrip Nilai Sementara', 'Transkrip nilai terbaru dari sistem akademik.', 'admin', 1, 2, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
+(3, 'kp', 'KRS Semester Berjalan', 'Kartu Rencana Studi semester berjalan.', 'admin', 1, 3, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
+(4, 'kp', 'Surat Penerimaan dari Instansi', 'Surat balasan atau persetujuan dari instansi tujuan KP.', 'admin', 1, 4, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
 (5, 'kp', 'Proposal Kerja Praktik', 'Proposal KP yang akan diperiksa dosen pembimbing.', 'dosen', 1, 5, 5120, 'pdf,doc,docx', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
-(6, 'ta', 'Transkrip Nilai', 'Transkrip nilai terbaru dari sistem akademik.', 'operator', 1, 1, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
-(7, 'ta', 'KRS Semester Berjalan', 'Kartu Rencana Studi semester berjalan.', 'operator', 1, 2, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
-(8, 'ta', 'Bukti Pembayaran UKT', 'Bukti pembayaran UKT semester berjalan.', 'operator', 1, 3, 5120, 'pdf,jpg,jpeg,png', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
+(6, 'ta', 'Transkrip Nilai', 'Transkrip nilai terbaru dari sistem akademik.', 'admin', 1, 1, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
+(7, 'ta', 'KRS Semester Berjalan', 'Kartu Rencana Studi semester berjalan.', 'admin', 1, 2, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
+(8, 'ta', 'Bukti Pembayaran UKT', 'Bukti pembayaran UKT semester berjalan.', 'admin', 1, 3, 5120, 'pdf,jpg,jpeg,png', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
 (9, 'ta', 'Proposal Tugas Akhir', 'Proposal TA yang akan diperiksa dosen pembimbing.', 'dosen', 1, 4, 5120, 'pdf,doc,docx', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40'),
 (10, 'ta', 'Lembar Persetujuan Topik', 'Opsional. Lembar persetujuan topik dari calon pembimbing.', 'dosen', 0, 5, 5120, 'pdf', 1, '2026-10-27 10:17:40', '2026-10-27 10:17:40');
 
 -- users
 INSERT INTO `users` (`id`, `name`, `email`, `email_verified_at`, `password`, `remember_token`, `created_at`, `updated_at`, `nomor_induk`, `role`, `program_studi_id`, `angkatan`, `no_hp`, `aktif`) VALUES
 (1, 'Administrator Sistem', 'admin@fasilkom.test', NULL, '$2y$12$6qpxqcvI34nJDr1RCJpJIegBgPzJUUd847IDT3W/nrze5d9BR5ir6', NULL, '2026-10-27 10:17:41', '2026-10-27 10:17:41', 'ADM0001', 'admin', NULL, NULL, NULL, 1),
-(2, 'Operator Akademik', 'operator@fasilkom.test', NULL, '$2y$12$I1Llz9uv96wcaOhZhqULd.N8fkhBcOUgTbm.9STL9ZRpnJGWqb8Lm', NULL, '2026-10-27 10:17:41', '2026-10-27 10:17:41', 'OPR0001', 'operator', NULL, NULL, NULL, 1),
-(3, 'Dr. Budi Santoso, M.Kom.', 'dosen1@fasilkom.test', NULL, '$2y$12$JdbJrAqPprYnSTbp0fEFAehjuqPjm3SZvcMpDX2AxWhDrxTwdjQiS', NULL, '2026-10-27 10:17:41', '2026-10-27 10:17:41', '198001012005011001', 'dosen', 1, NULL, NULL, 1),
-(4, 'Dr. Siti Rahma, M.T.', 'dosen2@fasilkom.test', NULL, '$2y$12$qS9yps5T9PIgfnOz0lpL8.3iQAo7b3OHSux2e7KyqIRrnogWc3QSS', NULL, '2026-10-27 10:17:41', '2026-10-27 10:17:41', '198203152006042001', 'dosen', 2, NULL, NULL, 1),
-(5, 'Andi Pratama', 'mahasiswa1@fasilkom.test', NULL, '$2y$12$QlXzERmpw8AbuFpCx4lIuuwbz2An9edTxSqkuq9o/wMnGSpxujwJ2', NULL, '2026-10-27 10:17:41', '2026-10-27 10:17:41', '09021282126001', 'mahasiswa', 1, 2021, NULL, 1),
-(6, 'Rina Lestari', 'mahasiswa2@fasilkom.test', NULL, '$2y$12$MpSaEQtDZeugrTqey2m/W.vYFK2RZMMyObF8.HgT3vATCU3crUmsG', NULL, '2026-10-27 10:17:41', '2026-10-27 10:17:41', '09021282227002', 'mahasiswa', 2, 2022, NULL, 1);
+(2, 'Dr. Budi Santoso, M.Kom.', 'dosen1@fasilkom.test', NULL, '$2y$12$JdbJrAqPprYnSTbp0fEFAehjuqPjm3SZvcMpDX2AxWhDrxTwdjQiS', NULL, '2026-10-27 10:17:41', '2026-10-27 10:17:41', '198001012005011001', 'dosen', 1, NULL, NULL, 1),
+(3, 'Dr. Siti Rahma, M.T.', 'dosen2@fasilkom.test', NULL, '$2y$12$qS9yps5T9PIgfnOz0lpL8.3iQAo7b3OHSux2e7KyqIRrnogWc3QSS', NULL, '2026-10-27 10:17:41', '2026-10-27 10:17:41', '198203152006042001', 'dosen', 2, NULL, NULL, 1),
+(4, 'Andi Pratama', 'mahasiswa1@fasilkom.test', NULL, '$2y$12$QlXzERmpw8AbuFpCx4lIuuwbz2An9edTxSqkuq9o/wMnGSpxujwJ2', NULL, '2026-10-27 10:17:41', '2026-10-27 10:17:41', '09021282126001', 'mahasiswa', 1, 2021, NULL, 1),
+(5, 'Rina Lestari', 'mahasiswa2@fasilkom.test', NULL, '$2y$12$MpSaEQtDZeugrTqey2m/W.vYFK2RZMMyObF8.HgT3vATCU3crUmsG', NULL, '2026-10-27 10:17:41', '2026-10-27 10:17:41', '09021282227002', 'mahasiswa', 2, 2022, NULL, 1);
 
 -- migrations (semua migrasi dianggap sudah dijalankan, batch 1)
 INSERT INTO `migrations` (`migration`, `batch`) VALUES
@@ -394,6 +398,7 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
 ('2026_10_22_000010_create_log_aktivitas_table', 1),
 ('2026_10_24_000001_add_pembimbing_to_pengajuan_table', 1),
 ('2026_10_24_000002_create_riwayat_pembimbing_table', 1),
-('2026_10_26_000001_create_surat_balasan_table', 1);
+('2026_10_26_000001_create_surat_balasan_table', 1),
+('2026_11_02_000001_gabungkan_operator_ke_admin', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

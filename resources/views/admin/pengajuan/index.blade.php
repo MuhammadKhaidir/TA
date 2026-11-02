@@ -46,7 +46,7 @@
         </div>
         <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-6">
             <button type="submit" class="btn btn-primary">Terapkan</button>
-            <a href="{{ route('operator.pengajuan.index') }}" class="btn btn-secondary">Reset</a>
+            <a href="{{ route('admin.pengajuan.index') }}" class="btn btn-secondary">Reset</a>
         </div>
     </form>
 
@@ -69,7 +69,7 @@
                                 <td>{{ $p->ringkasanPembimbing() }}</td>
                                 <td><x-status-badge :status="$p->status" /></td>
                                 <td class="whitespace-nowrap">{{ $p->updated_at->translatedFormat('d M Y') }}</td>
-                                <td class="text-right"><a href="{{ route('operator.pengajuan.show', $p) }}" class="btn btn-secondary btn-sm">Kelola</a></td>
+                                <td class="text-right"><a href="{{ route('admin.pengajuan.show', $p) }}" class="btn btn-secondary btn-sm">Kelola</a></td>
                             </tr>
                         @endforeach
                     </tbody>

@@ -18,19 +18,19 @@
     <x-page-header :judul="'Dokumen Resmi: '.$pengajuan->judul"
                    :sub="$pengajuan->mahasiswa->name.' ('.($pengajuan->mahasiswa->nomor_induk ?? '-').')'">
         <x-slot:aksi>
-            <a href="{{ route('operator.dokumen-resmi.index') }}" class="btn btn-secondary">Kembali</a>
+            <a href="{{ route('admin.dokumen-resmi.index') }}" class="btn btn-secondary">Kembali</a>
         </x-slot:aksi>
     </x-page-header>
 
     <div class="grid gap-6 xl:grid-cols-3">
         <div class="space-y-6 xl:col-span-2">
-            {{-- Alur surat TA: ringkasan tiga langkah, lalu tindakan operator di setiap langkah --}}
+            {{-- Alur surat TA: ringkasan tiga langkah, lalu tindakan admin di setiap langkah --}}
             @include('partials.pengajuan.surat-ta')
 
             @can('terbitkanSuratPengantar', $pengajuan)
                 <section class="card">
                     <div class="card-header"><h2 class="font-semibold text-slate-900">Terbitkan Surat Pengantar TA</h2></div>
-                    <form method="POST" action="{{ route('operator.dokumen-resmi.surat-pengantar', $pengajuan) }}" enctype="multipart/form-data" class="card-body grid gap-4 sm:grid-cols-2">
+                    <form method="POST" action="{{ route('admin.dokumen-resmi.surat-pengantar', $pengajuan) }}" enctype="multipart/form-data" class="card-body grid gap-4 sm:grid-cols-2">
                         @csrf
                         <p class="text-sm text-slate-600 sm:col-span-2">
                             Unggah surat pengantar yang sudah ditandatangani (PDF). Setelah terbit, mahasiswa dapat mengunduhnya dan mengunggah surat balasan dari instansi.
@@ -64,7 +64,7 @@
                         <p class="max-w-xl text-sm text-slate-600">
                             Salah unggah atau salah nomor? Surat pengantar dapat ditarik selama mahasiswa belum mengunggah surat balasan.
                         </p>
-                        <form method="POST" action="{{ route('operator.dokumen-resmi.destroy', [$pengajuan, $pengajuan->suratPengantarTa()]) }}" data-konfirmasi="Tarik surat pengantar ini? Anda dapat menerbitkan yang baru sesudahnya.">
+                        <form method="POST" action="{{ route('admin.dokumen-resmi.destroy', [$pengajuan, $pengajuan->suratPengantarTa()]) }}" data-konfirmasi="Tarik surat pengantar ini? Anda dapat menerbitkan yang baru sesudahnya.">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="btn btn-secondary">Tarik surat pengantar</button>
@@ -76,7 +76,7 @@
             @can('periksaSuratBalasan', $pengajuan)
                 <section class="card" id="periksa-balasan">
                     <div class="card-header"><h2 class="font-semibold text-slate-900">Periksa Surat Balasan</h2></div>
-                    <form method="POST" action="{{ route('operator.dokumen-resmi.surat-balasan', $pengajuan) }}" class="card-body space-y-4">
+                    <form method="POST" action="{{ route('admin.dokumen-resmi.surat-balasan', $pengajuan) }}" class="card-body space-y-4">
                         @csrf
                         <input type="hidden" name="balasan_id" value="{{ $balasan->id }}">
 
@@ -120,7 +120,7 @@
             @if ($bisaProses)
                 <section class="card">
                     <div class="card-header"><h2 class="font-semibold text-slate-900">{{ $ta ? 'Terbitkan SK Pembimbing / Dokumen Lain' : 'Unggah Dokumen Resmi' }}</h2></div>
-                    <form method="POST" action="{{ route('operator.dokumen-resmi.store', $pengajuan) }}" enctype="multipart/form-data" class="card-body grid gap-4 sm:grid-cols-2">
+                    <form method="POST" action="{{ route('admin.dokumen-resmi.store', $pengajuan) }}" enctype="multipart/form-data" class="card-body grid gap-4 sm:grid-cols-2">
                         @csrf
                         <div>
                             <label for="jenis" class="label">Jenis dokumen</label>
@@ -161,7 +161,7 @@
                 @php($belumBisaArsip = $pengajuan->dokumenResmi->isEmpty() || ($ta && $pengajuan->skPembimbing() === null))
                 <section class="card">
                     <div class="card-header"><h2 class="font-semibold text-slate-900">Arsipkan Berkas Final</h2></div>
-                    <form method="POST" action="{{ route('operator.dokumen-resmi.arsipkan', $pengajuan) }}" class="card-body space-y-4"
+                    <form method="POST" action="{{ route('admin.dokumen-resmi.arsipkan', $pengajuan) }}" class="card-body space-y-4"
                           data-konfirmasi="Arsipkan berkas final? Status pengajuan akan menjadi selesai dan tidak dapat diubah lagi.">
                         @csrf
                         <p class="text-sm text-slate-600">
@@ -183,7 +183,7 @@
                 </section>
             @elseif ($pengajuan->status === \App\Enums\StatusPengajuan::Diarsipkan)
                 <div class="alert alert-info">
-                    Pengajuan ini sudah diarsipkan. <a href="{{ route('operator.arsip.show', $pengajuan) }}" class="underline">Buka di arsip</a>.
+                    Pengajuan ini sudah diarsipkan. <a href="{{ route('admin.arsip.show', $pengajuan) }}" class="underline">Buka di arsip</a>.
                 </div>
             @elseif ($ta && $suratTa)
                 <div class="alert alert-info">

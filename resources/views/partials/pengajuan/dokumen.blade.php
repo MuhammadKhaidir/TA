@@ -33,7 +33,7 @@
                                 @endunless
                             </div>
                             <div class="text-xs text-slate-500">
-                                Diperiksa {{ $syarat->pemeriksa === \App\Enums\Role::Dosen ? 'dosen pembimbing' : 'operator akademik' }}
+                                Diperiksa {{ $syarat->pemeriksa === \App\Enums\Role::Dosen ? 'dosen pembimbing' : 'admin' }}
                                 &middot; Format {{ strtoupper(implode(', ', $syarat->ekstensiList())) }}
                                 &middot; Maks. {{ $syarat->ukuranMaksManusia() }}
                             </div>

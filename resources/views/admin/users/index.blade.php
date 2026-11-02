@@ -3,7 +3,7 @@
 @section('judul', 'Manajemen Pengguna')
 
 @section('konten')
-    <x-page-header judul="Manajemen Pengguna" sub="Kelola akun mahasiswa, dosen, operator akademik, dan admin.">
+    <x-page-header judul="Manajemen Pengguna" sub="Kelola akun mahasiswa, dosen, dan admin.">
         <x-slot:aksi>
             <a href="{{ route('admin.users.create') }}" class="btn btn-primary"><x-icon name="plus" class="h-4 w-4" />Tambah Pengguna</a>
         </x-slot:aksi>

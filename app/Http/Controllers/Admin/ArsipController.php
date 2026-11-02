@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Operator;
+namespace App\Http\Controllers\Admin;
 
 use App\Enums\JenisPengajuan;
 use App\Enums\StatusPengajuan;
@@ -40,7 +40,7 @@ class ArsipController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        return view('operator.arsip.index', [
+        return view('admin.arsip.index', [
             'daftar' => $daftar,
             'filter' => $filter,
             'prodi' => ProgramStudi::orderBy('nama')->get(),
@@ -55,6 +55,6 @@ class ArsipController extends Controller
 
         $pengajuan->load(['mahasiswa.programStudi', 'pembimbing', 'riwayat.user', 'dokumenResmi.pengunggah', 'suratBalasan.pemeriksa', 'arsip.petugas']);
 
-        return view('operator.arsip.show', ['pengajuan' => $pengajuan] + $this->workflow->dataDokumen($pengajuan));
+        return view('admin.arsip.show', ['pengajuan' => $pengajuan] + $this->workflow->dataDokumen($pengajuan));
     }
 }

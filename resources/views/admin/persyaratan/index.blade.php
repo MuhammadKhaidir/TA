@@ -33,7 +33,7 @@
                                     @if ($s->dokumen_count > 0)<div class="text-xs text-slate-500">{{ $s->dokumen_count }} berkas diunggah</div>@endif
                                 </td>
                                 <td>{{ $s->jenis_pengajuan->singkat() }}</td>
-                                <td>{{ $s->pemeriksa === \App\Enums\Role::Dosen ? 'Dosen' : 'Operator' }}</td>
+                                <td>{{ $s->pemeriksa === \App\Enums\Role::Dosen ? 'Dosen' : 'Admin' }}</td>
                                 <td class="whitespace-nowrap">{{ strtoupper(implode(', ', $s->ekstensiList())) }}<div class="text-xs text-slate-500">maks. {{ $s->ukuranMaksManusia() }}</div></td>
                                 <td>{{ $s->wajib ? 'Wajib' : 'Opsional' }}</td>
                                 <td>

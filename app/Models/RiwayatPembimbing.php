@@ -29,7 +29,7 @@ class RiwayatPembimbing extends Model
         return $this->belongsTo(User::class, 'dosen_id');
     }
 
-    /** Pengguna yang melakukan tindakan (mahasiswa, dosen, atau operator). */
+    /** Pengguna yang melakukan tindakan (mahasiswa, dosen, atau admin). */
     public function oleh(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');

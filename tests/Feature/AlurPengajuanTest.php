@@ -28,7 +28,7 @@ class AlurPengajuanTest extends TestCase
 
     private User $dosenLain;
 
-    private User $operator;
+    private User $admin;
 
     protected function setUp(): void
     {
@@ -40,7 +40,7 @@ class AlurPengajuanTest extends TestCase
         $this->mahasiswa = User::factory()->mahasiswa()->create(['program_studi_id' => ProgramStudi::first()->id]);
         $this->dosen = User::factory()->dosen()->create();
         $this->dosenLain = User::factory()->dosen()->create();
-        $this->operator = User::factory()->operator()->create();
+        $this->admin = User::factory()->admin()->create();
     }
 
     private function unggah(Pengajuan $p, Persyaratan $syarat, ?UploadedFile $file = null)
@@ -81,7 +81,7 @@ class AlurPengajuanTest extends TestCase
     {
         $wajib = Persyaratan::aktif()->untuk(JenisPengajuan::Kp)->where('wajib', true)->orderBy('urutan')->get();
 
-        // 1. Mahasiswa membuat pengajuan KP (draft). Pembimbing KP ditetapkan operator, bukan dipilih mahasiswa,
+        // 1. Mahasiswa membuat pengajuan KP (draft). Pembimbing KP ditetapkan admin, bukan dipilih mahasiswa,
         //    sehingga pembimbing_id yang ikut terkirim diabaikan.
         $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.store', 'kp'), [
             'judul' => 'Rancang Bangun Sistem Arsip Digital',
@@ -133,67 +133,67 @@ class AlurPengajuanTest extends TestCase
         // Setelah dikirim, mahasiswa tidak dapat lagi mengganti dokumen.
         $this->unggah($p, $wajib->first())->assertForbidden();
 
-        // Pembimbing KP ditetapkan operator dari daftar dosen. Sebelum itu dosen belum berwenang atas pengajuan ini.
+        // Pembimbing KP ditetapkan admin dari daftar dosen. Sebelum itu dosen belum berwenang atas pengajuan ini.
         $this->actingAs($this->dosen)->get(route('dosen.pemeriksaan.show', $p))->assertForbidden();
-        $this->actingAs($this->dosen)->patch(route('operator.pengajuan.pembimbing', $p), ['pembimbing_id' => $this->dosen->id])
+        $this->actingAs($this->dosen)->patch(route('admin.pengajuan.pembimbing', $p), ['pembimbing_id' => $this->dosen->id])
             ->assertForbidden();
-        $this->actingAs($this->operator)->patch(route('operator.pengajuan.pembimbing', $p), ['pembimbing_id' => $this->dosen->id])
+        $this->actingAs($this->admin)->patch(route('admin.pengajuan.pembimbing', $p), ['pembimbing_id' => $this->dosen->id])
             ->assertSessionHasNoErrors();
         $p->refresh();
         $this->assertSame($this->dosen->id, (int) $p->pembimbing_id);
         $this->assertSame(StatusPembimbing::Ditetapkan, $p->status_pembimbing);
 
-        // 5. Operator: dosen tidak berwenang; hasil tanpa keputusan dan revisi tanpa catatan ditolak.
-        $this->periksa($this->dosen, 'operator.verifikasi.store', $p, [])->assertForbidden();
+        // 5. Admin: dosen tidak berwenang; hasil tanpa keputusan dan revisi tanpa catatan ditolak.
+        $this->periksa($this->dosen, 'admin.verifikasi.store', $p, [])->assertForbidden();
 
-        $docOperator = $this->dokumenPemeriksa($p, 'operator');
-        $this->assertGreaterThanOrEqual(2, $docOperator->count());
+        $docAdmin = $this->dokumenPemeriksa($p, 'admin');
+        $this->assertGreaterThanOrEqual(2, $docAdmin->count());
 
-        $this->periksa($this->operator, 'operator.verifikasi.store', $p, [])
-            ->assertSessionHasErrors("keputusan.{$docOperator[0]->id}");
+        $this->periksa($this->admin, 'admin.verifikasi.store', $p, [])
+            ->assertSessionHasErrors("keputusan.{$docAdmin[0]->id}");
 
-        $keputusan = $docOperator->mapWithKeys(fn ($d) => [$d->id => 'diterima'])->all();
-        $keputusan[$docOperator[0]->id] = 'revisi';
-        $this->periksa($this->operator, 'operator.verifikasi.store', $p, $keputusan)
-            ->assertSessionHasErrors("catatan.{$docOperator[0]->id}");
+        $keputusan = $docAdmin->mapWithKeys(fn ($d) => [$d->id => 'diterima'])->all();
+        $keputusan[$docAdmin[0]->id] = 'revisi';
+        $this->periksa($this->admin, 'admin.verifikasi.store', $p, $keputusan)
+            ->assertSessionHasErrors("catatan.{$docAdmin[0]->id}");
         $this->assertSame(StatusPengajuan::Diajukan, $p->fresh()->status);
         $this->assertDatabaseCount('pemeriksaan', 0);
 
-        // Operator meminta revisi satu dokumen.
-        $this->periksa($this->operator, 'operator.verifikasi.store', $p, $keputusan, [$docOperator[0]->id => 'Scan kurang jelas.'], 'Mohon perbaiki.')
+        // Admin meminta revisi satu dokumen.
+        $this->periksa($this->admin, 'admin.verifikasi.store', $p, $keputusan, [$docAdmin[0]->id => 'Scan kurang jelas.'], 'Mohon perbaiki.')
             ->assertSessionHasNoErrors();
         $this->assertSame(StatusPengajuan::RevisiAdministrasi, $p->fresh()->status);
-        $this->assertSame(StatusDokumen::Revisi, $docOperator[0]->fresh()->status);
-        $this->assertSame(StatusDokumen::Diterima, $docOperator[1]->fresh()->status);
-        $this->assertSame($docOperator->count(), $p->pemeriksaan()->count());
+        $this->assertSame(StatusDokumen::Revisi, $docAdmin[0]->fresh()->status);
+        $this->assertSame(StatusDokumen::Diterima, $docAdmin[1]->fresh()->status);
+        $this->assertSame($docAdmin->count(), $p->pemeriksaan()->count());
 
         // 6. Mahasiswa memperbaiki: hanya dokumen berstatus revisi yang boleh diunggah ulang.
-        $this->unggah($p, $docOperator[1]->persyaratan)->assertSessionHasErrors('berkas');
+        $this->unggah($p, $docAdmin[1]->persyaratan)->assertSessionHasErrors('berkas');
         $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.ajukan', $p))->assertSessionHasErrors('dokumen');
 
-        $this->unggah($p, $docOperator[0]->persyaratan)->assertSessionHasNoErrors();
-        $this->assertSame(2, $p->dokumen()->where('persyaratan_id', $docOperator[0]->persyaratan_id)->count());
-        $this->assertFalse($docOperator[0]->fresh()->terbaru);
-        $versiBaru = $p->dokumenTerbaru()->where('persyaratan_id', $docOperator[0]->persyaratan_id)->first();
+        $this->unggah($p, $docAdmin[0]->persyaratan)->assertSessionHasNoErrors();
+        $this->assertSame(2, $p->dokumen()->where('persyaratan_id', $docAdmin[0]->persyaratan_id)->count());
+        $this->assertFalse($docAdmin[0]->fresh()->terbaru);
+        $versiBaru = $p->dokumenTerbaru()->where('persyaratan_id', $docAdmin[0]->persyaratan_id)->first();
         $this->assertSame(2, $versiBaru->versi);
         $this->assertSame(StatusDokumen::Menunggu, $versiBaru->status);
 
         $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.ajukan', $p))->assertSessionHasNoErrors();
         $this->assertSame(StatusPengajuan::Diajukan, $p->fresh()->status);
 
-        // 7. Operator memeriksa lagi: hanya versi baru yang menunggu; semua diterima, lanjut ke dosen.
-        $menunggu = $this->dokumenPemeriksa($p, 'operator')->filter(fn ($d) => $d->status === StatusDokumen::Menunggu);
+        // 7. Admin memeriksa lagi: hanya versi baru yang menunggu; semua diterima, lanjut ke dosen.
+        $menunggu = $this->dokumenPemeriksa($p, 'admin')->filter(fn ($d) => $d->status === StatusDokumen::Menunggu);
         $this->assertCount(1, $menunggu);
-        $this->periksa($this->operator, 'operator.verifikasi.store', $p, [$menunggu->first()->id => 'diterima'])
+        $this->periksa($this->admin, 'admin.verifikasi.store', $p, [$menunggu->first()->id => 'diterima'])
             ->assertSessionHasNoErrors();
         $this->assertSame(StatusPengajuan::MenungguDosen, $p->fresh()->status);
 
         // Dokumen resmi belum boleh diproses sebelum dosen menyetujui.
-        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.arsipkan', $p))->assertForbidden();
+        $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.arsipkan', $p))->assertForbidden();
 
         // 8. Dosen: hanya pembimbing yang berwenang.
         $this->periksa($this->dosenLain, 'dosen.pemeriksaan.store', $p, [])->assertForbidden();
-        $this->periksa($this->operator, 'dosen.pemeriksaan.store', $p, [])->assertForbidden();
+        $this->periksa($this->admin, 'dosen.pemeriksaan.store', $p, [])->assertForbidden();
 
         $docDosen = $this->dokumenPemeriksa($p, 'dosen');
         $this->assertCount(1, $docDosen);
@@ -209,50 +209,50 @@ class AlurPengajuanTest extends TestCase
         $this->periksa($this->dosen, 'dosen.pemeriksaan.store', $p, [$baru->id => 'diterima'])->assertSessionHasNoErrors();
         $this->assertSame(StatusPengajuan::Disetujui, $p->fresh()->status);
 
-        // 9. Dokumen resmi dan arsip oleh operator.
-        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.arsipkan', $p))
+        // 9. Dokumen resmi dan arsip oleh admin.
+        $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.arsipkan', $p))
             ->assertSessionHasErrors('dokumen_resmi');
         $this->assertSame(StatusPengajuan::Disetujui, $p->fresh()->status);
 
-        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.store', $p), [
+        $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.store', $p), [
             'jenis' => 'surat_pengantar_kp', 'nomor' => '001/UN9.FASILKOM/2026', 'tanggal' => '2026-10-20',
             'berkas' => UploadedFile::fake()->create('surat.docx', 50, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
         ])->assertSessionHasErrors('berkas');
 
-        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.store', $p), [
+        $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.store', $p), [
             'jenis' => 'sk_ta', 'nomor' => '002', 'tanggal' => '2026-10-20', 'berkas' => $this->pdf('sk.pdf'),
         ])->assertSessionHasErrors('jenis');
 
-        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.store', $p), [
+        $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.store', $p), [
             'jenis' => 'surat_pengantar_kp', 'nomor' => '001/UN9.FASILKOM/2026', 'tanggal' => '2026-10-20',
             'berkas' => $this->pdf('surat-pengantar.pdf'),
         ])->assertSessionHasNoErrors();
         $resmi = $p->dokumenResmi()->firstOrFail();
         Storage::disk('local')->assertExists($resmi->path);
 
-        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.arsipkan', $p), ['catatan' => 'Lengkap.'])
+        $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.arsipkan', $p), ['catatan' => 'Lengkap.'])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('operator.arsip.show', $p));
+            ->assertRedirect(route('admin.arsip.show', $p));
 
         $p->refresh();
         $this->assertSame(StatusPengajuan::Diarsipkan, $p->status);
-        $this->assertDatabaseHas('arsip', ['pengajuan_id' => $p->id, 'diarsipkan_oleh' => $this->operator->id]);
+        $this->assertDatabaseHas('arsip', ['pengajuan_id' => $p->id, 'diarsipkan_oleh' => $this->admin->id]);
 
         // 10. Seluruh perubahan status tercatat berurutan beserta pelakunya.
         $this->assertSame([
             'draft', 'diajukan', 'revisi_administrasi', 'diajukan', 'menunggu_dosen',
             'revisi_akademik', 'menunggu_dosen', 'disetujui', 'diarsipkan',
         ], $this->urutanStatus($p));
-        $this->assertSame($this->operator->id, (int) $p->riwayat->last()->user_id);
+        $this->assertSame($this->admin->id, (int) $p->riwayat->last()->user_id);
         $this->assertDatabaseHas('log_aktivitas', ['aksi' => 'pengajuan.status']);
 
         // 11. Setelah diarsipkan: mahasiswa tidak dapat mengubah apa pun; arsip tampil bagi yang berwenang.
         $this->unggah($p, $wajib->first())->assertForbidden();
         $this->actingAs($this->mahasiswa)->put(route('mahasiswa.pengajuan.update', $p), ['judul' => 'Ubah'])->assertForbidden();
         $this->actingAs($this->mahasiswa)->delete(route('mahasiswa.pengajuan.destroy', $p))->assertForbidden();
-        $this->actingAs($this->operator)->get(route('operator.arsip.index'))->assertOk()->assertSee('Rancang Bangun Sistem Arsip Digital');
-        $this->actingAs($this->operator)->get(route('operator.arsip.show', $p))->assertOk()->assertSee('001/UN9.FASILKOM/2026');
-        $this->actingAs($this->mahasiswa)->get(route('operator.arsip.index'))->assertForbidden();
+        $this->actingAs($this->admin)->get(route('admin.arsip.index'))->assertOk()->assertSee('Rancang Bangun Sistem Arsip Digital');
+        $this->actingAs($this->admin)->get(route('admin.arsip.show', $p))->assertOk()->assertSee('001/UN9.FASILKOM/2026');
+        $this->actingAs($this->mahasiswa)->get(route('admin.arsip.index'))->assertForbidden();
         $this->actingAs($this->dosen)->get(route('dosen.pemeriksaan.show', $p))->assertOk();
         $this->actingAs($this->mahasiswa)->get(route('mahasiswa.berkas.index'))->assertOk()->assertSee('001/UN9.FASILKOM/2026')->assertSee('Rancang Bangun Sistem Arsip Digital');
     }
@@ -271,13 +271,12 @@ class AlurPengajuanTest extends TestCase
             'status' => StatusDokumen::Diterima,
         ]);
 
-        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.store', $p), [
+        $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.store', $p), [
             'jenis' => 'sk_kp', 'nomor' => '003', 'tanggal' => '2026-10-21', 'berkas' => $this->pdf('sk.pdf'),
         ])->assertSessionHasNoErrors();
         $resmi = $p->dokumenResmi()->firstOrFail();
 
         $lain = User::factory()->mahasiswa()->create();
-        $admin = User::factory()->admin()->create();
 
         $this->assertSame('/berkas/dokumen/'.$dok->id, parse_url(route('berkas.dokumen', ['dokumen' => $dok]), PHP_URL_PATH));
 
@@ -290,11 +289,10 @@ class AlurPengajuanTest extends TestCase
             $this->actingAs($this->mahasiswa)->get($url)->assertOk();
             $this->actingAs($this->mahasiswa)->get($url.'?unduh=1')->assertDownload();
             $this->actingAs($this->dosen)->get($url)->assertOk();
-            $this->actingAs($this->operator)->get($url)->assertOk();
+            $this->actingAs($this->admin)->get($url)->assertOk();
 
             $this->actingAs($lain)->get($url)->assertForbidden();
             $this->actingAs($this->dosenLain)->get($url)->assertForbidden();
-            $this->actingAs($admin)->get($url)->assertForbidden();
         }
 
         $this->app['auth']->forgetGuards();
@@ -313,7 +311,7 @@ class AlurPengajuanTest extends TestCase
         $path = $p->dokumen()->firstOrFail()->path;
         Storage::disk('local')->assertExists($path);
 
-        // Pada KP, kiriman pembimbing_id tidak berpengaruh karena pembimbing ditetapkan operator.
+        // Pada KP, kiriman pembimbing_id tidak berpengaruh karena pembimbing ditetapkan admin.
         $this->actingAs($this->mahasiswa)->put(route('mahasiswa.pengajuan.update', $p), [
             'judul' => 'Judul Diperbarui', 'instansi' => 'Instansi Baru', 'pembimbing_id' => $this->dosenLain->id,
         ])->assertSessionHasNoErrors();
@@ -329,11 +327,11 @@ class AlurPengajuanTest extends TestCase
         Storage::disk('local')->assertMissing($path);
     }
 
-    public function test_operator_dapat_mengganti_pembimbing_dan_pemeriksaan_dosen_mengikutinya(): void
+    public function test_admin_dapat_mengganti_pembimbing_dan_pemeriksaan_dosen_mengikutinya(): void
     {
         $p = $this->buatPengajuan($this->mahasiswa, $this->dosen, StatusPengajuan::MenungguDosen);
 
-        $this->actingAs($this->operator)->patch(route('operator.pengajuan.pembimbing', $p), ['pembimbing_id' => $this->dosenLain->id])
+        $this->actingAs($this->admin)->patch(route('admin.pengajuan.pembimbing', $p), ['pembimbing_id' => $this->dosenLain->id])
             ->assertSessionHasNoErrors();
         $this->assertSame($this->dosenLain->id, (int) $p->fresh()->pembimbing_id);
 
@@ -342,8 +340,8 @@ class AlurPengajuanTest extends TestCase
         $this->actingAs($this->dosenLain)->get(route('dosen.pemeriksaan.index'))->assertOk()->assertSee($this->mahasiswa->name);
         $this->actingAs($this->dosen)->get(route('dosen.pemeriksaan.index'))->assertOk()->assertDontSee($this->mahasiswa->name);
 
-        // Mahasiswa tidak boleh mengganti pembimbing lewat jalur operator.
-        $this->actingAs($this->mahasiswa)->patch(route('operator.pengajuan.pembimbing', $p), ['pembimbing_id' => $this->dosen->id])
+        // Mahasiswa tidak boleh mengganti pembimbing lewat jalur admin.
+        $this->actingAs($this->mahasiswa)->patch(route('admin.pengajuan.pembimbing', $p), ['pembimbing_id' => $this->dosen->id])
             ->assertForbidden();
     }
 

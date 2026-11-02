@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Operator;
+namespace App\Http\Controllers\Admin;
 
 use App\Enums\StatusDokumen;
 use App\Http\Controllers\Controller;
@@ -14,7 +14,7 @@ class SuratBalasanController extends Controller
 {
     public function __construct(private SuratTaService $surat) {}
 
-    /** Operator menerima atau meminta revisi surat balasan TA. */
+    /** Admin menerima atau meminta revisi surat balasan TA. */
     public function periksa(Request $request, Pengajuan $pengajuan): RedirectResponse
     {
         $this->authorize('periksaSuratBalasan', $pengajuan);
@@ -42,6 +42,6 @@ class SuratBalasanController extends Controller
                 : "Surat balasan diterima. SK pembimbing belum dapat diterbitkan: {$hambatan}";
         }
 
-        return redirect()->route('operator.dokumen-resmi.show', $pengajuan)->with('sukses', $pesan);
+        return redirect()->route('admin.dokumen-resmi.show', $pengajuan)->with('sukses', $pesan);
     }
 }

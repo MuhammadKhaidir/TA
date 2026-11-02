@@ -85,7 +85,7 @@
 
     <div class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <x-stat label="Total Pengajuan" :nilai="$pengajuan->count()" />
-        <x-stat label="Dalam Proses" :nilai="$dalamProses" hint="Diperiksa operator atau dosen" />
+        <x-stat label="Dalam Proses" :nilai="$dalamProses" hint="Diperiksa admin atau dosen" />
         <x-stat label="Perlu Revisi" :nilai="$perluRevisi->count()" hint="Menunggu perbaikan dari Anda" />
         <x-stat label="Selesai" :nilai="$selesai" hint="Sudah diarsipkan" />
     </div>

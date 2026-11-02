@@ -30,7 +30,7 @@ trait SiapkanData
         StatusPengajuan $status = StatusPengajuan::Draft,
         JenisPengajuan $jenis = JenisPengajuan::Kp,
     ): Pengajuan {
-        // Bila dosen diberikan, pembimbing dianggap sah: KP ditetapkan operator, TA diterima dosen pilihan mahasiswa.
+        // Bila dosen diberikan, pembimbing dianggap sah: KP ditetapkan admin, TA diterima dosen pilihan mahasiswa.
         return Pengajuan::create([
             'mahasiswa_id' => $mahasiswa->id,
             'pembimbing_id' => $dosen?->id,

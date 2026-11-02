@@ -30,11 +30,11 @@ enum StatusPengajuan: string
     {
         return match ($this) {
             self::Draft => 'Lengkapi data dan unggah semua dokumen wajib, lalu kirim pengajuan.',
-            self::Diajukan => 'Operator akademik sedang memeriksa kelengkapan administrasi.',
+            self::Diajukan => 'Admin sedang memeriksa kelengkapan administrasi.',
             self::RevisiAdministrasi => 'Perbaiki dokumen yang ditandai revisi, lalu kirim ulang.',
             self::MenungguDosen => 'Dosen pembimbing sedang memeriksa berkas akademik.',
             self::RevisiAkademik => 'Perbaiki dokumen yang ditandai revisi oleh dosen, lalu kirim ulang.',
-            self::Disetujui => 'Persyaratan terpenuhi. Operator akademik sedang memproses dokumen resmi.',
+            self::Disetujui => 'Persyaratan terpenuhi. Admin sedang memproses dokumen resmi.',
             self::Diarsipkan => 'Proses selesai. Dokumen final tersimpan di arsip digital.',
         };
     }

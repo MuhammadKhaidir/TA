@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Pembatas hak akses berdasarkan role. Contoh pemakaian pada route: ->middleware('role:admin,operator')
+ * Pembatas hak akses berdasarkan role. Contoh pemakaian pada route: ->middleware('role:admin,dosen')
  */
 class EnsureRole
 {

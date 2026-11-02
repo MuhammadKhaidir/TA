@@ -21,8 +21,8 @@ use Tests\Concerns\SiapkanData;
 use Tests\TestCase;
 
 /**
- * Alur surat Tugas Akhir: surat pengantar (operator) -> surat balasan (mahasiswa, diperiksa operator)
- * -> SK pembimbing (operator, hanya setelah balasan diterima dan dosen menyetujui). Hanya untuk TA.
+ * Alur surat Tugas Akhir: surat pengantar (admin) -> surat balasan (mahasiswa, diperiksa admin)
+ * -> SK pembimbing (admin, hanya setelah balasan diterima dan dosen menyetujui). Hanya untuk TA.
  */
 class SuratTaTest extends TestCase
 {
@@ -35,8 +35,6 @@ class SuratTaTest extends TestCase
     private User $dosen;
 
     private User $dosenLain;
-
-    private User $operator;
 
     private User $admin;
 
@@ -52,7 +50,6 @@ class SuratTaTest extends TestCase
         $this->mahasiswaLain = User::factory()->mahasiswa()->create(['program_studi_id' => $prodi]);
         $this->dosen = User::factory()->dosen()->create();
         $this->dosenLain = User::factory()->dosen()->create();
-        $this->operator = User::factory()->operator()->create();
         $this->admin = User::factory()->admin()->create();
     }
 
@@ -80,7 +77,7 @@ class SuratTaTest extends TestCase
         return $p;
     }
 
-    /** Memeriksa semua dokumen milik $peran (operator|dosen) dengan keputusan diterima lewat HTTP. */
+    /** Memeriksa semua dokumen milik $peran (admin|dosen) dengan keputusan diterima lewat HTTP. */
     private function terimaSemua(User $pemeriksa, string $rute, Pengajuan $p, string $peran): void
     {
         $keputusan = $p->dokumenTerbaru()
@@ -95,7 +92,7 @@ class SuratTaTest extends TestCase
     private function pengantar(Pengajuan $p): DokumenResmi
     {
         return DokumenResmi::create([
-            'pengajuan_id' => $p->id, 'diunggah_oleh' => $this->operator->id, 'jenis' => JenisPengajuan::SURAT_PENGANTAR_TA,
+            'pengajuan_id' => $p->id, 'diunggah_oleh' => $this->admin->id, 'jenis' => JenisPengajuan::SURAT_PENGANTAR_TA,
             'nomor' => '010/UN9/2026', 'tanggal' => now()->toDateString(),
             'nama_asli' => 'pengantar.pdf', 'path' => "dokumen-resmi/{$p->id}/pengantar.pdf", 'mime' => 'application/pdf', 'ukuran' => 2000,
         ]);
@@ -118,7 +115,7 @@ class SuratTaTest extends TestCase
 
     private function terbitkanPengantar(Pengajuan $p, ?UploadedFile $berkas = null)
     {
-        return $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.surat-pengantar', $p), [
+        return $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.surat-pengantar', $p), [
             'nomor_pengantar' => '010/UN9.FASILKOM/2026',
             'tanggal_pengantar' => '2026-10-20',
             'berkas_pengantar' => $berkas ?? $this->pdf('pengantar.pdf'),
@@ -134,14 +131,14 @@ class SuratTaTest extends TestCase
 
     private function periksaBalasan(Pengajuan $p, SuratBalasan $b, string $keputusan, ?string $catatan = null)
     {
-        return $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.surat-balasan', $p), [
+        return $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.surat-balasan', $p), [
             'balasan_id' => $b->id, 'keputusan' => $keputusan, 'catatan_balasan' => $catatan,
         ]);
     }
 
     private function terbitkanSk(Pengajuan $p)
     {
-        return $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.store', $p), [
+        return $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.store', $p), [
             'jenis' => JenisPengajuan::SK_TA, 'nomor' => '055/UN9/SK/2026', 'tanggal' => '2026-10-25', 'berkas' => $this->pdf('sk.pdf'),
         ]);
     }
@@ -160,20 +157,20 @@ class SuratTaTest extends TestCase
         // Sebelum diverifikasi: tidak ada surat yang bisa diterbitkan.
         $this->terbitkanPengantar($p)->assertForbidden();
 
-        // Operator memverifikasi, pengajuan lanjut ke dosen.
-        $this->terimaSemua($this->operator, 'operator.verifikasi.store', $p, 'operator');
+        // Admin memverifikasi, pengajuan lanjut ke dosen.
+        $this->terimaSemua($this->admin, 'admin.verifikasi.store', $p, 'admin');
         $this->assertSame(StatusPengajuan::MenungguDosen, $p->fresh()->status);
 
         // Surat balasan belum bisa diunggah sebelum surat pengantar terbit.
         $this->unggahBalasan($p)->assertForbidden();
         $this->assertSame(0, SuratBalasan::count());
 
-        // Operator menerbitkan surat pengantar: berkas hanya PDF, lalu tersimpan sebagai dokumen resmi.
+        // Admin menerbitkan surat pengantar: berkas hanya PDF, lalu tersimpan sebagai dokumen resmi.
         $this->terbitkanPengantar($p, UploadedFile::fake()->create('pengantar.jpg', 50, 'image/jpeg'))
             ->assertSessionHasErrors('berkas_pengantar');
         $this->assertSame(0, DokumenResmi::count());
 
-        $this->terbitkanPengantar($p)->assertSessionHasNoErrors()->assertRedirect(route('operator.dokumen-resmi.show', $p));
+        $this->terbitkanPengantar($p)->assertSessionHasNoErrors()->assertRedirect(route('admin.dokumen-resmi.show', $p));
         $pengantar = $p->fresh()->dokumenResmi()->where('jenis', JenisPengajuan::SURAT_PENGANTAR_TA)->firstOrFail();
         $this->assertSame('010/UN9.FASILKOM/2026', $pengantar->nomor);
         Storage::disk('local')->assertExists($pengantar->path);
@@ -210,15 +207,15 @@ class SuratTaTest extends TestCase
 
         $this->terbitkanSk($p)->assertSessionHasErrors('jenis');
         $this->assertFalse($this->adaSk($p));
-        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.arsipkan', $p))->assertSessionHasErrors('dokumen_resmi');
+        $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.arsipkan', $p))->assertSessionHasErrors('dokumen_resmi');
         $this->assertSame(StatusPengajuan::Disetujui, $p->fresh()->status);
 
-        // Operator meminta revisi (catatan wajib).
+        // Admin meminta revisi (catatan wajib).
         $this->periksaBalasan($p, $b1, 'revisi')->assertSessionHasErrors('catatan_balasan');
         $this->assertSame(StatusDokumen::Menunggu, $b1->fresh()->status);
         $this->periksaBalasan($p, $b1, 'revisi', 'Cap instansi belum terlihat.')->assertSessionHasNoErrors();
         $this->assertSame(StatusDokumen::Revisi, $b1->fresh()->status);
-        $this->assertSame($this->operator->id, (int) $b1->fresh()->diperiksa_oleh);
+        $this->assertSame($this->admin->id, (int) $b1->fresh()->diperiksa_oleh);
         $this->assertNotNull($b1->fresh()->diperiksa_at);
 
         $this->terbitkanSk($p)->assertSessionHasErrors('jenis');
@@ -234,7 +231,7 @@ class SuratTaTest extends TestCase
         $this->assertSame(2, $p->suratBalasan()->count());
         $this->terbitkanSk($p)->assertSessionHasErrors('jenis');
 
-        // Operator memeriksa versi yang sudah usang: ditolak, tidak ada yang berubah.
+        // Admin memeriksa versi yang sudah usang: ditolak, tidak ada yang berubah.
         $this->periksaBalasan($p, $b1, 'diterima')->assertSessionHasErrors('keputusan');
         $this->assertSame(StatusDokumen::Menunggu, $b2->fresh()->status);
 
@@ -243,7 +240,7 @@ class SuratTaTest extends TestCase
         $this->assertSame(StatusDokumen::Diterima, $b2->fresh()->status);
         $this->assertNull($b2->fresh()->catatan);
 
-        $this->actingAs($this->operator)->get(route('operator.dokumen-resmi.show', $p))
+        $this->actingAs($this->admin)->get(route('admin.dokumen-resmi.show', $p))
             ->assertOk()->assertSee('Terbitkan SK Pembimbing');
 
         $this->terbitkanSk($p)->assertSessionHasNoErrors();
@@ -256,16 +253,16 @@ class SuratTaTest extends TestCase
         $this->periksaBalasan($p, $b2, 'revisi', 'Eh.')->assertForbidden();
         $this->unggahBalasan($p)->assertForbidden();
 
-        // Mahasiswa mengunduh SK, lalu operator mengarsipkan.
+        // Mahasiswa mengunduh SK, lalu admin mengarsipkan.
         $this->actingAs($this->mahasiswa)->get(route('berkas.resmi', ['dokumenResmi' => $sk, 'unduh' => 1]))->assertOk();
-        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.arsipkan', $p), ['catatan' => 'Lengkap.'])
-            ->assertSessionHasNoErrors()->assertRedirect(route('operator.arsip.show', $p));
+        $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.arsipkan', $p), ['catatan' => 'Lengkap.'])
+            ->assertSessionHasNoErrors()->assertRedirect(route('admin.arsip.show', $p));
         $this->assertSame(StatusPengajuan::Diarsipkan, $p->fresh()->status);
 
         // Setelah diarsipkan semua langkah surat tertutup, tetapi riwayatnya tetap terlihat.
         $this->unggahBalasan($p)->assertForbidden();
         $this->periksaBalasan($p, $b2, 'revisi', 'Eh.')->assertForbidden();
-        $this->actingAs($this->operator)->get(route('operator.arsip.show', $p))
+        $this->actingAs($this->admin)->get(route('admin.arsip.show', $p))
             ->assertOk()->assertSee('Surat Pengantar')->assertSee('SK Pembimbing')->assertSee('Versi surat balasan sebelumnya');
         $this->actingAs($this->mahasiswa)->get(route('mahasiswa.berkas.index'))
             ->assertOk()->assertSee('Surat Balasan TA yang Diunggah')->assertSee('010/UN9.FASILKOM/2026')->assertSee('055/UN9/SK/2026');
@@ -295,7 +292,7 @@ class SuratTaTest extends TestCase
 
         // 3. Balasan menunggu pemeriksaan.
         $b = $this->balasan($p, StatusDokumen::Menunggu);
-        $this->assertSame('Surat balasan belum diperiksa operator.', $p->fresh()->hambatanSk());
+        $this->assertSame('Surat balasan belum diperiksa admin.', $p->fresh()->hambatanSk());
         $this->terbitkanSk($p)->assertSessionHasErrors('jenis');
 
         // 4. Balasan perlu revisi.
@@ -337,13 +334,13 @@ class SuratTaTest extends TestCase
     {
         $p = $this->ta(StatusPengajuan::Disetujui);
 
-        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.store', $p), [
+        $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.store', $p), [
             'jenis' => JenisPengajuan::SURAT_PENGANTAR_TA, 'nomor' => '1/X', 'tanggal' => '2026-10-25', 'berkas' => $this->pdf(),
         ])->assertSessionHasErrors('jenis');
         $this->assertSame(0, DokumenResmi::count());
 
         // Dokumen lain (lainnya) tetap bisa diunggah tanpa syarat surat balasan.
-        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.store', $p), [
+        $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.store', $p), [
             'jenis' => 'lainnya', 'nomor' => '2/X', 'tanggal' => '2026-10-25', 'berkas' => $this->pdf(),
         ])->assertSessionHasNoErrors();
         $this->assertSame(1, DokumenResmi::count());
@@ -355,15 +352,15 @@ class SuratTaTest extends TestCase
         $this->pengantar($p);
 
         // Sudah ada dokumen resmi (surat pengantar), tetapi SK belum terbit.
-        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.arsipkan', $p))->assertSessionHasErrors('dokumen_resmi');
+        $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.arsipkan', $p))->assertSessionHasErrors('dokumen_resmi');
         $this->assertSame(StatusPengajuan::Disetujui, $p->fresh()->status);
 
-        $this->actingAs($this->operator)->get(route('operator.dokumen-resmi.show', $p))
+        $this->actingAs($this->admin)->get(route('admin.dokumen-resmi.show', $p))
             ->assertOk()->assertSee('Terbitkan SK Pembimbing Tugas Akhir terlebih dahulu.');
 
         $this->balasan($p, StatusDokumen::Diterima);
         $this->terbitkanSk($p)->assertSessionHasNoErrors();
-        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.arsipkan', $p))->assertSessionHasNoErrors();
+        $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.arsipkan', $p))->assertSessionHasNoErrors();
         $this->assertSame(StatusPengajuan::Diarsipkan, $p->fresh()->status);
     }
 
@@ -378,7 +375,7 @@ class SuratTaTest extends TestCase
         $this->periksaBalasan($p, $b, 'diterima')->assertSessionHasNoErrors();
         $this->assertNull($p->fresh()->hambatanSk());
 
-        // Salah menerima: operator membatalkan dengan meminta revisi, SK kembali tertahan.
+        // Salah menerima: admin membatalkan dengan meminta revisi, SK kembali tertahan.
         $this->periksaBalasan($p, $b, 'revisi', 'Salah berkas.')->assertSessionHasNoErrors();
         $this->assertSame(StatusDokumen::Revisi, $b->fresh()->status);
         $this->assertNotNull($p->fresh()->hambatanSk());
@@ -417,10 +414,10 @@ class SuratTaTest extends TestCase
         Storage::disk('local')->assertExists($pengantar->path);
 
         // Mahasiswa dan dosen tidak berwenang menarik.
-        $this->actingAs($this->mahasiswa)->delete(route('operator.dokumen-resmi.destroy', [$p, $pengantar]))->assertForbidden();
-        $this->actingAs($this->dosen)->delete(route('operator.dokumen-resmi.destroy', [$p, $pengantar]))->assertForbidden();
+        $this->actingAs($this->mahasiswa)->delete(route('admin.dokumen-resmi.destroy', [$p, $pengantar]))->assertForbidden();
+        $this->actingAs($this->dosen)->delete(route('admin.dokumen-resmi.destroy', [$p, $pengantar]))->assertForbidden();
 
-        $this->actingAs($this->operator)->delete(route('operator.dokumen-resmi.destroy', [$p, $pengantar]))->assertSessionHasNoErrors();
+        $this->actingAs($this->admin)->delete(route('admin.dokumen-resmi.destroy', [$p, $pengantar]))->assertSessionHasNoErrors();
         $this->assertNull($p->fresh()->suratPengantarTa());
         Storage::disk('local')->assertMissing($pengantar->path);
         $this->assertDatabaseHas('log_aktivitas', ['aksi' => 'surat-pengantar.hapus']);
@@ -429,7 +426,7 @@ class SuratTaTest extends TestCase
         $this->terbitkanPengantar($p)->assertSessionHasNoErrors();
         $this->unggahBalasan($p)->assertSessionHasNoErrors();
         $baru = $p->fresh()->suratPengantarTa();
-        $this->actingAs($this->operator)->delete(route('operator.dokumen-resmi.destroy', [$p, $baru]))->assertForbidden();
+        $this->actingAs($this->admin)->delete(route('admin.dokumen-resmi.destroy', [$p, $baru]))->assertForbidden();
         $this->assertNotNull($p->fresh()->suratPengantarTa());
     }
 
@@ -439,9 +436,9 @@ class SuratTaTest extends TestCase
     {
         $p = $this->ta(StatusPengajuan::MenungguDosen);
 
-        // Hanya operator yang menerbitkan surat pengantar.
-        foreach ([$this->mahasiswa, $this->dosen, $this->admin] as $bukanOperator) {
-            $this->actingAs($bukanOperator)->post(route('operator.dokumen-resmi.surat-pengantar', $p), [
+        // Hanya admin yang menerbitkan surat pengantar.
+        foreach ([$this->mahasiswa, $this->dosen] as $bukanAdmin) {
+            $this->actingAs($bukanAdmin)->post(route('admin.dokumen-resmi.surat-pengantar', $p), [
                 'nomor_pengantar' => '1', 'tanggal_pengantar' => '2026-10-20', 'berkas_pengantar' => $this->pdf(),
             ])->assertForbidden();
         }
@@ -452,23 +449,22 @@ class SuratTaTest extends TestCase
         // Hanya mahasiswa pemilik yang mengunggah surat balasan.
         $this->unggahBalasan($p, null, $this->mahasiswaLain)->assertForbidden();
         $this->unggahBalasan($p, null, $this->dosen)->assertForbidden();
-        $this->unggahBalasan($p, null, $this->operator)->assertForbidden();
         $this->unggahBalasan($p, null, $this->admin)->assertForbidden();
         $this->assertSame(0, SuratBalasan::count());
         $this->unggahBalasan($p)->assertSessionHasNoErrors();
         $b = $p->fresh()->balasanTerbaru();
 
-        // Hanya operator yang memeriksa.
-        foreach ([$this->mahasiswa, $this->dosen, $this->admin] as $bukanOperator) {
-            $this->actingAs($bukanOperator)->post(route('operator.dokumen-resmi.surat-balasan', $p), [
+        // Hanya admin yang memeriksa.
+        foreach ([$this->mahasiswa, $this->dosen] as $bukanAdmin) {
+            $this->actingAs($bukanAdmin)->post(route('admin.dokumen-resmi.surat-balasan', $p), [
                 'balasan_id' => $b->id, 'keputusan' => 'diterima',
             ])->assertForbidden();
         }
         $this->assertSame(StatusDokumen::Menunggu, $b->fresh()->status);
 
-        // Halaman operator tertutup untuk role lain.
-        $this->actingAs($this->mahasiswa)->get(route('operator.dokumen-resmi.show', $p))->assertForbidden();
-        $this->actingAs($this->dosen)->get(route('operator.dokumen-resmi.show', $p))->assertForbidden();
+        // Halaman admin tertutup untuk role lain.
+        $this->actingAs($this->mahasiswa)->get(route('admin.dokumen-resmi.show', $p))->assertForbidden();
+        $this->actingAs($this->dosen)->get(route('admin.dokumen-resmi.show', $p))->assertForbidden();
     }
 
     public function test_unggah_balasan_butuh_login_dan_tidak_berlaku_untuk_kp(): void
@@ -481,7 +477,7 @@ class SuratTaTest extends TestCase
 
         $kp = $this->buatPengajuan($this->mahasiswaLain, $this->dosen, StatusPengajuan::MenungguDosen, JenisPengajuan::Kp);
         DokumenResmi::create([
-            'pengajuan_id' => $kp->id, 'diunggah_oleh' => $this->operator->id, 'jenis' => JenisPengajuan::SURAT_PENGANTAR_TA,
+            'pengajuan_id' => $kp->id, 'diunggah_oleh' => $this->admin->id, 'jenis' => JenisPengajuan::SURAT_PENGANTAR_TA,
             'nomor' => '1', 'tanggal' => now()->toDateString(), 'nama_asli' => 'x.pdf', 'path' => 'x.pdf', 'ukuran' => 1,
         ]);
         $this->unggahBalasan($kp, null, $this->mahasiswaLain)->assertForbidden();
@@ -500,12 +496,11 @@ class SuratTaTest extends TestCase
         $url = route('berkas.balasan', ['suratBalasan' => $b, 'unduh' => 1]);
 
         $this->actingAs($this->mahasiswa)->get($url)->assertOk();
-        $this->actingAs($this->operator)->get($url)->assertOk();
+        $this->actingAs($this->admin)->get($url)->assertOk();
         $this->actingAs($this->dosen)->get($url)->assertOk();
 
         $this->actingAs($this->mahasiswaLain)->get($url)->assertForbidden();
         $this->actingAs($this->dosenLain)->get($url)->assertForbidden();
-        $this->actingAs($this->admin)->get($url)->assertForbidden();
 
         auth()->logout();
         $this->get($url)->assertRedirect(route('login'));
@@ -526,7 +521,7 @@ class SuratTaTest extends TestCase
 
         $p->update(['status' => StatusPengajuan::MenungguDosen]);
         $this->actingAs($this->mahasiswa)->get(route('mahasiswa.pengajuan.show', $p))
-            ->assertOk()->assertSee('id="surat-ta"', false)->assertSee('Menunggu operator')
+            ->assertOk()->assertSee('id="surat-ta"', false)->assertSee('Menunggu admin')
             ->assertSee('Dapat diunggah setelah surat pengantar terbit.')
             ->assertDontSee('name="berkas_balasan"', false);
 
@@ -545,7 +540,7 @@ class SuratTaTest extends TestCase
             ->assertDontSee('Belum ada dokumen resmi yang diterbitkan.');
     }
 
-    public function test_dashboard_dan_daftar_operator_menampilkan_surat_ta_yang_perlu_diproses(): void
+    public function test_dashboard_dan_daftar_admin_menampilkan_surat_ta_yang_perlu_diproses(): void
     {
         $perluPengantar = $this->ta(StatusPengajuan::MenungguDosen);
         $perluPeriksa = $this->ta(StatusPengajuan::MenungguDosen, null, $this->mahasiswaLain);
@@ -557,17 +552,17 @@ class SuratTaTest extends TestCase
         $this->assertTrue(Pengajuan::balasanMenunggu()->whereKey($perluPeriksa->id)->exists());
         $this->assertFalse(Pengajuan::balasanMenunggu()->whereKey($perluPengantar->id)->exists());
 
-        $this->actingAs($this->operator)->get(route('operator.dashboard'))
+        $this->actingAs($this->admin)->get(route('admin.dashboard'))
             ->assertOk()->assertSee('Surat Pengantar TA')->assertSee('Surat Balasan TA')
             ->assertSee('Terbitkan surat pengantar')->assertSee('Periksa surat balasan');
 
-        $this->actingAs($this->operator)->get(route('operator.dokumen-resmi.index'))
+        $this->actingAs($this->admin)->get(route('admin.dokumen-resmi.index'))
             ->assertOk()->assertSee('Surat TA Perlu Diproses')->assertSee($this->mahasiswa->name)->assertSee($this->mahasiswaLain->name);
 
-        // Operator melihat formulir terbitkan untuk yang pertama dan formulir periksa untuk yang kedua.
-        $this->actingAs($this->operator)->get(route('operator.dokumen-resmi.show', $perluPengantar))
+        // Admin melihat formulir terbitkan untuk yang pertama dan formulir periksa untuk yang kedua.
+        $this->actingAs($this->admin)->get(route('admin.dokumen-resmi.show', $perluPengantar))
             ->assertOk()->assertSee('name="berkas_pengantar"', false)->assertDontSee('id="periksa-balasan"', false);
-        $this->actingAs($this->operator)->get(route('operator.dokumen-resmi.show', $perluPeriksa))
+        $this->actingAs($this->admin)->get(route('admin.dokumen-resmi.show', $perluPeriksa))
             ->assertOk()->assertSee('id="periksa-balasan"', false)->assertDontSee('name="berkas_pengantar"', false);
     }
 
@@ -584,13 +579,13 @@ class SuratTaTest extends TestCase
             ->assertOk()->assertDontSee('id="surat-ta"', false);
 
         // KP tetap memakai surat pengantar KP dan SK KP tanpa syarat surat balasan, dan tidak menerima kode jenis TA.
-        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.store', $kp), [
+        $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.store', $kp), [
             'jenis' => JenisPengajuan::SK_TA, 'nomor' => '1', 'tanggal' => '2026-10-25', 'berkas' => $this->pdf(),
         ])->assertSessionHasErrors('jenis');
-        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.store', $kp), [
+        $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.store', $kp), [
             'jenis' => 'sk_kp', 'nomor' => '2', 'tanggal' => '2026-10-25', 'berkas' => $this->pdf(),
         ])->assertSessionHasNoErrors();
-        $this->actingAs($this->operator)->post(route('operator.dokumen-resmi.arsipkan', $kp))->assertSessionHasNoErrors();
+        $this->actingAs($this->admin)->post(route('admin.dokumen-resmi.arsipkan', $kp))->assertSessionHasNoErrors();
         $this->assertSame(StatusPengajuan::Diarsipkan, $kp->fresh()->status);
     }
 }

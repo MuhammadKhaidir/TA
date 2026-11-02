@@ -5,8 +5,8 @@ namespace App\Enums;
 /**
  * Status dosen pembimbing pada sebuah pengajuan.
  *
- *  KP : belum -> ditetapkan (operator menetapkan dari daftar dosen)
- *  TA : menunggu (dipilih mahasiswa) -> diterima | ditolak -> (bila ditolak) ditetapkan oleh operator
+ *  KP : belum -> ditetapkan (admin menetapkan dari daftar dosen)
+ *  TA : menunggu (dipilih mahasiswa) -> diterima | ditolak -> (bila ditolak) ditetapkan oleh admin
  */
 enum StatusPembimbing: string
 {
@@ -23,7 +23,7 @@ enum StatusPembimbing: string
             self::Menunggu => 'Menunggu konfirmasi dosen',
             self::Diterima => 'Diterima dosen',
             self::Ditolak => 'Ditolak dosen',
-            self::Ditetapkan => 'Ditetapkan operator',
+            self::Ditetapkan => 'Ditetapkan admin',
         };
     }
 
@@ -35,7 +35,7 @@ enum StatusPembimbing: string
             self::Menunggu => 'Dipilih mahasiswa',
             self::Diterima => 'Diterima dosen',
             self::Ditolak => 'Ditolak dosen',
-            self::Ditetapkan => 'Ditetapkan operator',
+            self::Ditetapkan => 'Ditetapkan admin',
         };
     }
 

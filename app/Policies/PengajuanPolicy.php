@@ -12,7 +12,7 @@ use App\Models\User;
 
 /**
  * Pusat aturan kewenangan atas pengajuan dan seluruh berkas di dalamnya.
- * Admin sengaja tidak diberi akses ke isi pengajuan maupun berkas mahasiswa.
+ * Admin memegang seluruh kewenangan administrasi (verifikasi, penetapan pembimbing, dokumen resmi, arsip).
  */
 class PengajuanPolicy
 {
@@ -21,8 +21,7 @@ class PengajuanPolicy
         return match ($user->role) {
             Role::Mahasiswa => (int) $pengajuan->mahasiswa_id === (int) $user->id,
             Role::Dosen => $pengajuan->pembimbing_id !== null && (int) $pengajuan->pembimbing_id === (int) $user->id,
-            Role::Operator => true,
-            default => false,
+            Role::Admin => true,
         };
     }
 
@@ -41,10 +40,10 @@ class PengajuanPolicy
             && $pengajuan->status === StatusPengajuan::Draft;
     }
 
-    /** Operator memeriksa kelengkapan administrasi. */
+    /** Admin memeriksa kelengkapan administrasi. */
     public function verifikasi(User $user, Pengajuan $pengajuan): bool
     {
-        return $user->role === Role::Operator && $pengajuan->status === StatusPengajuan::Diajukan;
+        return $user->role === Role::Admin && $pengajuan->status === StatusPengajuan::Diajukan;
     }
 
     /** Dosen pembimbing memeriksa berkas akademik. */
@@ -81,27 +80,27 @@ class PengajuanPolicy
             && $pengajuan->hambatanKartuKonsultasi() === null;
     }
 
-    /** Operator menetapkan atau mengganti dosen pembimbing selama belum diarsipkan. */
+    /** Admin menetapkan atau mengganti dosen pembimbing selama belum diarsipkan. */
     public function kelola(User $user, Pengajuan $pengajuan): bool
     {
-        return $user->role === Role::Operator && $pengajuan->status !== StatusPengajuan::Diarsipkan;
+        return $user->role === Role::Admin && $pengajuan->status !== StatusPengajuan::Diarsipkan;
     }
 
-    /** Operator mengunggah dokumen resmi dan mengarsipkan setelah pengajuan disetujui. */
+    /** Admin mengunggah dokumen resmi dan mengarsipkan setelah pengajuan disetujui. */
     public function prosesDokumenResmi(User $user, Pengajuan $pengajuan): bool
     {
-        return $user->role === Role::Operator && $pengajuan->status === StatusPengajuan::Disetujui;
+        return $user->role === Role::Admin && $pengajuan->status === StatusPengajuan::Disetujui;
     }
 
     /*
-    | Alur surat Tugas Akhir: surat pengantar (operator) -> surat balasan (mahasiswa, diperiksa operator)
-    | -> SK pembimbing (operator, hanya bila balasan diterima; lihat Pengajuan::hambatanSk()).
+    | Alur surat Tugas Akhir: surat pengantar (admin) -> surat balasan (mahasiswa, diperiksa admin)
+    | -> SK pembimbing (admin, hanya bila balasan diterima; lihat Pengajuan::hambatanSk()).
     */
 
-    /** Operator menerbitkan surat pengantar TA, satu kali, setelah pengajuan lolos verifikasi. */
+    /** Admin menerbitkan surat pengantar TA, satu kali, setelah pengajuan lolos verifikasi. */
     public function terbitkanSuratPengantar(User $user, Pengajuan $pengajuan): bool
     {
-        return $user->role === Role::Operator
+        return $user->role === Role::Admin
             && $pengajuan->tahapSuratAktif()
             && $pengajuan->suratPengantarTa() === null;
     }
@@ -109,7 +108,7 @@ class PengajuanPolicy
     /** Surat pengantar boleh ditarik selama mahasiswa belum mengunggah surat balasan. */
     public function hapusSuratPengantar(User $user, Pengajuan $pengajuan): bool
     {
-        return $user->role === Role::Operator
+        return $user->role === Role::Admin
             && $pengajuan->tahapSuratAktif()
             && $pengajuan->suratPengantarTa() !== null
             && $pengajuan->suratBalasan->isEmpty();
@@ -133,12 +132,12 @@ class PengajuanPolicy
     }
 
     /**
-     * Operator memeriksa surat balasan. Keputusan masih bisa diubah (mis. salah menerima)
+     * Admin memeriksa surat balasan. Keputusan masih bisa diubah (mis. salah menerima)
      * selama SK pembimbing belum terbit, sebab SK bergantung pada surat balasan yang diterima.
      */
     public function periksaSuratBalasan(User $user, Pengajuan $pengajuan): bool
     {
-        if ($user->role !== Role::Operator || ! $pengajuan->tahapSuratAktif() || $pengajuan->skPembimbing() !== null) {
+        if ($user->role !== Role::Admin || ! $pengajuan->tahapSuratAktif() || $pengajuan->skPembimbing() !== null) {
             return false;
         }
 

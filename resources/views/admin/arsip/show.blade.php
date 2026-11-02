@@ -6,7 +6,7 @@
     <x-page-header :judul="$pengajuan->jenis->label().': '.$pengajuan->judul"
                    :sub="$pengajuan->mahasiswa->name.' ('.($pengajuan->mahasiswa->nomor_induk ?? '-').')'">
         <x-slot:aksi>
-            <a href="{{ route('operator.arsip.index') }}" class="btn btn-secondary">Kembali ke arsip</a>
+            <a href="{{ route('admin.arsip.index') }}" class="btn btn-secondary">Kembali ke arsip</a>
         </x-slot:aksi>
     </x-page-header>
 

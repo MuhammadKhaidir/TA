@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Operator;
+namespace App\Http\Controllers\Admin;
 
 use App\Enums\JenisPengajuan;
 use App\Enums\StatusPengajuan;
@@ -29,7 +29,7 @@ class DokumenResmiController extends Controller
             ->orderBy('updated_at')
             ->get();
 
-        // Pengajuan TA yang menunggu tindakan operator pada alur surat: pengantar belum terbit, atau balasan perlu diperiksa.
+        // Pengajuan TA yang menunggu tindakan admin pada alur surat: pengantar belum terbit, atau balasan perlu diperiksa.
         $perluPengantar = Pengajuan::with(['mahasiswa'])->perluSuratPengantar()->orderBy('updated_at')->get();
         $perluPeriksaBalasan = Pengajuan::with(['mahasiswa'])->balasanMenunggu()->orderBy('updated_at')->get();
 
@@ -37,7 +37,7 @@ class DokumenResmiController extends Controller
             ->orderByDesc('id')
             ->paginate(10);
 
-        return view('operator.dokumen-resmi.index', compact('perluDiproses', 'perluPengantar', 'perluPeriksaBalasan', 'terbit'));
+        return view('admin.dokumen-resmi.index', compact('perluDiproses', 'perluPengantar', 'perluPeriksaBalasan', 'terbit'));
     }
 
     public function show(Pengajuan $pengajuan): View
@@ -46,7 +46,7 @@ class DokumenResmiController extends Controller
 
         $pengajuan->load(['mahasiswa.programStudi', 'pembimbing', 'riwayat.user', 'dokumenResmi.pengunggah', 'suratBalasan.pemeriksa']);
 
-        return view('operator.dokumen-resmi.show', ['pengajuan' => $pengajuan] + $this->workflow->dataDokumen($pengajuan));
+        return view('admin.dokumen-resmi.show', ['pengajuan' => $pengajuan] + $this->workflow->dataDokumen($pengajuan));
     }
 
     public function store(Request $request, Pengajuan $pengajuan): RedirectResponse
@@ -89,11 +89,11 @@ class DokumenResmiController extends Controller
             $dokumen,
         );
 
-        return redirect()->route('operator.dokumen-resmi.show', $pengajuan)
+        return redirect()->route('admin.dokumen-resmi.show', $pengajuan)
             ->with('sukses', 'Dokumen resmi berhasil diunggah.');
     }
 
-    /** Operator menerbitkan surat pengantar TA (PDF yang sudah ditandatangani) untuk diunduh mahasiswa. */
+    /** Admin menerbitkan surat pengantar TA (PDF yang sudah ditandatangani) untuk diunduh mahasiswa. */
     public function suratPengantar(Request $request, Pengajuan $pengajuan): RedirectResponse
     {
         $this->authorize('terbitkanSuratPengantar', $pengajuan);
@@ -112,7 +112,7 @@ class DokumenResmiController extends Controller
             $request->file('berkas_pengantar'),
         );
 
-        return redirect()->route('operator.dokumen-resmi.show', $pengajuan)
+        return redirect()->route('admin.dokumen-resmi.show', $pengajuan)
             ->with('sukses', 'Surat pengantar diterbitkan. Mahasiswa kini dapat mengunduhnya dan mengunggah surat balasan.');
     }
 
@@ -149,7 +149,7 @@ class DokumenResmiController extends Controller
 
         $this->workflow->arsipkan($pengajuan, $request->user(), $data['catatan'] ?? null);
 
-        return redirect()->route('operator.arsip.show', $pengajuan)
+        return redirect()->route('admin.arsip.show', $pengajuan)
             ->with('sukses', 'Berkas final berhasil dipindahkan ke arsip digital.');
     }
 }

@@ -6,7 +6,6 @@ use App\Http\Controllers\BerkasController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Dosen;
 use App\Http\Controllers\Mahasiswa;
-use App\Http\Controllers\Operator;
 use App\Http\Controllers\ProfilController;
 use Illuminate\Support\Facades\Route;
 
@@ -31,7 +30,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/profil', [ProfilController::class, 'update'])->name('profil.update');
     Route::put('/profil/password', [ProfilController::class, 'password'])->name('profil.password');
 
-    // Berkas privat: akses diperiksa policy (pemilik, dosen pembimbing, operator).
+    // Berkas privat: akses diperiksa policy (pemilik, dosen pembimbing, admin).
     Route::get('/berkas/dokumen/{dokumen}', [BerkasController::class, 'dokumen'])->name('berkas.dokumen');
     Route::get('/berkas/resmi/{dokumenResmi}', [BerkasController::class, 'resmi'])->name('berkas.resmi');
     Route::get('/berkas/balasan/{suratBalasan}', [BerkasController::class, 'balasan'])->name('berkas.balasan');
@@ -77,37 +76,32 @@ Route::middleware('auth')->group(function () {
     });
 
     /*
-    | Operator Akademik
-    */
-    Route::middleware('role:operator')->prefix('operator')->name('operator.')->group(function () {
-        Route::get('/dashboard', [DashboardController::class, 'operator'])->name('dashboard');
-
-        Route::get('/verifikasi', [Operator\VerifikasiController::class, 'index'])->name('verifikasi.index');
-        Route::get('/verifikasi/{pengajuan}', [Operator\VerifikasiController::class, 'show'])->name('verifikasi.show');
-        Route::post('/verifikasi/{pengajuan}', [Operator\VerifikasiController::class, 'store'])->name('verifikasi.store');
-
-        Route::get('/pengajuan', [Operator\PengajuanController::class, 'index'])->name('pengajuan.index');
-        Route::get('/pengajuan/{pengajuan}', [Operator\PengajuanController::class, 'show'])->name('pengajuan.show');
-        Route::patch('/pengajuan/{pengajuan}/pembimbing', [Operator\PengajuanController::class, 'pembimbing'])->name('pengajuan.pembimbing');
-
-        Route::get('/dokumen-resmi', [Operator\DokumenResmiController::class, 'index'])->name('dokumen-resmi.index');
-        Route::get('/dokumen-resmi/{pengajuan}', [Operator\DokumenResmiController::class, 'show'])->name('dokumen-resmi.show');
-        Route::post('/dokumen-resmi/{pengajuan}', [Operator\DokumenResmiController::class, 'store'])->name('dokumen-resmi.store');
-        Route::post('/dokumen-resmi/{pengajuan}/arsipkan', [Operator\DokumenResmiController::class, 'arsipkan'])->name('dokumen-resmi.arsipkan');
-        Route::post('/dokumen-resmi/{pengajuan}/surat-pengantar', [Operator\DokumenResmiController::class, 'suratPengantar'])->name('dokumen-resmi.surat-pengantar');
-        Route::post('/dokumen-resmi/{pengajuan}/surat-balasan', [Operator\SuratBalasanController::class, 'periksa'])->name('dokumen-resmi.surat-balasan');
-        Route::delete('/dokumen-resmi/{pengajuan}/{dokumenResmi}', [Operator\DokumenResmiController::class, 'destroy'])->name('dokumen-resmi.destroy');
-
-        Route::get('/arsip', [Operator\ArsipController::class, 'index'])->name('arsip.index');
-        Route::get('/arsip/{pengajuan}', [Operator\ArsipController::class, 'show'])->name('arsip.show');
-    });
-
-    /*
-    | Admin
+    | Admin (menjalankan pula seluruh fungsi yang dulu dipegang operator akademik)
     */
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'admin'])->name('dashboard');
 
+        // Verifikasi administrasi, pengelolaan KP/TA, dokumen resmi, dan arsip berkas.
+        Route::get('/verifikasi', [Admin\VerifikasiController::class, 'index'])->name('verifikasi.index');
+        Route::get('/verifikasi/{pengajuan}', [Admin\VerifikasiController::class, 'show'])->name('verifikasi.show');
+        Route::post('/verifikasi/{pengajuan}', [Admin\VerifikasiController::class, 'store'])->name('verifikasi.store');
+
+        Route::get('/pengajuan', [Admin\PengajuanController::class, 'index'])->name('pengajuan.index');
+        Route::get('/pengajuan/{pengajuan}', [Admin\PengajuanController::class, 'show'])->name('pengajuan.show');
+        Route::patch('/pengajuan/{pengajuan}/pembimbing', [Admin\PengajuanController::class, 'pembimbing'])->name('pengajuan.pembimbing');
+
+        Route::get('/dokumen-resmi', [Admin\DokumenResmiController::class, 'index'])->name('dokumen-resmi.index');
+        Route::get('/dokumen-resmi/{pengajuan}', [Admin\DokumenResmiController::class, 'show'])->name('dokumen-resmi.show');
+        Route::post('/dokumen-resmi/{pengajuan}', [Admin\DokumenResmiController::class, 'store'])->name('dokumen-resmi.store');
+        Route::post('/dokumen-resmi/{pengajuan}/arsipkan', [Admin\DokumenResmiController::class, 'arsipkan'])->name('dokumen-resmi.arsipkan');
+        Route::post('/dokumen-resmi/{pengajuan}/surat-pengantar', [Admin\DokumenResmiController::class, 'suratPengantar'])->name('dokumen-resmi.surat-pengantar');
+        Route::post('/dokumen-resmi/{pengajuan}/surat-balasan', [Admin\SuratBalasanController::class, 'periksa'])->name('dokumen-resmi.surat-balasan');
+        Route::delete('/dokumen-resmi/{pengajuan}/{dokumenResmi}', [Admin\DokumenResmiController::class, 'destroy'])->name('dokumen-resmi.destroy');
+
+        Route::get('/arsip', [Admin\ArsipController::class, 'index'])->name('arsip.index');
+        Route::get('/arsip/{pengajuan}', [Admin\ArsipController::class, 'show'])->name('arsip.show');
+
+        // Manajemen pengguna, data master, persyaratan, dan log aktivitas.
         Route::resource('pengguna', Admin\UserController::class)
             ->except('show')
             ->parameters(['pengguna' => 'user'])

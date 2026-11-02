@@ -24,6 +24,6 @@ class SuratBalasanController extends Controller
         $balasan = $this->surat->unggahBalasan($pengajuan, $request->user(), $request->file('berkas_balasan'));
 
         return redirect()->route('mahasiswa.pengajuan.show', $pengajuan)
-            ->with('sukses', "Surat balasan (versi {$balasan->versi}) berhasil diunggah dan menunggu pemeriksaan operator.");
+            ->with('sukses', "Surat balasan (versi {$balasan->versi}) berhasil diunggah dan menunggu pemeriksaan admin.");
     }
 }

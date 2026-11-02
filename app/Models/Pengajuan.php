@@ -42,7 +42,7 @@ class Pengajuan extends Model
         return $this->belongsTo(User::class, 'mahasiswa_id');
     }
 
-    /** Dosen pembimbing yang sah (sudah menerima atau ditetapkan operator). Null bila belum ada. */
+    /** Dosen pembimbing yang sah (sudah menerima atau ditetapkan admin). Null bila belum ada. */
     public function pembimbing(): BelongsTo
     {
         return $this->belongsTo(User::class, 'pembimbing_id');
@@ -106,7 +106,7 @@ class Pengajuan extends Model
     }
 
     /**
-     * Pengajuan yang sudah dikirim tetapi masih membutuhkan penetapan pembimbing oleh operator:
+     * Pengajuan yang sudah dikirim tetapi masih membutuhkan penetapan pembimbing oleh admin:
      * belum ada pembimbing (KP), ditolak dosen (TA), atau dosen pilihan mahasiswa sudah nonaktif.
      */
     public function scopePerluPembimbing(Builder $query): Builder
@@ -122,7 +122,7 @@ class Pengajuan extends Model
             });
     }
 
-    /** Status ketika alur surat TA (pengantar, balasan, SK) dapat dikerjakan: setelah operator memverifikasi, sampai diarsipkan. */
+    /** Status ketika alur surat TA (pengantar, balasan, SK) dapat dikerjakan: setelah admin memverifikasi, sampai diarsipkan. */
     private const STATUS_SURAT_AKTIF = [
         StatusPengajuan::MenungguDosen,
         StatusPengajuan::RevisiAkademik,
@@ -130,7 +130,7 @@ class Pengajuan extends Model
     ];
 
     /**
-     * Pengajuan TA yang sudah lolos verifikasi operator dan belum diarsipkan:
+     * Pengajuan TA yang sudah lolos verifikasi admin dan belum diarsipkan:
      * pada masa inilah surat pengantar, surat balasan, dan SK pembimbing diproses.
      */
     public function tahapSuratAktif(): bool
@@ -194,7 +194,7 @@ class Pengajuan extends Model
         }
 
         if ($balasan->status === StatusDokumen::Menunggu) {
-            return 'Surat balasan belum diperiksa operator.';
+            return 'Surat balasan belum diperiksa admin.';
         }
 
         if ($balasan->status === StatusDokumen::Revisi) {
@@ -213,7 +213,7 @@ class Pengajuan extends Model
     }
 
     /**
-     * Tiga tahap alur surat TA beserta keadaannya, untuk tampilan (mahasiswa maupun operator).
+     * Tiga tahap alur surat TA beserta keadaannya, untuk tampilan (mahasiswa maupun admin).
      * Kosong untuk pengajuan yang bukan TA atau belum lolos verifikasi.
      *
      * @return list<array{kunci: string, judul: string, status: StatusTahapSurat, label: string, keterangan: string, dokumen: ?DokumenResmi, balasan: ?SuratBalasan}>
@@ -229,16 +229,16 @@ class Pengajuan extends Model
         $balasan = $this->balasanTerbaru();
         $sk = $this->skPembimbing();
 
-        // 1. Surat pengantar (operator)
+        // 1. Surat pengantar (admin)
         if ($pengantar) {
             $t1 = [StatusTahapSurat::Selesai, 'Sudah terbit', 'Nomor '.$pengantar->nomor.', tanggal '.$pengantar->tanggal->translatedFormat('d M Y').'.'];
         } elseif ($arsip) {
             $t1 = [StatusTahapSurat::Terkunci, 'Tidak tercatat', 'Tidak ada surat pengantar pada pengajuan ini.'];
         } else {
-            $t1 = [StatusTahapSurat::Menunggu, 'Menunggu operator', 'Operator akademik akan menerbitkan surat pengantar.'];
+            $t1 = [StatusTahapSurat::Menunggu, 'Menunggu admin', 'Admin akan menerbitkan surat pengantar.'];
         }
 
-        // 2. Surat balasan (mahasiswa mengunggah, operator memeriksa)
+        // 2. Surat balasan (mahasiswa mengunggah, admin memeriksa)
         if ($balasan === null) {
             $t2 = match (true) {
                 $pengantar === null => [StatusTahapSurat::Terkunci, 'Belum tersedia', 'Dapat diunggah setelah surat pengantar terbit.'],
@@ -247,17 +247,17 @@ class Pengajuan extends Model
             };
         } else {
             $t2 = match ($balasan->status) {
-                StatusDokumen::Menunggu => [StatusTahapSurat::Menunggu, 'Menunggu pemeriksaan', "Surat balasan versi {$balasan->versi} sedang diperiksa operator."],
-                StatusDokumen::Diterima => [StatusTahapSurat::Selesai, 'Diterima', "Surat balasan versi {$balasan->versi} diterima operator."],
+                StatusDokumen::Menunggu => [StatusTahapSurat::Menunggu, 'Menunggu pemeriksaan', "Surat balasan versi {$balasan->versi} sedang diperiksa admin."],
+                StatusDokumen::Diterima => [StatusTahapSurat::Selesai, 'Diterima', "Surat balasan versi {$balasan->versi} diterima admin."],
                 StatusDokumen::Revisi => [StatusTahapSurat::Revisi, 'Perlu revisi', $balasan->catatan ?: 'Unggah ulang surat balasan yang sudah diperbaiki.'],
             };
         }
 
-        // 3. SK pembimbing (operator)
+        // 3. SK pembimbing (admin)
         if ($sk) {
             $t3 = [StatusTahapSurat::Selesai, 'Sudah terbit', 'Nomor '.$sk->nomor.', tanggal '.$sk->tanggal->translatedFormat('d M Y').'.'];
         } elseif (($hambatan = $this->hambatanSk()) === null) {
-            $t3 = [StatusTahapSurat::Menunggu, 'Menunggu operator', 'Semua syarat terpenuhi. Operator akademik akan menerbitkan SK pembimbing.'];
+            $t3 = [StatusTahapSurat::Menunggu, 'Menunggu admin', 'Semua syarat terpenuhi. Admin akan menerbitkan SK pembimbing.'];
         } else {
             $t3 = [StatusTahapSurat::Terkunci, 'Belum tersedia', $hambatan];
         }
@@ -274,7 +274,7 @@ class Pengajuan extends Model
         ];
     }
 
-    /** TA yang menunggu operator menerbitkan surat pengantar. */
+    /** TA yang menunggu admin menerbitkan surat pengantar. */
     public function scopePerluSuratPengantar(Builder $query): Builder
     {
         return $query->where('jenis', JenisPengajuan::Ta->value)
@@ -282,7 +282,7 @@ class Pengajuan extends Model
             ->whereDoesntHave('dokumenResmi', fn (Builder $q) => $q->where('jenis', JenisPengajuan::SURAT_PENGANTAR_TA));
     }
 
-    /** TA yang surat balasannya (versi terbaru) menunggu diperiksa operator. */
+    /** TA yang surat balasannya (versi terbaru) menunggu diperiksa admin. */
     public function scopeBalasanMenunggu(Builder $query): Builder
     {
         return $query->where('jenis', JenisPengajuan::Ta->value)
@@ -299,7 +299,7 @@ class Pengajuan extends Model
 
         return match ($this->status_pembimbing) {
             StatusPembimbing::Menunggu => ($this->pembimbingPilihan?->name ?? '-').' (menunggu konfirmasi)',
-            StatusPembimbing::Ditolak => 'Ditolak dosen, menunggu penetapan operator',
+            StatusPembimbing::Ditolak => 'Ditolak dosen, menunggu penetapan admin',
             default => 'Belum ditentukan',
         };
     }
@@ -311,13 +311,13 @@ class Pengajuan extends Model
 
         return match ($this->status_pembimbing) {
             StatusPembimbing::Diterima => 'Dosen pilihan mahasiswa telah menerima permintaan pembimbing.',
-            StatusPembimbing::Ditetapkan => 'Ditetapkan oleh operator akademik.',
+            StatusPembimbing::Ditetapkan => 'Ditetapkan oleh admin.',
             StatusPembimbing::Menunggu => $this->status === StatusPengajuan::Draft
                 ? "{$pilihan} baru menerima permintaan setelah pengajuan dikirim."
                 : "Menunggu konfirmasi dari {$pilihan}.",
-            StatusPembimbing::Ditolak => "{$pilihan} menolak. Operator akademik akan menetapkan dosen pengganti.",
+            StatusPembimbing::Ditolak => "{$pilihan} menolak. Admin akan menetapkan dosen pengganti.",
             default => $this->jenis === JenisPengajuan::Kp
-                ? 'Ditetapkan oleh operator akademik setelah pengajuan dikirim.'
+                ? 'Ditetapkan oleh admin setelah pengajuan dikirim.'
                 : 'Belum ditentukan.',
         };
     }
@@ -335,7 +335,7 @@ class Pengajuan extends Model
 
         return match ($this->status_pembimbing) {
             StatusPembimbing::Menunggu => 'Kartu konsultasi tersedia setelah dosen pembimbing menerima permintaan Anda.',
-            StatusPembimbing::Ditolak => 'Kartu konsultasi tersedia setelah operator akademik menetapkan dosen pembimbing pengganti.',
+            StatusPembimbing::Ditolak => 'Kartu konsultasi tersedia setelah admin menetapkan dosen pembimbing pengganti.',
             default => 'Kartu konsultasi tersedia setelah dosen pembimbing ditetapkan.',
         };
     }

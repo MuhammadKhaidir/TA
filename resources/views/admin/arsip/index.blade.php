@@ -30,7 +30,7 @@
         </div>
         <div class="flex items-end gap-2">
             <button type="submit" class="btn btn-primary">Terapkan</button>
-            <a href="{{ route('operator.arsip.index') }}" class="btn btn-secondary">Reset</a>
+            <a href="{{ route('admin.arsip.index') }}" class="btn btn-secondary">Reset</a>
         </div>
     </form>
 
@@ -52,7 +52,7 @@
                                 <td>{{ $p->judul }}</td>
                                 <td>{{ $p->dokumenResmi->count() }} berkas</td>
                                 <td class="whitespace-nowrap">{{ $p->arsip?->diarsipkan_at?->translatedFormat('d M Y') ?? '-' }}</td>
-                                <td class="text-right"><a href="{{ route('operator.arsip.show', $p) }}" class="btn btn-secondary btn-sm">Buka</a></td>
+                                <td class="text-right"><a href="{{ route('admin.arsip.show', $p) }}" class="btn btn-secondary btn-sm">Buka</a></td>
                             </tr>
                         @endforeach
                     </tbody>

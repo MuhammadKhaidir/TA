@@ -24,7 +24,7 @@
                                 <td>{{ $p->judul }}</td>
                                 <td>{{ $p->ringkasanPembimbing() }}</td>
                                 <td class="whitespace-nowrap">{{ $p->diajukan_at?->translatedFormat('d M Y') ?? '-' }}</td>
-                                <td class="text-right"><a href="{{ route('operator.verifikasi.show', $p) }}" class="btn btn-primary btn-sm">Verifikasi</a></td>
+                                <td class="text-right"><a href="{{ route('admin.verifikasi.show', $p) }}" class="btn btn-primary btn-sm">Verifikasi</a></td>
                             </tr>
                         @endforeach
                     </tbody>

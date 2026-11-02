@@ -29,7 +29,7 @@ class DashboardController extends Controller
         $user = $request->user()->load('programStudi');
         $pengajuan = $user->pengajuan()->with(['pembimbing', 'pembimbingPilihan', 'dokumenResmi', 'suratBalasan'])->orderByDesc('updated_at')->get();
 
-        // Pembimbing per jenis: KP ditetapkan operator dari database dosen, TA berasal dari pilihan mahasiswa.
+        // Pembimbing per jenis: KP ditetapkan admin dari database dosen, TA berasal dari pilihan mahasiswa.
         $pengajuanKp = $pengajuan->first(fn (Pengajuan $p) => $p->jenis === JenisPengajuan::Kp);
         $pengajuanTa = $pengajuan->first(fn (Pengajuan $p) => $p->jenis === JenisPengajuan::Ta);
 
@@ -71,7 +71,8 @@ class DashboardController extends Controller
         return view('dashboard.dosen', compact('antrean', 'jumlahMahasiswa', 'selesai', 'totalDiperiksa', 'permintaanPembimbing'));
     }
 
-    public function operator(): View
+    /** Dashboard admin: antrean kerja administrasi KP/TA, ringkasan pengguna, dan pengaturan sistem. */
+    public function admin(): View
     {
         $jumlah = Pengajuan::selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
 
@@ -106,19 +107,15 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
-        return view('dashboard.operator', compact(
-            'jumlah', 'antreanVerifikasi', 'perluDokumenResmi', 'jumlahPerluPembimbing', 'perluPembimbing',
-            'jumlahPerluPengantar', 'jumlahBalasanMenunggu', 'antreanSurat',
-        ));
-    }
-
-    public function admin(): View
-    {
         $perRole = User::selectRaw('role, count(*) as total')->groupBy('role')->pluck('total', 'role');
         $jumlahProdi = ProgramStudi::count();
         $jumlahPersyaratan = Persyaratan::aktif()->count();
         $logTerbaru = LogAktivitas::with('user')->orderByDesc('id')->limit(8)->get();
 
-        return view('dashboard.admin', compact('perRole', 'jumlahProdi', 'jumlahPersyaratan', 'logTerbaru'));
+        return view('dashboard.admin', compact(
+            'jumlah', 'antreanVerifikasi', 'perluDokumenResmi', 'jumlahPerluPembimbing', 'perluPembimbing',
+            'jumlahPerluPengantar', 'jumlahBalasanMenunggu', 'antreanSurat',
+            'perRole', 'jumlahProdi', 'jumlahPersyaratan', 'logTerbaru',
+        ));
     }
 }

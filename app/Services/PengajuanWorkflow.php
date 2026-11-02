@@ -149,7 +149,7 @@ class PengajuanWorkflow
     }
 
     /**
-     * Pemeriksaan dokumen oleh operator (administrasi) atau dosen (akademik).
+     * Pemeriksaan dokumen oleh admin (administrasi) atau dosen (akademik).
      * Yang diperiksa hanya dokumen versi terbaru berstatus menunggu milik peran tersebut.
      *
      * @param  array<int|string, string|null>  $keputusan  id dokumen => diterima|revisi
@@ -211,7 +211,7 @@ class PengajuanWorkflow
                 ->exists();
 
             $tujuan = match ($peran) {
-                Role::Operator => $adaRevisi ? StatusPengajuan::RevisiAdministrasi : StatusPengajuan::MenungguDosen,
+                Role::Admin => $adaRevisi ? StatusPengajuan::RevisiAdministrasi : StatusPengajuan::MenungguDosen,
                 default => $adaRevisi ? StatusPengajuan::RevisiAkademik : StatusPengajuan::Disetujui,
             };
 
@@ -219,7 +219,7 @@ class PengajuanWorkflow
         });
     }
 
-    /** Operator memindahkan pengajuan yang sudah memiliki dokumen resmi ke arsip digital. */
+    /** Admin memindahkan pengajuan yang sudah memiliki dokumen resmi ke arsip digital. */
     public function arsipkan(Pengajuan $pengajuan, User $oleh, ?string $catatan = null): void
     {
         if (! $pengajuan->dokumenResmi()->exists()) {

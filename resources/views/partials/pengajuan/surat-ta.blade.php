@@ -1,8 +1,8 @@
 {{--
     Alur surat Tugas Akhir dalam tiga langkah: surat pengantar -> surat balasan -> SK pembimbing.
     Membutuhkan: $pengajuan (relasi dokumenResmi dan suratBalasan sudah dimuat)
-    Dipakai halaman mahasiswa (ada formulir unggah surat balasan bila berhak) dan halaman operator (hanya status).
-    Tidak menampilkan apa pun untuk pengajuan yang bukan TA atau yang belum lolos verifikasi operator.
+    Dipakai halaman mahasiswa (ada formulir unggah surat balasan bila berhak) dan halaman admin (hanya status).
+    Tidak menampilkan apa pun untuk pengajuan yang bukan TA atau yang belum lolos verifikasi admin.
 --}}
 @php
     $tahap = $pengajuan->tahapSurat();

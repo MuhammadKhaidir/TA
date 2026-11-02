@@ -6,7 +6,6 @@ enum Role: string
 {
     case Mahasiswa = 'mahasiswa';
     case Dosen = 'dosen';
-    case Operator = 'operator';
     case Admin = 'admin';
 
     public function label(): string
@@ -14,7 +13,6 @@ enum Role: string
         return match ($this) {
             self::Mahasiswa => 'Mahasiswa',
             self::Dosen => 'Dosen',
-            self::Operator => 'Operator Akademik',
             self::Admin => 'Admin',
         };
     }
@@ -25,7 +23,7 @@ enum Role: string
         return match ($this) {
             self::Mahasiswa => 'NIM',
             self::Dosen => 'NIP / NIDN',
-            self::Operator, self::Admin => 'NIP / ID Pegawai',
+            self::Admin => 'NIP / ID Pegawai',
         };
     }
 

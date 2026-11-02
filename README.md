@@ -10,8 +10,9 @@ Dibangun dengan Laravel 13, Blade, Tailwind CSS v4 (lewat Vite), dan MySQL.
 |---|---|
 | Mahasiswa | Dashboard, Pengajuan KP, Pengajuan TA, Status Pengajuan, Berkas Saya |
 | Dosen | Dashboard, Pemeriksaan Berkas, Mahasiswa Bimbingan, Riwayat Pemeriksaan |
-| Operator Akademik | Dashboard, Verifikasi Administrasi, Pengelolaan KP/TA, Dokumen Resmi, Arsip Berkas |
-| Admin | Dashboard, Manajemen Pengguna, Data Master, Pengaturan Persyaratan, Log Aktivitas |
+| Admin | Dashboard, Verifikasi Administrasi, Pengelolaan KP/TA, Dokumen Resmi, Arsip Berkas, Manajemen Pengguna, Data Master, Pengaturan Persyaratan, Log Aktivitas |
+
+Admin memegang seluruh fungsi administrasi akademik (verifikasi, penetapan dosen pembimbing, dokumen resmi, arsip) sekaligus pengelolaan sistem. Peran operator akademik sudah dihapus dan digabung ke admin.
 
 Semua peran juga punya Profil dan Logout. Hak akses dijaga di backend (middleware peran + Policy), bukan hanya dengan menyembunyikan menu.
 
@@ -72,9 +73,10 @@ Dibuat oleh `php artisan migrate --seed`. Kata sandi semuanya `password`.
 | Peran | Email | 
 |---|---|
 | Admin | admin@fasilkom.test |
-| Operator | operator@fasilkom.test |
 | Dosen | dosen1@fasilkom.test, dosen2@fasilkom.test |
 | Mahasiswa | mahasiswa1@fasilkom.test, mahasiswa2@fasilkom.test |
+
+Bila database Anda dibuat sebelum peran operator digabung ke admin, jalankan `php artisan migrate`: migrasi `gabungkan_operator_ke_admin` mengubah akun operator lama menjadi admin (akun, kata sandi, dan riwayat kerjanya tetap).
 
 Login juga bisa memakai nomor induk (NIM/NIP). **Ganti kata sandi atau hapus akun ini sebelum aplikasi dipakai sungguhan.**
 
@@ -84,9 +86,9 @@ Seeder memakai `firstOrCreate`, jadi aman dijalankan ulang dan tidak menimpa dat
 
 1. Mahasiswa membuat pengajuan KP/TA (judul, instansi; untuk TA ditambah dosen pembimbing pilihan) dan mengunggah dokumen persyaratan. Pengajuan masih berstatus Draft. Pembimbing KP tidak dipilih mahasiswa, lihat bagian Dosen pembimbing.
 2. Setelah semua dokumen wajib lengkap, mahasiswa mengirim pengajuan (Diajukan).
-3. Operator memeriksa dokumen yang menjadi tugas operator. Dokumen bisa Diterima atau Perlu Revisi (catatan wajib). Ada revisi: status Revisi Administrasi, mahasiswa memperbaiki hanya dokumen yang diminta, lalu mengirim ulang.
+3. Admin memeriksa dokumen yang menjadi tugas admin. Dokumen bisa Diterima atau Perlu Revisi (catatan wajib). Ada revisi: status Revisi Administrasi, mahasiswa memperbaiki hanya dokumen yang diminta, lalu mengirim ulang.
 4. Jika semua diterima, pengajuan Menunggu Dosen. Dosen pembimbing memeriksa dokumen akademik dengan cara yang sama (Revisi Akademik atau Disetujui).
-5. Setelah Disetujui, operator mengunggah dokumen resmi (surat pengantar KP, SK KP, dan lain-lain) lalu mengarsipkan pengajuan (Diarsipkan). Untuk TA ada alur surat tersendiri, lihat bagian Alur surat Tugas Akhir.
+5. Setelah Disetujui, admin mengunggah dokumen resmi (surat pengantar KP, SK KP, dan lain-lain) lalu mengarsipkan pengajuan (Diarsipkan). Untuk TA ada alur surat tersendiri, lihat bagian Alur surat Tugas Akhir.
 6. Berkas final tersimpan di Arsip Berkas dan dapat dibuka oleh pihak yang berwenang.
 
 ```
@@ -102,7 +104,7 @@ Dokumen yang diunggah ulang disimpan sebagai versi baru; versi lama tetap ada se
 
 ## Berkas SQL database
 
-Seluruh struktur database ada di migrasi (`database/migrations`, file PHP, itu cara Laravel membuat tabel). Untuk yang butuh file `.sql` biasa, tersedia `database/sql/arsip_kp_ta.sql`: struktur 20 tabel beserta data awal (3 program studi, 10 persyaratan, 6 akun contoh dengan kata sandi `password`).
+Seluruh struktur database ada di migrasi (`database/migrations`, file PHP, itu cara Laravel membuat tabel). Untuk yang butuh file `.sql` biasa, tersedia `database/sql/arsip_kp_ta.sql`: struktur 20 tabel beserta data awal (3 program studi, 10 persyaratan, 5 akun contoh dengan kata sandi `password`).
 
 ```
 mysql -u root -p < database/sql/arsip_kp_ta.sql
@@ -120,12 +122,12 @@ mysqldump -u root -p arsip_kp_ta > database/sql/arsip_kp_ta.sql
 
 Khusus TA. Alur KP tidak berubah.
 
-1. Mahasiswa mengirim pengajuan TA beserta dokumennya, lalu operator memverifikasinya (status Menunggu Dosen).
-2. Operator menerbitkan **surat pengantar** (nomor, tanggal, dan berkas PDF yang sudah ditandatangani) dari halaman Dokumen Resmi. Mahasiswa mengunduhnya dari halaman detail pengajuan.
+1. Mahasiswa mengirim pengajuan TA beserta dokumennya, lalu admin memverifikasinya (status Menunggu Dosen).
+2. Admin menerbitkan **surat pengantar** (nomor, tanggal, dan berkas PDF yang sudah ditandatangani) dari halaman Dokumen Resmi. Mahasiswa mengunduhnya dari halaman detail pengajuan.
 3. Mahasiswa mengunggah **surat balasan** (PDF, JPG, atau PNG, maks. 5 MB). Boleh diunggah ulang selama belum diterima; versi lama tersimpan sebagai jejak.
-4. Operator memeriksa surat balasan: **diterima** atau **revisi** (catatan wajib, tampil di halaman mahasiswa). Keputusan masih bisa diubah selama SK belum terbit.
+4. Admin memeriksa surat balasan: **diterima** atau **revisi** (catatan wajib, tampil di halaman mahasiswa). Keputusan masih bisa diubah selama SK belum terbit.
 5. **SK Pembimbing Tugas Akhir** hanya bisa diterbitkan bila: surat pengantar sudah terbit, surat balasan versi terbaru sudah diterima, dosen pembimbing sudah sah, dan pengajuan sudah disetujui dosen. Aturannya dijaga di server (`Pengajuan::hambatanSk()`), bukan hanya dengan menyembunyikan tombol.
-6. Mahasiswa mengunduh SK, lalu operator mengarsipkan. Pengarsipan TA mewajibkan SK sudah terbit.
+6. Mahasiswa mengunduh SK, lalu admin mengarsipkan. Pengarsipan TA mewajibkan SK sudah terbit.
 
 Surat pengantar dan SK disimpan sebagai dokumen resmi (jenis `surat_pengantar_ta` dan `sk_ta`), surat balasan di tabel `surat_balasan`. Kode jenis `sk_ta` tidak berubah, hanya labelnya menjadi "SK Pembimbing Tugas Akhir". Pengajuan TA yang sudah berstatus Disetujui sebelum fitur ini ada akan melewati langkah surat pengantar dan surat balasan dulu sebelum SK dapat diterbitkan.
 
@@ -135,32 +137,32 @@ Pembimbing KP dan TA berasal dari sumber yang berbeda.
 
 | | KP | TA |
 |---|---|---|
-| Siapa yang menentukan | Operator akademik, dari daftar dosen di database | Mahasiswa memilih saat membuat pengajuan |
+| Siapa yang menentukan | Admin, dari daftar dosen di database | Mahasiswa memilih saat membuat pengajuan |
 | Persetujuan dosen | Tidak perlu, langsung berlaku | Dosen pilihan menerima atau menolak (alasan wajib bila menolak) |
-| Bila ditolak | - | Operator menetapkan dosen pengganti |
+| Bila ditolak | - | Admin menetapkan dosen pengganti |
 
-Alur TA: mahasiswa memilih dosen (status *Menunggu konfirmasi*), mengirim pengajuan, lalu permintaan muncul di halaman **Mahasiswa Bimbingan** milik dosen itu dan di kartu pada dashboard dosen. Dosen menerima (*Diterima*) atau menolak (*Ditolak*). Setelah ditolak, pengajuan masuk daftar **Perlu Penetapan Dosen Pembimbing** di dashboard operator dan dapat difilter di menu Pengelolaan KP/TA (filter Pembimbing: Perlu penetapan).
+Alur TA: mahasiswa memilih dosen (status *Menunggu konfirmasi*), mengirim pengajuan, lalu permintaan muncul di halaman **Mahasiswa Bimbingan** milik dosen itu dan di kartu pada dashboard dosen. Dosen menerima (*Diterima*) atau menolak (*Ditolak*). Setelah ditolak, pengajuan masuk daftar **Perlu Penetapan Dosen Pembimbing** di dashboard admin dan dapat difilter di menu Pengelolaan KP/TA (filter Pembimbing: Perlu penetapan).
 
-Penetapan oleh operator ada di halaman Kelola pada pengajuan. Daftar dosen diurutkan dari **bimbingan aktif paling sedikit** (pengajuan yang sudah diarsipkan tidak dihitung) dan dosen dengan bimbingan paling sedikit sudah terpilih. Dosen yang menolak pengajuan itu tidak dapat dipilih lagi. Catatan wajib diisi bila operator menggantikan dosen yang masih menunggu konfirmasi atau yang sudah menerima.
+Penetapan oleh admin ada di halaman Kelola pada pengajuan. Daftar dosen diurutkan dari **bimbingan aktif paling sedikit** (pengajuan yang sudah diarsipkan tidak dihitung) dan dosen dengan bimbingan paling sedikit sudah terpilih. Dosen yang menolak pengajuan itu tidak dapat dipilih lagi. Catatan wajib diisi bila admin menggantikan dosen yang masih menunggu konfirmasi atau yang sudah menerima.
 
 Hal lain yang perlu diketahui:
 
 - Dosen baru berwenang membuka dokumen dan memeriksa berkas setelah menjadi pembimbing yang sah (diterima atau ditetapkan). Dosen yang baru dipilih mahasiswa hanya melihat ringkasan permintaan.
 - Mahasiswa dapat mengganti dosen pilihan TA hanya selama pengajuan masih Draft.
-- Seluruh pemilihan, penerimaan, penolakan, dan penetapan tersimpan di riwayat dosen pembimbing beserta pelaku dan catatannya, tampil di halaman detail mahasiswa dan operator.
+- Seluruh pemilihan, penerimaan, penolakan, dan penetapan tersimpan di riwayat dosen pembimbing beserta pelaku dan catatannya, tampil di halaman detail mahasiswa dan admin.
 - Dashboard mahasiswa menampilkan pembimbing KP dan TA beserta statusnya. Data diambil dari tabel yang sama dengan halaman lain.
-- Yang menetapkan pembimbing adalah operator, bukan admin. Bila di fakultas Anda berbeda, ubah ability `kelola` di `app/Policies/PengajuanPolicy.php` dan route `operator.pengajuan.pembimbing`.
+- Yang menetapkan pembimbing adalah admin. Bila di fakultas Anda berbeda, ubah ability `kelola` di `app/Policies/PengajuanPolicy.php` dan route `admin.pengajuan.pembimbing`.
 
 ## Keamanan berkas
 
 - Berkas disimpan di `storage/app/private`, tidak punya URL publik.
-- Berkas hanya bisa dibuka lewat `/berkas/...` setelah dicek Policy: pemilik pengajuan, dosen pembimbing, dan operator. Admin tidak dapat membuka isi berkas pengajuan.
+- Berkas hanya bisa dibuka lewat `/berkas/...` setelah dicek Policy: pemilik pengajuan, dosen pembimbing, dan admin. Mahasiswa lain, dosen lain, dan tamu ditolak.
 - Format dan ukuran berkas divalidasi dari pengaturan persyaratan (whitelist pdf, doc, docx, jpg, jpeg, png), nama file di disk diacak, dan respons membawa header `X-Content-Type-Options: nosniff`.
 - Pengguna yang dinonaktifkan admin langsung dikeluarkan dari sesi berjalan.
 
 ## Satu sumber data
 
-Tidak ada data statis atau salinan. Halaman profil mahasiswa, daftar bimbingan dosen, antrean operator, dan halaman admin membaca tabel yang sama lewat relasi Eloquent. Contoh: admin mengubah nama, NIM, program studi, atau angkatan mahasiswa, atau mengganti nama program studi, maka halaman lain langsung menampilkan nilai baru setelah dimuat ulang. Persyaratan dokumen yang diubah admin langsung dipakai pada form dan validasi unggahan mahasiswa.
+Tidak ada data statis atau salinan. Halaman profil mahasiswa, daftar bimbingan dosen, antrean kerja admin, dan halaman pengelolaan membaca tabel yang sama lewat relasi Eloquent. Contoh: admin mengubah nama, NIM, program studi, atau angkatan mahasiswa, atau mengganti nama program studi, maka halaman lain langsung menampilkan nilai baru setelah dimuat ulang. Persyaratan dokumen yang diubah admin langsung dipakai pada form dan validasi unggahan mahasiswa.
 
 Pembatasan integritas: pengguna, program studi, dan persyaratan yang sudah dipakai data lain tidak bisa dihapus (nonaktifkan saja). Admin tidak dapat menurunkan peran atau menonaktifkan akunnya sendiri.
 
@@ -172,7 +174,7 @@ app/Models           Model dan relasi Eloquent
 app/Services         PengajuanWorkflow: seluruh perpindahan status ada di sini
 app/Policies         Hak akses per pengajuan, dokumen, dan dokumen resmi
 app/Http/Middleware  EnsureRole, EnsureUserActive
-app/Http/Controllers Dipisah per peran: Mahasiswa, Dosen, Operator, Admin
+app/Http/Controllers Dipisah per peran: Mahasiswa, Dosen, Admin
 app/Support          Menu per peran, pencatat log aktivitas
 database/migrations  Skema (migrasi tambahan, tidak mengubah migrasi bawaan Laravel)
 database/seeders     Program studi, persyaratan, dan akun contoh
@@ -190,15 +192,15 @@ php artisan test
 
 Uji memakai SQLite in-memory (butuh ekstensi `pdo_sqlite`), jadi tidak menyentuh database MySQL Anda.
 
-Hasil terakhir di lingkungan pengembangan: **71 uji, 1488 assertion, semuanya lulus.** Cakupannya:
+Jalankan perintah di atas untuk melihat hasil terkini. Cakupannya:
 
 - Login (email atau nomor induk), logout, akun nonaktif, pengalihan dashboard per peran, pencatatan log login.
 - Matriks akses: setiap peran hanya dapat membuka halamannya sendiri (200) dan ditolak (403) di halaman peran lain, termasuk aksi tulis lintas peran dan ID yang tidak ada.
 - Alur KP lengkap dari draft sampai arsip, termasuk validasi unggahan (format dan ukuran), revisi administrasi dan akademik, versi dokumen, urutan riwayat status, dan penguncian setelah diarsipkan.
-- Akses berkas privat: pemilik, pembimbing, dan operator dapat membuka; mahasiswa lain, dosen lain, admin, dan tamu ditolak; tidak ada URL publik.
+- Akses berkas privat: pemilik, pembimbing, dan admin dapat membuka; mahasiswa lain, dosen lain, dan tamu ditolak; tidak ada URL publik.
 - Sinkronisasi data setelah admin mengubah mahasiswa, dosen, program studi, dan persyaratan.
 - CRUD admin (pengguna, program studi, persyaratan), validasi, perlindungan data yang dipakai, log aktivitas, profil, dan ganti kata sandi.
-- Alur dosen pembimbing: KP ditetapkan operator, TA dipilih mahasiswa lalu diterima atau ditolak dosen, penetapan pengganti dengan bimbingan paling sedikit, hak akses, dan dashboard mahasiswa.
+- Alur dosen pembimbing: KP ditetapkan admin, TA dipilih mahasiswa lalu diterima atau ditolak dosen, penetapan pengganti dengan bimbingan paling sedikit, hak akses, dan dashboard mahasiswa.
 - Alur surat TA: surat pengantar hanya setelah verifikasi, surat balasan hanya setelah surat pengantar, SK tertahan sampai balasan diterima dan dosen menyetujui, revisi dan unggah ulang, keputusan usang ditolak, arsip TA mewajibkan SK, hak akses tiap peran, privasi berkas surat balasan, dan KP tidak terpengaruh.
 - Render semua halaman untuk setiap peran pada setiap status pengajuan dan status pembimbing, termasuk tujuh variasi keadaan surat TA.
 - Migrasi (naik dan rollback) serta seeder, termasuk aman dijalankan ulang.
@@ -213,7 +215,7 @@ Hal berikut belum bisa diuji di lingkungan pengembangan dan sebaiknya Anda cek s
 
 ## Keterbatasan saat ini
 
-- Dokumen resmi (surat pengantar, SK) diunggah operator sebagai berkas. Aplikasi belum membuat dokumen dari templat.
+- Dokumen resmi (surat pengantar, SK) diunggah admin sebagai berkas. Aplikasi belum membuat dokumen dari templat.
 - Data Master baru berisi Program Studi.
 - Belum ada notifikasi email, pencarian lintas arsip tingkat lanjut, atau ekspor laporan.
 - Satu pengajuan hanya memiliki satu dosen pembimbing (belum ada pembimbing kedua) dan belum ada batas kuota bimbingan per dosen.

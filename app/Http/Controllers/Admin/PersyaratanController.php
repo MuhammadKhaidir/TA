@@ -14,7 +14,7 @@ use Illuminate\View\View;
 
 /**
  * Pengaturan Persyaratan. Form pengajuan mahasiswa, validasi unggahan, dan pembagian
- * pemeriksa (operator/dosen) semuanya dibaca dari tabel persyaratan.
+ * pemeriksa (admin/dosen) semuanya dibaca dari tabel persyaratan.
  */
 class PersyaratanController extends Controller
 {
@@ -82,7 +82,7 @@ class PersyaratanController extends Controller
             'jenis_pengajuan' => ['required', Rule::in(array_keys(JenisPengajuan::pilihan()))],
             'nama' => ['required', 'string', 'max:255'],
             'deskripsi' => ['nullable', 'string', 'max:1000'],
-            'pemeriksa' => ['required', Rule::in([Role::Operator->value, Role::Dosen->value])],
+            'pemeriksa' => ['required', Rule::in([Role::Admin->value, Role::Dosen->value])],
             'urutan' => ['required', 'integer', 'min:0', 'max:999'],
             'ukuran_maks_kb' => ['required', 'integer', 'min:100', 'max:20480'],
             'ekstensi' => ['required', 'array', 'min:1'],

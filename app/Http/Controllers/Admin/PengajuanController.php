@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Operator;
+namespace App\Http\Controllers\Admin;
 
 use App\Enums\JenisPengajuan;
 use App\Enums\Role;
@@ -51,7 +51,7 @@ class PengajuanController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        return view('operator.pengajuan.index', [
+        return view('admin.pengajuan.index', [
             'daftar' => $daftar,
             'filter' => $filter,
             'prodi' => ProgramStudi::orderBy('nama')->get(),
@@ -67,7 +67,7 @@ class PengajuanController extends Controller
             'riwayatPembimbing.dosen', 'riwayatPembimbing.oleh', 'dokumenResmi', 'suratBalasan.pemeriksa', 'arsip',
         ]);
 
-        return view('operator.pengajuan.show', [
+        return view('admin.pengajuan.show', [
             'pengajuan' => $pengajuan,
             // Diurutkan dari beban bimbingan paling sedikit.
             'dosen' => $this->pembimbing->daftarDosen($pengajuan),

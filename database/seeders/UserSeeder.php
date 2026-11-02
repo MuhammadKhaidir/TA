@@ -23,10 +23,6 @@ class UserSeeder extends Seeder
                 'role' => Role::Admin, 'nomor_induk' => 'ADM0001',
             ],
             [
-                'name' => 'Operator Akademik', 'email' => 'operator@fasilkom.test',
-                'role' => Role::Operator, 'nomor_induk' => 'OPR0001',
-            ],
-            [
                 'name' => 'Dr. Budi Santoso, M.Kom.', 'email' => 'dosen1@fasilkom.test',
                 'role' => Role::Dosen, 'nomor_induk' => '198001012005011001', 'program_studi_id' => $prodi['TI'] ?? null,
             ],

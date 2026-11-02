@@ -7,7 +7,7 @@ use App\Models\Pengajuan;
 use App\Models\User;
 
 /**
- * Berkas mengikuti kewenangan atas pengajuannya: pemilik, dosen pembimbing, dan operator.
+ * Berkas mengikuti kewenangan atas pengajuannya: pemilik, dosen pembimbing, dan admin.
  */
 class DokumenPengajuanPolicy
 {

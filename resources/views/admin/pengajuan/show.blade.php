@@ -6,18 +6,18 @@
     <x-page-header :judul="$pengajuan->jenis->label().': '.$pengajuan->judul"
                    :sub="$pengajuan->mahasiswa->name.' ('.($pengajuan->mahasiswa->nomor_induk ?? '-').')'">
         <x-slot:aksi>
-            <a href="{{ route('operator.pengajuan.index') }}" class="btn btn-secondary">Kembali</a>
+            <a href="{{ route('admin.pengajuan.index') }}" class="btn btn-secondary">Kembali</a>
             @can('verifikasi', $pengajuan)
-                <a href="{{ route('operator.verifikasi.show', $pengajuan) }}" class="btn btn-primary">Verifikasi</a>
+                <a href="{{ route('admin.verifikasi.show', $pengajuan) }}" class="btn btn-primary">Verifikasi</a>
             @endcan
             @can('prosesDokumenResmi', $pengajuan)
-                <a href="{{ route('operator.dokumen-resmi.show', $pengajuan) }}" class="btn btn-primary">Proses Dokumen Resmi</a>
+                <a href="{{ route('admin.dokumen-resmi.show', $pengajuan) }}" class="btn btn-primary">Proses Dokumen Resmi</a>
             @endcan
             @if ($pengajuan->tahapSuratAktif() && ! auth()->user()->can('prosesDokumenResmi', $pengajuan))
-                <a href="{{ route('operator.dokumen-resmi.show', $pengajuan) }}" class="btn btn-primary">Kelola Surat TA</a>
+                <a href="{{ route('admin.dokumen-resmi.show', $pengajuan) }}" class="btn btn-primary">Kelola Surat TA</a>
             @endif
             @if ($pengajuan->status === \App\Enums\StatusPengajuan::Diarsipkan)
-                <a href="{{ route('operator.arsip.show', $pengajuan) }}" class="btn btn-primary">Lihat di Arsip</a>
+                <a href="{{ route('admin.arsip.show', $pengajuan) }}" class="btn btn-primary">Lihat di Arsip</a>
             @endif
         </x-slot:aksi>
     </x-page-header>
@@ -38,7 +38,7 @@
                         <div class="font-medium text-slate-900">{{ $pengajuan->ringkasanPembimbing() }}</div>
                         <div class="text-xs text-slate-500">{{ $pengajuan->keteranganPembimbing() }}</div>
                     </div>
-                    <form method="POST" action="{{ route('operator.pengajuan.pembimbing', $pengajuan) }}" class="card-body space-y-4">
+                    <form method="POST" action="{{ route('admin.pengajuan.pembimbing', $pengajuan) }}" class="card-body space-y-4">
                         @csrf
                         @method('PATCH')
 

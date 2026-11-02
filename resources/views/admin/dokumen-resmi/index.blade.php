@@ -22,7 +22,7 @@
                                 </td>
                                 <td>{{ $p->judul }}</td>
                                 <td><span class="badge bg-amber-50 text-amber-800 ring-amber-200">Periksa surat balasan</span></td>
-                                <td class="text-right"><a href="{{ route('operator.dokumen-resmi.show', $p) }}" class="btn btn-primary btn-sm">Periksa</a></td>
+                                <td class="text-right"><a href="{{ route('admin.dokumen-resmi.show', $p) }}" class="btn btn-primary btn-sm">Periksa</a></td>
                             </tr>
                         @endforeach
                         @foreach ($perluPengantar as $p)
@@ -33,7 +33,7 @@
                                 </td>
                                 <td>{{ $p->judul }}</td>
                                 <td><span class="badge bg-sky-50 text-sky-700 ring-sky-200">Terbitkan surat pengantar</span></td>
-                                <td class="text-right"><a href="{{ route('operator.dokumen-resmi.show', $p) }}" class="btn btn-primary btn-sm">Terbitkan</a></td>
+                                <td class="text-right"><a href="{{ route('admin.dokumen-resmi.show', $p) }}" class="btn btn-primary btn-sm">Terbitkan</a></td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -61,7 +61,7 @@
                                 <td>{{ $p->judul }}</td>
                                 <td>{{ $p->ringkasanPembimbing() }}</td>
                                 <td class="text-xs text-slate-500">{{ $p->jenis === \App\Enums\JenisPengajuan::Ta ? ($p->hambatanSk() ?? 'SK pembimbing siap diterbitkan.') : 'Siap diproses.' }}</td>
-                                <td class="text-right"><a href="{{ route('operator.dokumen-resmi.show', $p) }}" class="btn btn-primary btn-sm">Proses</a></td>
+                                <td class="text-right"><a href="{{ route('admin.dokumen-resmi.show', $p) }}" class="btn btn-primary btn-sm">Proses</a></td>
                             </tr>
                         @endforeach
                     </tbody>

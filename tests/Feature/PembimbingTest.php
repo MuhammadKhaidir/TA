@@ -18,8 +18,8 @@ use Tests\TestCase;
 
 /**
  * Alur dosen pembimbing:
- *  - KP : ditetapkan operator dari database dosen (mahasiswa tidak memilih).
- *  - TA : dipilih mahasiswa, dosen menerima atau menolak; bila ditolak operator menetapkan
+ *  - KP : ditetapkan admin dari database dosen (mahasiswa tidak memilih).
+ *  - TA : dipilih mahasiswa, dosen menerima atau menolak; bila ditolak admin menetapkan
  *         pengganti yang beban bimbingannya paling sedikit.
  */
 class PembimbingTest extends TestCase
@@ -33,8 +33,6 @@ class PembimbingTest extends TestCase
     private User $dosenB;
 
     private User $dosenC;
-
-    private User $operator;
 
     private User $admin;
 
@@ -50,7 +48,6 @@ class PembimbingTest extends TestCase
         $this->dosenA = User::factory()->dosen()->create(['name' => 'Dosen Alpha']);
         $this->dosenB = User::factory()->dosen()->create(['name' => 'Dosen Bravo']);
         $this->dosenC = User::factory()->dosen()->create(['name' => 'Dosen Charlie']);
-        $this->operator = User::factory()->operator()->create();
         $this->admin = User::factory()->admin()->create();
     }
 
@@ -78,7 +75,7 @@ class PembimbingTest extends TestCase
     private function tetapkan(User $oleh, Pengajuan $p, User $dosen, array $tambahan = [])
     {
         return $this->actingAs($oleh->fresh())->patch(
-            route('operator.pengajuan.pembimbing', $p),
+            route('admin.pengajuan.pembimbing', $p),
             ['pembimbing_id' => $dosen->id] + $tambahan,
         );
     }
@@ -88,7 +85,7 @@ class PembimbingTest extends TestCase
         $this->actingAs($this->mahasiswa)->get(route('mahasiswa.pengajuan.create', 'kp'))
             ->assertOk()
             ->assertDontSee('name="pembimbing_id"', false)
-            ->assertSee('Operator akademik menetapkan dosen pembimbing KP');
+            ->assertSee('Admin menetapkan dosen pembimbing KP');
 
         $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.store', 'kp'), [
             'judul' => 'KP Uji', 'instansi' => 'PT Uji', 'pembimbing_id' => $this->dosenA->id,
@@ -113,7 +110,7 @@ class PembimbingTest extends TestCase
 
         $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.store', 'ta'), $dasar)
             ->assertSessionHasErrors('pembimbing_id');
-        $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.store', 'ta'), $dasar + ['pembimbing_id' => $this->operator->id])
+        $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.store', 'ta'), $dasar + ['pembimbing_id' => $this->admin->id])
             ->assertSessionHasErrors('pembimbing_id');
         $this->actingAs($this->mahasiswa)->post(route('mahasiswa.pengajuan.store', 'ta'), $dasar + ['pembimbing_id' => $nonaktif->id])
             ->assertSessionHasErrors('pembimbing_id');
@@ -200,7 +197,7 @@ class PembimbingTest extends TestCase
             ->assertOk()->assertSee('Dosen Alpha')->assertSee('Diterima dosen');
     }
 
-    public function test_dosen_menolak_wajib_beralasan_lalu_operator_menetapkan_dosen_dengan_bimbingan_tersedikit(): void
+    public function test_dosen_menolak_wajib_beralasan_lalu_admin_menetapkan_dosen_dengan_bimbingan_tersedikit(): void
     {
         // Beban bimbingan aktif: Alpha 1, Bravo 2, Charlie 0 (pengajuan yang sudah diarsipkan tidak dihitung).
         $lain = fn () => User::factory()->mahasiswa()->create();
@@ -233,10 +230,10 @@ class PembimbingTest extends TestCase
         $this->actingAs($this->mahasiswa)->get(route('mahasiswa.status.index'))
             ->assertOk()->assertSee('Bidang tidak sesuai keahlian saya.');
 
-        // Operator melihatnya sebagai pengajuan yang perlu penetapan.
-        $this->actingAs($this->operator)->get(route('operator.dashboard'))
+        // Admin melihatnya sebagai pengajuan yang perlu penetapan.
+        $this->actingAs($this->admin)->get(route('admin.dashboard'))
             ->assertOk()->assertSee('Perlu Penetapan Dosen Pembimbing')->assertSee('Mahasiswa Uji');
-        $this->actingAs($this->operator)->get(route('operator.pengajuan.index', ['pembimbing' => 'perlu']))
+        $this->actingAs($this->admin)->get(route('admin.pengajuan.index', ['pembimbing' => 'perlu']))
             ->assertOk()->assertSee('Judul TA Uji');
 
         // Daftar dosen urut dari bimbingan paling sedikit; yang sudah menolak tidak dapat dipilih.
@@ -245,18 +242,18 @@ class PembimbingTest extends TestCase
         $this->assertSame(1, $beban['Dosen Alpha']);
         $this->assertSame(2, $beban['Dosen Bravo']);
 
-        $this->actingAs($this->operator)->get(route('operator.pengajuan.show', $p))
+        $this->actingAs($this->admin)->get(route('admin.pengajuan.show', $p))
             ->assertOk()
             ->assertSeeInOrder(['Dosen Charlie', 'Dosen Alpha', 'Dosen Bravo'])
             ->assertSee('Bimbingan paling sedikit')
             ->assertSee('Menolak pengajuan ini');
 
         // Dosen yang sudah menolak tidak dapat ditetapkan kembali.
-        $this->tetapkan($this->operator, $p, $this->dosenA)->assertSessionHasErrors('pembimbing_id');
+        $this->tetapkan($this->admin, $p, $this->dosenA)->assertSessionHasErrors('pembimbing_id');
         $this->assertNull($p->fresh()->pembimbing_id);
 
-        // Operator menetapkan dosen dengan bimbingan paling sedikit.
-        $this->tetapkan($this->operator, $p, $this->dosenC)->assertSessionHasNoErrors();
+        // Admin menetapkan dosen dengan bimbingan paling sedikit.
+        $this->tetapkan($this->admin, $p, $this->dosenC)->assertSessionHasNoErrors();
 
         $p->refresh();
         $this->assertSame($this->dosenC->id, (int) $p->pembimbing_id);
@@ -265,7 +262,7 @@ class PembimbingTest extends TestCase
         $this->assertSame(1, $p->riwayatPembimbing()->where('status', 'ditolak')->count());
         $this->assertSame(1, $p->riwayatPembimbing()->where('status', 'ditetapkan')->count());
         $this->assertDatabaseHas('riwayat_pembimbing', [
-            'pengajuan_id' => $p->id, 'dosen_id' => $this->dosenC->id, 'user_id' => $this->operator->id, 'status' => 'ditetapkan',
+            'pengajuan_id' => $p->id, 'dosen_id' => $this->dosenC->id, 'user_id' => $this->admin->id, 'status' => 'ditetapkan',
         ]);
 
         $this->actingAs($this->dosenC)->get(route('dosen.pemeriksaan.show', $p))->assertOk();
@@ -273,12 +270,12 @@ class PembimbingTest extends TestCase
         $this->assertSame(0, Pengajuan::perluPembimbing()->count());
 
         $this->actingAs($this->mahasiswa)->get(route('mahasiswa.dashboard'))
-            ->assertOk()->assertSee('Dosen Charlie')->assertSee('Ditetapkan operator');
-        $this->actingAs($this->operator)->get(route('operator.pengajuan.show', $p))
+            ->assertOk()->assertSee('Dosen Charlie')->assertSee('Ditetapkan admin');
+        $this->actingAs($this->admin)->get(route('admin.pengajuan.show', $p))
             ->assertOk()->assertSee('Riwayat Dosen Pembimbing')->assertSee('Bidang tidak sesuai keahlian saya.');
     }
 
-    public function test_pembimbing_kp_ditetapkan_operator_dan_tampil_di_dashboard_mahasiswa(): void
+    public function test_pembimbing_kp_ditetapkan_admin_dan_tampil_di_dashboard_mahasiswa(): void
     {
         $kp = $this->buatPengajuan($this->mahasiswa, null, StatusPengajuan::Diajukan, JenisPengajuan::Kp);
         $mahasiswaDua = User::factory()->mahasiswa()->create(['name' => 'Mahasiswa Dua']);
@@ -288,12 +285,12 @@ class PembimbingTest extends TestCase
             ->assertOk()->assertSee('Pembimbing KP')->assertSee('Pembimbing TA')
             ->assertSee('Belum ditentukan')->assertSee('Belum ada pengajuan TA');
 
-        // Antrean operator hanya memuat pengajuan yang sudah dikirim, bukan draft.
+        // Antrean admin hanya memuat pengajuan yang sudah dikirim, bukan draft.
         $this->assertSame(1, Pengajuan::perluPembimbing()->count());
-        $this->actingAs($this->operator)->get(route('operator.dashboard'))
+        $this->actingAs($this->admin)->get(route('admin.dashboard'))
             ->assertOk()->assertSee('Mahasiswa Uji')->assertDontSee('Mahasiswa Dua');
 
-        $this->tetapkan($this->operator, $kp, $this->dosenB)->assertSessionHasNoErrors();
+        $this->tetapkan($this->admin, $kp, $this->dosenB)->assertSessionHasNoErrors();
 
         $kp->refresh();
         $this->assertSame($this->dosenB->id, (int) $kp->pembimbing_id);
@@ -301,7 +298,7 @@ class PembimbingTest extends TestCase
         $this->assertSame(StatusPembimbing::Ditetapkan, $kp->status_pembimbing);
 
         $this->actingAs($this->mahasiswa)->get(route('mahasiswa.dashboard'))
-            ->assertOk()->assertSee('Dosen Bravo')->assertSee('Ditetapkan operator');
+            ->assertOk()->assertSee('Dosen Bravo')->assertSee('Ditetapkan admin');
         $this->actingAs($this->mahasiswa)->get(route('mahasiswa.pengajuan.show', $kp))
             ->assertOk()->assertSee('Dosen Bravo');
         $this->actingAs($this->dosenB)->get(route('dosen.bimbingan.index'))->assertOk()->assertSee('Mahasiswa Uji');
@@ -314,18 +311,18 @@ class PembimbingTest extends TestCase
 
         $this->actingAs($this->mahasiswa)->get(route('mahasiswa.dashboard'))
             ->assertOk()
-            ->assertSeeInOrder(['Pembimbing KP', 'Dosen Alpha', 'Ditetapkan operator', 'Pembimbing TA', 'Dosen Bravo (menunggu konfirmasi)']);
+            ->assertSeeInOrder(['Pembimbing KP', 'Dosen Alpha', 'Ditetapkan admin', 'Pembimbing TA', 'Dosen Bravo (menunggu konfirmasi)']);
     }
 
-    public function test_hanya_operator_yang_menetapkan_dan_hanya_dosen_pilihan_yang_menjawab(): void
+    public function test_hanya_admin_yang_menetapkan_dan_hanya_dosen_pilihan_yang_menjawab(): void
     {
         $p = $this->buatTa(StatusPengajuan::Diajukan, $this->dosenA);
 
-        foreach ([$this->mahasiswa, $this->dosenA, $this->dosenB, $this->admin] as $pengguna) {
+        foreach ([$this->mahasiswa, $this->dosenA, $this->dosenB] as $pengguna) {
             $this->tetapkan($pengguna, $p, $this->dosenC)->assertForbidden();
         }
 
-        foreach ([$this->mahasiswa, $this->dosenB, $this->operator, $this->admin] as $pengguna) {
+        foreach ([$this->mahasiswa, $this->dosenB, $this->admin] as $pengguna) {
             $this->konfirmasi($pengguna, $p, ['keputusan' => 'terima'])->assertForbidden();
         }
 
@@ -335,27 +332,27 @@ class PembimbingTest extends TestCase
         $this->assertDatabaseCount('riwayat_pembimbing', 0);
     }
 
-    public function test_operator_wajib_beralasan_saat_menggantikan_dosen_pilihan_mahasiswa(): void
+    public function test_admin_wajib_beralasan_saat_menggantikan_dosen_pilihan_mahasiswa(): void
     {
         $p = $this->buatTa(StatusPengajuan::Diajukan, $this->dosenA);
 
         // Menggantikan dosen yang masih menunggu konfirmasi harus beralasan.
-        $this->tetapkan($this->operator, $p, $this->dosenB)->assertSessionHasErrors('catatan');
+        $this->tetapkan($this->admin, $p, $this->dosenB)->assertSessionHasErrors('catatan');
         $this->assertNull($p->fresh()->pembimbing_id);
 
-        $this->tetapkan($this->operator, $p, $this->dosenB, ['catatan' => 'Dosen Alpha sedang cuti panjang.'])
+        $this->tetapkan($this->admin, $p, $this->dosenB, ['catatan' => 'Dosen Alpha sedang cuti panjang.'])
             ->assertSessionHasNoErrors();
         $this->assertSame($this->dosenB->id, (int) $p->fresh()->pembimbing_id);
         $this->assertDatabaseHas('riwayat_pembimbing', ['pengajuan_id' => $p->id, 'status' => 'ditetapkan', 'catatan' => 'Dosen Alpha sedang cuti panjang.']);
 
-        // Mengganti pembimbing yang ditetapkan operator tidak perlu alasan, tetapi dosen yang sama ditolak.
-        $this->tetapkan($this->operator, $p, $this->dosenC)->assertSessionHasNoErrors();
-        $this->tetapkan($this->operator, $p, $this->dosenC)->assertSessionHasErrors('pembimbing_id');
+        // Mengganti pembimbing yang ditetapkan admin tidak perlu alasan, tetapi dosen yang sama ditolak.
+        $this->tetapkan($this->admin, $p, $this->dosenC)->assertSessionHasNoErrors();
+        $this->tetapkan($this->admin, $p, $this->dosenC)->assertSessionHasErrors('pembimbing_id');
 
         // Menggantikan dosen yang sudah menerima juga harus beralasan.
         $mahasiswaDua = User::factory()->mahasiswa()->create();
         $diterima = $this->buatPengajuan($mahasiswaDua, $this->dosenA, StatusPengajuan::Diajukan, JenisPengajuan::Ta);
-        $this->tetapkan($this->operator, $diterima, $this->dosenB)->assertSessionHasErrors('catatan');
+        $this->tetapkan($this->admin, $diterima, $this->dosenB)->assertSessionHasErrors('catatan');
         $this->assertSame($this->dosenA->id, (int) $diterima->fresh()->pembimbing_id);
     }
 
@@ -363,7 +360,7 @@ class PembimbingTest extends TestCase
     {
         $p = $this->buatPengajuan($this->mahasiswa, $this->dosenA, StatusPengajuan::Diarsipkan);
 
-        $this->tetapkan($this->operator, $p, $this->dosenB)->assertForbidden();
+        $this->tetapkan($this->admin, $p, $this->dosenB)->assertForbidden();
         $this->assertSame($this->dosenA->id, (int) $p->fresh()->pembimbing_id);
     }
 
@@ -384,7 +381,7 @@ class PembimbingTest extends TestCase
         $this->assertDatabaseCount('riwayat_pembimbing', 0);
     }
 
-    public function test_permintaan_ke_dosen_yang_dinonaktifkan_masuk_antrean_operator(): void
+    public function test_permintaan_ke_dosen_yang_dinonaktifkan_masuk_antrean_admin(): void
     {
         $this->buatTa(StatusPengajuan::Diajukan, $this->dosenA);
         $this->assertSame(0, Pengajuan::perluPembimbing()->count());

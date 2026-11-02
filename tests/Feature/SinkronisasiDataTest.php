@@ -28,7 +28,6 @@ class SinkronisasiDataTest extends TestCase
 
         $admin = User::factory()->admin()->create();
         $dosen = User::factory()->dosen()->create();
-        $operator = User::factory()->operator()->create();
         $mahasiswa = User::factory()->mahasiswa()->create([
             'name' => 'Nama Lama Mahasiswa',
             'nomor_induk' => '09021282100001',
@@ -65,11 +64,11 @@ class SinkronisasiDataTest extends TestCase
         $this->actingAs($mahasiswa->fresh())->get(route('mahasiswa.pengajuan.show', $pengajuan))
             ->assertSee('Nama Baru Mahasiswa')->assertSee('Sistem Informasi');
 
-        // Halaman operator dan dosen membaca sumber data yang sama.
-        $this->actingAs($operator)->get(route('operator.verifikasi.index'))
+        // Halaman admin dan dosen membaca sumber data yang sama.
+        $this->actingAs($admin)->get(route('admin.verifikasi.index'))
             ->assertSee('Nama Baru Mahasiswa')->assertSee('09021282100777')->assertDontSee('Nama Lama Mahasiswa');
-        $this->actingAs($operator)->get(route('operator.pengajuan.index'))->assertSee('Nama Baru Mahasiswa');
-        $this->actingAs($operator)->get(route('operator.verifikasi.show', $pengajuan))
+        $this->actingAs($admin)->get(route('admin.pengajuan.index'))->assertSee('Nama Baru Mahasiswa');
+        $this->actingAs($admin)->get(route('admin.verifikasi.show', $pengajuan))
             ->assertSee('Nama Baru Mahasiswa')->assertSee('Sistem Informasi');
         $this->actingAs($dosen)->get(route('dosen.bimbingan.index'))
             ->assertSee('Nama Baru Mahasiswa')->assertSee('2023')->assertDontSee('Nama Lama Mahasiswa');
@@ -80,7 +79,7 @@ class SinkronisasiDataTest extends TestCase
         ])->assertSessionHasNoErrors();
 
         $this->actingAs($mahasiswa->fresh())->get('/profil')->assertSee('Sistem Informasi Bisnis');
-        $this->actingAs($operator)->get(route('operator.pengajuan.index'))->assertSee('Sistem Informasi Bisnis');
+        $this->actingAs($admin)->get(route('admin.pengajuan.index'))->assertSee('Sistem Informasi Bisnis');
 
         // Mengganti nama dosen terbaca di halaman pengajuan mahasiswa.
         $this->actingAs($admin)->put(route('admin.users.update', $dosen), [
@@ -106,7 +105,7 @@ class SinkronisasiDataTest extends TestCase
 
         // Tambah persyaratan baru, tampil di halaman mahasiswa.
         $this->actingAs($admin)->post(route('admin.persyaratan.store'), [
-            'jenis_pengajuan' => 'kp', 'nama' => 'Surat Izin Orang Tua', 'pemeriksa' => 'operator',
+            'jenis_pengajuan' => 'kp', 'nama' => 'Surat Izin Orang Tua', 'pemeriksa' => 'admin',
             'urutan' => 9, 'ukuran_maks_kb' => 2048, 'ekstensi' => ['pdf'], 'wajib' => 1, 'aktif' => 1,
         ])->assertSessionHasNoErrors();
 
@@ -123,7 +122,7 @@ class SinkronisasiDataTest extends TestCase
 
         // Format dan batas ukuran dibaca dari pengaturan: hanya DOCX, maks. 100 KB.
         $this->actingAs($admin)->put(route('admin.persyaratan.update', $awal), [
-            'jenis_pengajuan' => 'kp', 'nama' => $awal->nama, 'pemeriksa' => 'operator',
+            'jenis_pengajuan' => 'kp', 'nama' => $awal->nama, 'pemeriksa' => 'admin',
             'urutan' => 1, 'ukuran_maks_kb' => 100, 'ekstensi' => ['docx'], 'wajib' => 1, 'aktif' => 1,
         ])->assertSessionHasNoErrors();
 
@@ -134,7 +133,7 @@ class SinkronisasiDataTest extends TestCase
         // Persyaratan yang dinonaktifkan hilang dari form pengajuan baru dan tidak lagi wajib.
         $baru = Persyaratan::where('nama', 'Surat Izin Orang Tua')->firstOrFail();
         $this->actingAs($admin)->put(route('admin.persyaratan.update', $baru), [
-            'jenis_pengajuan' => 'kp', 'nama' => $baru->nama, 'pemeriksa' => 'operator',
+            'jenis_pengajuan' => 'kp', 'nama' => $baru->nama, 'pemeriksa' => 'admin',
             'urutan' => 9, 'ukuran_maks_kb' => 2048, 'ekstensi' => ['pdf'], 'wajib' => 1, 'aktif' => 0,
         ])->assertSessionHasNoErrors();
 

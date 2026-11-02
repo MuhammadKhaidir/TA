@@ -1,6 +1,6 @@
 {{--
     Membutuhkan: $pengajuan (relasi dokumenResmi sudah dimuat)
-    Opsional: $hapus (true bila operator boleh menghapus dokumen resmi)
+    Opsional: $hapus (true bila admin boleh menghapus dokumen resmi)
               $kecuali (kode jenis dokumen yang tidak ditampilkan di sini karena sudah tampil di kartu lain, mis. surat TA)
               $sembunyikanBilaKosong (true: kartu tidak ditampilkan sama sekali bila tidak ada dokumen untuk ditampilkan)
 --}}
@@ -32,7 +32,7 @@
                         <a href="{{ route('berkas.resmi', ['dokumenResmi' => $resmi]) }}" target="_blank" rel="noopener" class="tautan">Lihat</a>
                         <a href="{{ route('berkas.resmi', ['dokumenResmi' => $resmi, 'unduh' => 1]) }}" class="tautan">Unduh</a>
                         @if ($hapus)
-                            <form method="POST" action="{{ route('operator.dokumen-resmi.destroy', [$pengajuan, $resmi]) }}" data-konfirmasi="Hapus dokumen resmi ini?">
+                            <form method="POST" action="{{ route('admin.dokumen-resmi.destroy', [$pengajuan, $resmi]) }}" data-konfirmasi="Hapus dokumen resmi ini?">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="text-sm font-medium text-red-600 hover:underline">Hapus</button>

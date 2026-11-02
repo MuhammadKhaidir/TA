@@ -133,7 +133,7 @@ class AdminDanProfilTest extends TestCase
     public function test_crud_persyaratan_validasi_ekstensi_dan_perlindungan_dokumen(): void
     {
         $dasar = [
-            'jenis_pengajuan' => 'ta', 'nama' => 'Surat Keterangan', 'pemeriksa' => 'operator',
+            'jenis_pengajuan' => 'ta', 'nama' => 'Surat Keterangan', 'pemeriksa' => 'admin',
             'urutan' => 1, 'ukuran_maks_kb' => 1024, 'wajib' => 1, 'aktif' => 1,
         ];
 

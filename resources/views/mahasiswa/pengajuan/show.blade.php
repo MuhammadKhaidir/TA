@@ -30,7 +30,7 @@
                     <div class="card-body flex flex-wrap items-center justify-between gap-4">
                         <p class="max-w-xl text-sm text-slate-600">
                             @if ($draft)
-                                Pastikan semua dokumen wajib sudah diunggah, lalu kirim pengajuan agar diperiksa operator akademik.
+                                Pastikan semua dokumen wajib sudah diunggah, lalu kirim pengajuan agar diperiksa admin.
                             @else
                                 Setelah semua dokumen yang ditandai revisi diunggah ulang, kirim kembali perbaikan Anda.
                             @endif

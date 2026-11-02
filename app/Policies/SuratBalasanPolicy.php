@@ -8,7 +8,7 @@ use App\Models\User;
 
 class SuratBalasanPolicy
 {
-    /** Mengikuti hak lihat pengajuan: mahasiswa pemilik, dosen pembimbing, operator. Admin tidak. */
+    /** Mengikuti hak lihat pengajuan: mahasiswa pemilik, dosen pembimbing, dan admin. */
     public function view(User $user, SuratBalasan $balasan): bool
     {
         $pengajuan = $balasan->pengajuan;

@@ -30,7 +30,7 @@
             <div>
                 <label for="pemeriksa" class="label">Diperiksa oleh</label>
                 <select id="pemeriksa" name="pemeriksa" required class="input">
-                    <option value="operator" @selected(old('pemeriksa', $syarat?->pemeriksa?->value) === 'operator')>Operator akademik (administrasi)</option>
+                    <option value="admin" @selected(old('pemeriksa', $syarat?->pemeriksa?->value) === 'admin')>Admin (administrasi)</option>
                     <option value="dosen" @selected(old('pemeriksa', $syarat?->pemeriksa?->value) === 'dosen')>Dosen pembimbing (akademik)</option>
                 </select>
                 @error('pemeriksa')<p class="galat">{{ $message }}</p>@enderror

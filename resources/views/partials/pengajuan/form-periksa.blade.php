@@ -1,5 +1,5 @@
 {{--
-    Form pemeriksaan dokumen oleh operator (administrasi) atau dosen (akademik).
+    Form pemeriksaan dokumen oleh admin (administrasi) atau dosen (akademik).
     Membutuhkan: $pengajuan, $persyaratan, $dokumenTerbaru, $peran (App\Enums\Role), $aksi (URL tujuan)
 --}}
 @php
@@ -7,12 +7,12 @@
         fn ($syarat) => $syarat->pemeriksa === $peran
             && $dokumenTerbaru->get($syarat->id)?->status === \App\Enums\StatusDokumen::Menunggu
     );
-    $sebagaiOperator = $peran === \App\Enums\Role::Operator;
+    $sebagaiAdmin = $peran === \App\Enums\Role::Admin;
 @endphp
 
 <section class="card">
     <div class="card-header">
-        <h2 class="font-semibold text-slate-900">Pemeriksaan {{ $sebagaiOperator ? 'Administrasi' : 'Akademik' }}</h2>
+        <h2 class="font-semibold text-slate-900">Pemeriksaan {{ $sebagaiAdmin ? 'Administrasi' : 'Akademik' }}</h2>
     </div>
 
     <form method="POST" action="{{ $aksi }}" class="card-body space-y-5">
@@ -63,7 +63,7 @@
         <div class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
             Jika ada dokumen yang perlu revisi, pengajuan dikembalikan kepada mahasiswa.
             Jika semua diterima, pengajuan
-            {{ $sebagaiOperator ? 'diteruskan ke dosen pembimbing.' : 'dinyatakan disetujui dan diteruskan ke operator untuk dokumen resmi.' }}
+            {{ $sebagaiAdmin ? 'diteruskan ke dosen pembimbing.' : 'dinyatakan disetujui dan diteruskan ke admin untuk dokumen resmi.' }}
         </div>
 
         <button type="submit" class="btn btn-primary">Simpan hasil pemeriksaan</button>

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Operator;
+namespace App\Http\Controllers\Admin;
 
 use App\Enums\Role;
 use App\Enums\StatusPengajuan;
@@ -23,7 +23,7 @@ class VerifikasiController extends Controller
             ->orderBy('diajukan_at')
             ->paginate(15);
 
-        return view('operator.verifikasi.index', compact('daftar'));
+        return view('admin.verifikasi.index', compact('daftar'));
     }
 
     public function show(Pengajuan $pengajuan): View
@@ -32,7 +32,7 @@ class VerifikasiController extends Controller
 
         $pengajuan->load(['mahasiswa.programStudi', 'pembimbing', 'riwayat.user', 'dokumenResmi']);
 
-        return view('operator.verifikasi.show', ['pengajuan' => $pengajuan] + $this->workflow->dataDokumen($pengajuan));
+        return view('admin.verifikasi.show', ['pengajuan' => $pengajuan] + $this->workflow->dataDokumen($pengajuan));
     }
 
     public function store(Request $request, Pengajuan $pengajuan): RedirectResponse
@@ -50,12 +50,12 @@ class VerifikasiController extends Controller
         $this->workflow->periksa(
             $pengajuan,
             $request->user(),
-            Role::Operator,
+            Role::Admin,
             $data['keputusan'] ?? [],
             $data['catatan'] ?? [],
             $data['catatan_umum'] ?? null,
         );
 
-        return redirect()->route('operator.verifikasi.index')->with('sukses', 'Hasil verifikasi tersimpan.');
+        return redirect()->route('admin.verifikasi.index')->with('sukses', 'Hasil verifikasi tersimpan.');
     }
 }

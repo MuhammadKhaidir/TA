@@ -1,5 +1,5 @@
 {{--
-    Kerangka halaman tema pasir untuk semua role (Mahasiswa, Dosen, Operator, Admin): sidebar krem yang bisa dilipat + header ringkas.
+    Kerangka halaman tema pasir untuk semua role (Mahasiswa, Dosen, Admin): sidebar krem yang bisa dilipat + header ringkas.
     Hanya tampilan. Menu tetap dari App\Support\Menu::untuk(), sehingga isi dan hak akses menu tidak berubah.
 
     Latar halaman: public/images/BackgroundDashboard.png (dilewati bila berkasnya tidak ada).

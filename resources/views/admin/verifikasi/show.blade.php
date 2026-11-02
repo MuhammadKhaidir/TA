@@ -6,7 +6,7 @@
     <x-page-header :judul="'Verifikasi: '.$pengajuan->judul"
                    :sub="$pengajuan->mahasiswa->name.' ('.($pengajuan->mahasiswa->nomor_induk ?? '-').')'">
         <x-slot:aksi>
-            <a href="{{ route('operator.verifikasi.index') }}" class="btn btn-secondary">Kembali</a>
+            <a href="{{ route('admin.verifikasi.index') }}" class="btn btn-secondary">Kembali</a>
         </x-slot:aksi>
     </x-page-header>
 
@@ -16,8 +16,8 @@
 
             @can('verifikasi', $pengajuan)
                 @include('partials.pengajuan.form-periksa', [
-                    'peran' => \App\Enums\Role::Operator,
-                    'aksi' => route('operator.verifikasi.store', $pengajuan),
+                    'peran' => \App\Enums\Role::Admin,
+                    'aksi' => route('admin.verifikasi.store', $pengajuan),
                 ])
             @else
                 <div class="alert alert-info">

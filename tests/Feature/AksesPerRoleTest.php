@@ -24,13 +24,9 @@ class AksesPerRoleTest extends TestCase
             'dosen' => [
                 '/dosen/dashboard', '/dosen/pemeriksaan', '/dosen/bimbingan', '/dosen/riwayat',
             ],
-            'operator' => [
-                '/operator/dashboard', '/operator/verifikasi', '/operator/pengajuan',
-                '/operator/dokumen-resmi', '/operator/arsip',
-            ],
             'admin' => [
-                '/admin/dashboard', '/admin/pengguna', '/admin/data-master/program-studi',
-                '/admin/persyaratan', '/admin/log-aktivitas',
+                '/admin/dashboard', '/admin/verifikasi', '/admin/pengajuan', '/admin/dokumen-resmi', '/admin/arsip',
+                '/admin/pengguna', '/admin/data-master/program-studi', '/admin/persyaratan', '/admin/log-aktivitas',
             ],
         ];
     }
@@ -61,26 +57,24 @@ class AksesPerRoleTest extends TestCase
 
         $mahasiswa = User::factory()->mahasiswa()->create();
         $dosen = User::factory()->dosen()->create();
-        $operator = User::factory()->operator()->create();
         $admin = User::factory()->admin()->create();
         $pengajuan = $this->buatPengajuan($mahasiswa, $dosen, StatusPengajuan::Diajukan);
 
-        $this->actingAs($mahasiswa)->post('/operator/verifikasi/'.$pengajuan->id)->assertForbidden();
+        $this->actingAs($mahasiswa)->post('/admin/verifikasi/'.$pengajuan->id)->assertForbidden();
         $this->actingAs($mahasiswa)->post('/admin/pengguna', ['name' => 'X'])->assertForbidden();
         $this->actingAs($mahasiswa)->delete('/admin/pengguna/'.$dosen->id)->assertForbidden();
         $this->actingAs($dosen)->post('/mahasiswa/pengajuan/kp', ['judul' => 'X'])->assertForbidden();
-        $this->actingAs($dosen)->post('/operator/verifikasi/'.$pengajuan->id)->assertForbidden();
-        $this->actingAs($operator)->post('/dosen/pemeriksaan/'.$pengajuan->id)->assertForbidden();
-        $this->actingAs($operator)->post('/admin/persyaratan', ['nama' => 'X'])->assertForbidden();
-        $this->actingAs($admin)->get('/operator/verifikasi/'.$pengajuan->id)->assertForbidden();
+        $this->actingAs($dosen)->post('/admin/verifikasi/'.$pengajuan->id)->assertForbidden();
+        $this->actingAs($dosen)->post('/admin/persyaratan', ['nama' => 'X'])->assertForbidden();
+        $this->actingAs($admin)->post('/dosen/pemeriksaan/'.$pengajuan->id)->assertForbidden();
         $this->actingAs($admin)->get('/mahasiswa/pengajuan/detail/'.$pengajuan->id)->assertForbidden();
 
         // ID yang tidak ada tetap 403 untuk role yang salah, sehingga keberadaan data tidak bocor.
-        $this->actingAs($mahasiswa)->get('/operator/verifikasi/999999')->assertForbidden();
+        $this->actingAs($mahasiswa)->get('/admin/verifikasi/999999')->assertForbidden();
         $this->actingAs($dosen)->get('/mahasiswa/pengajuan/detail/999999')->assertForbidden();
 
         $this->assertSame(StatusPengajuan::Diajukan, $pengajuan->fresh()->status);
-        $this->assertDatabaseCount('users', 4);
+        $this->assertDatabaseCount('users', 3);
     }
 
     public function test_mahasiswa_tidak_dapat_mengakses_pengajuan_milik_orang_lain(): void
@@ -129,8 +123,10 @@ class AksesPerRoleTest extends TestCase
         $menu = [
             'mahasiswa' => ['Dashboard', 'Pengajuan KP', 'Pengajuan TA', 'Status Pengajuan', 'Berkas Saya'],
             'dosen' => ['Dashboard', 'Pemeriksaan Berkas', 'Mahasiswa Bimbingan', 'Riwayat Pemeriksaan'],
-            'operator' => ['Dashboard', 'Verifikasi Administrasi', 'Pengelolaan KP/TA', 'Dokumen Resmi', 'Arsip Berkas'],
-            'admin' => ['Dashboard', 'Manajemen Pengguna', 'Data Master', 'Pengaturan Persyaratan', 'Log Aktivitas'],
+            'admin' => [
+                'Dashboard', 'Verifikasi Administrasi', 'Pengelolaan KP/TA', 'Dokumen Resmi', 'Arsip Berkas',
+                'Manajemen Pengguna', 'Data Master', 'Pengaturan Persyaratan', 'Log Aktivitas',
+            ],
         ];
 
         foreach (Role::cases() as $role) {

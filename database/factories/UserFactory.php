@@ -48,15 +48,6 @@ class UserFactory extends Factory
         ]);
     }
 
-    public function operator(): static
-    {
-        return $this->state(fn () => [
-            'role' => Role::Operator,
-            'nomor_induk' => fake()->unique()->numerify('OPR#####'),
-            'angkatan' => null,
-        ]);
-    }
-
     public function admin(): static
     {
         return $this->state(fn () => [

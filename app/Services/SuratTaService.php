@@ -20,18 +20,18 @@ use Illuminate\Validation\ValidationException;
  * Alur surat Tugas Akhir. Hak melakukan tiap langkah diputuskan PengajuanPolicy sebelum
  * kelas ini dipanggil; kelas ini mengerjakan penyimpanan berkas, pencatatan, dan log.
  *
- *   surat pengantar (operator) -> surat balasan (mahasiswa) -> pemeriksaan operator -> SK pembimbing
+ *   surat pengantar (admin) -> surat balasan (mahasiswa) -> pemeriksaan admin -> SK pembimbing
  */
 class SuratTaService
 {
-    /** Operator menerbitkan surat pengantar TA sebagai dokumen resmi. */
-    public function terbitkanPengantar(Pengajuan $pengajuan, User $operator, string $nomor, string|CarbonInterface $tanggal, UploadedFile $berkas): DokumenResmi
+    /** Admin menerbitkan surat pengantar TA sebagai dokumen resmi. */
+    public function terbitkanPengantar(Pengajuan $pengajuan, User $admin, string $nomor, string|CarbonInterface $tanggal, UploadedFile $berkas): DokumenResmi
     {
         $path = $berkas->store("dokumen-resmi/{$pengajuan->id}", 'local');
 
         $dokumen = DokumenResmi::create([
             'pengajuan_id' => $pengajuan->id,
-            'diunggah_oleh' => $operator->id,
+            'diunggah_oleh' => $admin->id,
             'jenis' => JenisPengajuan::SURAT_PENGANTAR_TA,
             'nomor' => $nomor,
             'tanggal' => $tanggal,
@@ -47,14 +47,14 @@ class SuratTaService
             'surat-pengantar.terbit',
             "Menerbitkan surat pengantar TA nomor {$nomor} untuk pengajuan TA #{$pengajuan->id}",
             $dokumen,
-            $operator,
+            $admin,
         );
 
         return $dokumen;
     }
 
     /** Menarik surat pengantar (hanya selama belum ada surat balasan; dijaga policy). */
-    public function hapusPengantar(Pengajuan $pengajuan, DokumenResmi $pengantar, User $operator): void
+    public function hapusPengantar(Pengajuan $pengajuan, DokumenResmi $pengantar, User $admin): void
     {
         Storage::disk('local')->delete($pengantar->path);
         $pengantar->delete();
@@ -64,7 +64,7 @@ class SuratTaService
             'surat-pengantar.hapus',
             "Menarik surat pengantar TA nomor {$pengantar->nomor} dari pengajuan TA #{$pengajuan->id}",
             $pengajuan,
-            $operator,
+            $admin,
         );
     }
 
@@ -107,11 +107,11 @@ class SuratTaService
     }
 
     /**
-     * Operator menerima atau meminta revisi surat balasan.
+     * Admin menerima atau meminta revisi surat balasan.
      *
-     * @param  int  $balasanId  id surat balasan yang sedang dilihat operator; ditolak bila mahasiswa sudah menggantinya
+     * @param  int  $balasanId  id surat balasan yang sedang dilihat admin; ditolak bila mahasiswa sudah menggantinya
      */
-    public function periksaBalasan(Pengajuan $pengajuan, User $operator, int $balasanId, StatusDokumen $keputusan, ?string $catatan): SuratBalasan
+    public function periksaBalasan(Pengajuan $pengajuan, User $admin, int $balasanId, StatusDokumen $keputusan, ?string $catatan): SuratBalasan
     {
         $balasan = $pengajuan->balasanTerbaru();
 
@@ -129,7 +129,7 @@ class SuratTaService
 
         $balasan->update([
             'status' => $keputusan,
-            'diperiksa_oleh' => $operator->id,
+            'diperiksa_oleh' => $admin->id,
             'diperiksa_at' => now(),
             'catatan' => $keputusan === StatusDokumen::Revisi ? $catatan : null,
         ]);
@@ -140,7 +140,7 @@ class SuratTaService
             'surat-balasan.periksa',
             "Surat balasan TA (versi {$balasan->versi}) pengajuan TA #{$pengajuan->id}: {$keputusan->label()}",
             $balasan,
-            $operator,
+            $admin,
         );
 
         return $balasan;

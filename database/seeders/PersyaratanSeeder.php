@@ -17,16 +17,16 @@ class PersyaratanSeeder extends Seeder
     {
         $semua = [
             // Kerja Praktik
-            [JenisPengajuan::Kp, 'Surat Permohonan KP', 'Surat permohonan KP bertanda tangan.', Role::Operator, true, 1, 'pdf'],
-            [JenisPengajuan::Kp, 'Transkrip Nilai Sementara', 'Transkrip nilai terbaru dari sistem akademik.', Role::Operator, true, 2, 'pdf'],
-            [JenisPengajuan::Kp, 'KRS Semester Berjalan', 'Kartu Rencana Studi semester berjalan.', Role::Operator, true, 3, 'pdf'],
-            [JenisPengajuan::Kp, 'Surat Penerimaan dari Instansi', 'Surat balasan atau persetujuan dari instansi tujuan KP.', Role::Operator, true, 4, 'pdf'],
+            [JenisPengajuan::Kp, 'Surat Permohonan KP', 'Surat permohonan KP bertanda tangan.', Role::Admin, true, 1, 'pdf'],
+            [JenisPengajuan::Kp, 'Transkrip Nilai Sementara', 'Transkrip nilai terbaru dari sistem akademik.', Role::Admin, true, 2, 'pdf'],
+            [JenisPengajuan::Kp, 'KRS Semester Berjalan', 'Kartu Rencana Studi semester berjalan.', Role::Admin, true, 3, 'pdf'],
+            [JenisPengajuan::Kp, 'Surat Penerimaan dari Instansi', 'Surat balasan atau persetujuan dari instansi tujuan KP.', Role::Admin, true, 4, 'pdf'],
             [JenisPengajuan::Kp, 'Proposal Kerja Praktik', 'Proposal KP yang akan diperiksa dosen pembimbing.', Role::Dosen, true, 5, 'pdf,doc,docx'],
 
             // Tugas Akhir
-            [JenisPengajuan::Ta, 'Transkrip Nilai', 'Transkrip nilai terbaru dari sistem akademik.', Role::Operator, true, 1, 'pdf'],
-            [JenisPengajuan::Ta, 'KRS Semester Berjalan', 'Kartu Rencana Studi semester berjalan.', Role::Operator, true, 2, 'pdf'],
-            [JenisPengajuan::Ta, 'Bukti Pembayaran UKT', 'Bukti pembayaran UKT semester berjalan.', Role::Operator, true, 3, 'pdf,jpg,jpeg,png'],
+            [JenisPengajuan::Ta, 'Transkrip Nilai', 'Transkrip nilai terbaru dari sistem akademik.', Role::Admin, true, 1, 'pdf'],
+            [JenisPengajuan::Ta, 'KRS Semester Berjalan', 'Kartu Rencana Studi semester berjalan.', Role::Admin, true, 2, 'pdf'],
+            [JenisPengajuan::Ta, 'Bukti Pembayaran UKT', 'Bukti pembayaran UKT semester berjalan.', Role::Admin, true, 3, 'pdf,jpg,jpeg,png'],
             [JenisPengajuan::Ta, 'Proposal Tugas Akhir', 'Proposal TA yang akan diperiksa dosen pembimbing.', Role::Dosen, true, 4, 'pdf,doc,docx'],
             [JenisPengajuan::Ta, 'Lembar Persetujuan Topik', 'Opsional. Lembar persetujuan topik dari calon pembimbing.', Role::Dosen, false, 5, 'pdf'],
         ];

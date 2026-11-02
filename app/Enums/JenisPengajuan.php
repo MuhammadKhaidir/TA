@@ -26,7 +26,7 @@ enum JenisPengajuan: string
     }
 
     /**
-     * Jenis dokumen resmi yang dapat diterbitkan operator untuk jenis pengajuan ini.
+     * Jenis dokumen resmi yang dapat diterbitkan admin untuk jenis pengajuan ini.
      *
      * @return array<string, string> kode => label
      */
