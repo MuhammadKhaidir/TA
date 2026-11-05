@@ -1,0 +1,497 @@
+diff --git a/public/css/pasir-dashboard.css b/public/css/pasir-dashboard.css
+index 10add97..7b9d212 100644
+--- a/public/css/pasir-dashboard.css
++++ b/public/css/pasir-dashboard.css
+@@ -1,134 +1,79 @@
+-/* Tema visual Arsip KP & TA — hanya berlaku pada area setelah login. */
++/* Penyempurnaan area konten Arsip KP & TA.
++   Sengaja tidak mengatur .sidebar-pasir, header, navbar, maupun toggle sidebar.
++   BackgroundDashboard.png tetap disediakan oleh lapisan fixed di shell-pasir. */
+ .shell-pasir {
+-    --pasir-ivory: #fffaf1;
+-    --pasir-paper: #fffdf8;
+-    --pasir-line: #ead7b6;
+-    --pasir-line-strong: #d9b777;
+-    --pasir-gold: #a87620;
+-    --pasir-gold-dark: #80550f;
+-    --pasir-ink: #192442;
+-    color: var(--pasir-ink);
+-    background: linear-gradient(135deg, #fffdf8 0%, #fbf4e8 52%, #fffaf1 100%);
+-}
+-
+-.shell-pasir .sidebar-pasir {
+-    background: linear-gradient(180deg, rgba(255, 252, 245, .96), rgba(250, 241, 224, .88));
+-    border-right-color: var(--pasir-line);
+-    box-shadow: 5px 0 24px rgba(128, 85, 15, .045);
+-}
+-
+-.shell-pasir #sidebar-pasir > div.relative.z-10.flex.items-center {
+-    min-height: 120px;
+-    border-bottom: 1px solid rgba(217, 183, 119, .46);
+-}
+-
+-.shell-pasir .sidebar-pasir nav {
+-    padding-top: 1.1rem;
+-    padding-bottom: 1.1rem;
+-}
+-
+-.shell-pasir .sidebar-pasir nav a,
+-.shell-pasir .sidebar-pasir > div:last-child a,
+-.shell-pasir .sidebar-pasir > div:last-child button {
+-    border: 1px solid transparent;
+-    border-radius: 14px;
+-    transition: background-color .18s ease, border-color .18s ease, transform .18s ease;
+-}
+-
+-.shell-pasir .sidebar-pasir nav a[aria-current="page"],
+-.shell-pasir .sidebar-pasir > div:last-child a[aria-current="page"] {
+-    background: linear-gradient(105deg, rgba(241, 219, 179, .82), rgba(250, 235, 208, .72));
+-    border-color: rgba(217, 183, 119, .34);
+-    box-shadow: 0 4px 12px rgba(128, 85, 15, .055);
+-}
+-
+-.shell-pasir .sidebar-pasir nav a:hover,
+-.shell-pasir .sidebar-pasir > div:last-child a:hover,
+-.shell-pasir .sidebar-pasir > div:last-child button:hover {
+-    background: rgba(238, 220, 190, .58);
+-    border-color: rgba(217, 183, 119, .28);
+-}
+-
+-.shell-pasir .sidebar-pasir > div:last-child {
+-    background: linear-gradient(180deg, rgba(255, 251, 242, .1), rgba(247, 235, 214, .56));
+-    border-top-color: rgba(217, 183, 119, .45);
+-}
+-
+-.shell-pasir header {
+-    min-height: 82px;
+-    border-bottom-color: rgba(217, 183, 119, .45);
+-    background: rgba(255, 253, 248, .72);
+-    box-shadow: 0 3px 18px rgba(128, 85, 15, .025);
+-}
+-
+-.shell-pasir header details > summary {
+-    border: 1px solid rgba(217, 183, 119, .56);
+-    box-shadow: 0 5px 18px rgba(128, 85, 15, .09);
++    --pasir-line: #e8c994;
++    --pasir-line-soft: rgba(210, 170, 105, .42);
++    --pasir-ink: #17233f;
++    --pasir-gold: #946313;
+ }
+ 
++/* Area kerja: biarkan background fixed dari shell terlihat di belakang konten. */
+ .shell-pasir main {
+-    padding-top: clamp(1.5rem, 3vw, 2.25rem);
+-    padding-bottom: 3rem;
++    background: transparent;
++    padding-top: clamp(1.35rem, 2.4vw, 2rem);
++    padding-bottom: 2.75rem;
+ }
+ 
+ .shell-pasir main > div {
+     max-width: 100rem;
+ }
+ 
+-/* Judul halaman dibuat lebih editorial, seperti referensi dashboard. */
+-.shell-pasir .judul-halaman {
++/* Judul konten. */
++.shell-pasir main .judul-halaman {
+     margin: 0;
+-    color: #17233f;
++    color: var(--pasir-ink);
+     font-family: Georgia, 'Times New Roman', serif;
+-    font-size: clamp(2rem, 3.1vw, 2.8rem);
++    font-size: clamp(2rem, 3vw, 2.8rem);
+     font-weight: 700;
+     letter-spacing: -.035em;
+     line-height: 1.12;
+ }
+ 
+-.shell-pasir .sub-halaman {
++.shell-pasir main .sub-halaman {
+     margin-top: .35rem;
+     color: #4d5872;
+     font-size: .98rem;
+     line-height: 1.55;
+ }
+ 
+-.shell-pasir .card {
++/* Panel dan kartu data di area konten saja. */
++.shell-pasir main .card {
+     position: relative;
+-    border: 1px solid var(--pasir-line);
++    border: 1.5px solid var(--pasir-line);
+     border-radius: 17px;
+-    background: rgba(255, 254, 250, .88);
+-    box-shadow: 0 5px 17px rgba(128, 85, 15, .055), 0 1px 2px rgba(128, 85, 15, .035);
++    background: rgba(255, 254, 250, .91);
++    box-shadow: 0 5px 17px rgba(128, 85, 15, .07), 0 1px 2px rgba(128, 85, 15, .04);
+     transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+ }
+ 
+-.shell-pasir a.card:hover {
+-    border-color: var(--pasir-line-strong);
+-    box-shadow: 0 9px 24px rgba(128, 85, 15, .095);
++.shell-pasir main a.card:hover {
++    border-color: #d2a85f;
++    box-shadow: 0 9px 24px rgba(128, 85, 15, .11);
+ }
+ 
+-.shell-pasir .card-header {
++.shell-pasir main .card-header {
+     min-height: 58px;
+-    border-bottom: 1px solid rgba(217, 183, 119, .36);
++    border-bottom: 1px solid var(--pasir-line-soft);
+     border-radius: 16px 16px 0 0;
+-    background: linear-gradient(100deg, rgba(247, 231, 202, .92), rgba(251, 241, 222, .76));
++    background: linear-gradient(100deg, rgba(247, 231, 202, .94), rgba(251, 241, 222, .82));
+     padding-top: .9rem;
+     padding-bottom: .9rem;
+ }
+ 
+-.shell-pasir .card-header h2 {
++.shell-pasir main .card-header h2 {
+     color: #192442;
+     font-family: Georgia, 'Times New Roman', serif;
+     font-size: 1.02rem;
+     font-weight: 700;
+ }
+ 
+-.shell-pasir .card-body {
++.shell-pasir main .card-body {
+     padding: 1.25rem;
+ }
+ 
+-/* Kartu angka statistik. */
+-.shell-pasir .stat-card {
++/* Kartu statistik mengikuti komposisi referensi: ikon, pemisah, angka dan keterangan. */
++.shell-pasir main .stat-card {
+     display: flex;
+     min-width: 0;
+     min-height: 126px;
+@@ -137,31 +82,46 @@
+     overflow: hidden;
+     padding: 1rem;
+     background:
+-        radial-gradient(ellipse at 100% 115%, rgba(226, 194, 139, .25) 0, rgba(226, 194, 139, .11) 25%, transparent 58%),
++        radial-gradient(ellipse at 100% 118%, rgba(226, 194, 139, .30) 0, rgba(226, 194, 139, .13) 27%, transparent 59%),
+         linear-gradient(135deg, rgba(255, 255, 252, .97), rgba(255, 250, 240, .94));
+ }
+ 
+-.shell-pasir .stat-icon {
++.shell-pasir main .stat-card::after {
++    position: absolute;
++    right: -1.8rem;
++    bottom: -2.3rem;
++    width: 11rem;
++    height: 5.7rem;
++    border: 1px solid rgba(218, 187, 137, .23);
++    border-radius: 50%;
++    content: '';
++    pointer-events: none;
++    transform: rotate(-17deg);
++}
++
++.shell-pasir main .stat-icon {
++    z-index: 1;
+     display: grid;
+     width: 3.55rem;
+     height: 3.55rem;
+     flex: 0 0 3.55rem;
+     place-items: center;
+-    border: 1px solid rgba(217, 183, 119, .34);
++    border: 1px solid rgba(217, 183, 119, .38);
+     border-radius: 17px;
+     background: linear-gradient(145deg, #f8e8c9, #f1d9a9);
+     color: #916416;
+-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7);
++    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .72);
+ }
+ 
+-.shell-pasir .stat-copy {
++.shell-pasir main .stat-copy {
++    z-index: 1;
+     min-width: 0;
+     flex: 1;
+-    border-left: 1px solid rgba(217, 183, 119, .72);
++    border-left: 1px solid rgba(217, 183, 119, .76);
+     padding: .3rem 0 .15rem 1rem;
+ }
+ 
+-.shell-pasir .stat-label {
++.shell-pasir main .stat-label {
+     color: #202b46;
+     font-family: Georgia, 'Times New Roman', serif;
+     font-size: .98rem;
+@@ -169,7 +129,7 @@
+     line-height: 1.3;
+ }
+ 
+-.shell-pasir .stat-angka {
++.shell-pasir main .stat-angka {
+     margin-top: .25rem;
+     color: #17233f;
+     font-family: Georgia, 'Times New Roman', serif;
+@@ -179,20 +139,20 @@
+     letter-spacing: -.04em;
+ }
+ 
+-.shell-pasir .stat-hint {
++.shell-pasir main .stat-hint {
+     margin-top: .55rem;
+     color: #5e6680;
+     font-size: .76rem;
+     line-height: 1.4;
+ }
+ 
+-.shell-pasir .stat-card[href]:hover {
++.shell-pasir main .stat-card[href]:hover {
+     transform: translateY(-2px);
+-    border-color: #d5ad69;
++    border-color: #d2a85f;
+ }
+ 
+-/* Area kosong, tabel, dan panel data. */
+-.shell-pasir .empty-state {
++/* Kondisi belum ada data. */
++.shell-pasir main .empty-state {
+     display: flex;
+     min-height: 176px;
+     flex-direction: column;
+@@ -205,7 +165,7 @@
+     font-size: .9rem;
+ }
+ 
+-.shell-pasir .empty-state-icon {
++.shell-pasir main .empty-state-icon {
+     display: grid;
+     width: 4.1rem;
+     height: 4.1rem;
+@@ -217,187 +177,171 @@
+     box-shadow: 0 7px 18px rgba(128, 85, 15, .07);
+ }
+ 
+-.shell-pasir .tabel {
++/* Tabel pada halaman konten. */
++.shell-pasir main .tabel {
+     border-collapse: separate;
+     border-spacing: 0;
+     color: #27334f;
+ }
+ 
+-.shell-pasir .tabel thead th {
++.shell-pasir main .tabel thead th {
+     border-bottom: 1px solid #e9d7b9;
+-    background: rgba(248, 239, 222, .82);
++    background: rgba(248, 239, 222, .88);
+     color: #6d5a3d;
+     font-size: .69rem;
+     letter-spacing: .075em;
+     padding: .9rem 1rem;
+ }
+ 
+-.shell-pasir .tabel tbody td {
+-    border-bottom: 1px solid rgba(234, 215, 182, .62);
++.shell-pasir main .tabel tbody td {
++    border-bottom: 1px solid rgba(234, 215, 182, .66);
+     color: #35405a;
+     line-height: 1.5;
+     padding: .9rem 1rem;
+ }
+ 
+-.shell-pasir .tabel tbody tr:last-child td {
++.shell-pasir main .tabel tbody tr:last-child td {
+     border-bottom: 0;
+ }
+ 
+-.shell-pasir .tabel tbody tr:hover td {
+-    background: rgba(250, 242, 227, .56);
++.shell-pasir main .tabel tbody tr:hover td {
++    background: rgba(250, 242, 227, .58);
+ }
+ 
+-/* Formulir, tombol, label, dan status. */
+-.shell-pasir .label {
++/* Kontrol formulir hanya di area isi, bukan form dropdown/header/sidebar. */
++.shell-pasir main .label {
+     color: #3c4660;
+     font-weight: 600;
+ }
+ 
+-.shell-pasir .input {
++.shell-pasir main .input {
+     min-height: 42px;
+     border: 1px solid #dfcfb2;
+     border-radius: 11px;
+-    background: rgba(255, 255, 252, .94);
++    background: rgba(255, 255, 252, .95);
+     color: #202b46;
+     box-shadow: inset 0 1px 2px rgba(90, 65, 27, .025);
+ }
+ 
+-.shell-pasir textarea.input {
++.shell-pasir main textarea.input {
+     min-height: auto;
+ }
+ 
+-.shell-pasir .input:focus {
++.shell-pasir main .input:focus {
+     border-color: #bd9450;
+     outline: none;
+     box-shadow: 0 0 0 3px rgba(206, 169, 104, .2);
+ }
+ 
+-.shell-pasir .btn {
++.shell-pasir main .btn {
+     min-height: 39px;
+     border-radius: 11px;
+     font-weight: 600;
+     transition: transform .16s ease, box-shadow .16s ease, background-color .16s ease;
+ }
+ 
+-.shell-pasir .btn:active {
++.shell-pasir main .btn:active {
+     transform: translateY(1px);
+ }
+ 
+-.shell-pasir .btn-primary {
++.shell-pasir main .btn-primary {
+     border-color: #9a6a1c;
+     background: linear-gradient(135deg, #b9852e, #946416);
+     color: #fffdf8;
+     box-shadow: 0 3px 9px rgba(128, 85, 15, .15);
+ }
+ 
+-.shell-pasir .btn-primary:hover {
++.shell-pasir main .btn-primary:hover {
+     background: linear-gradient(135deg, #a97622, #80550f);
+     box-shadow: 0 5px 13px rgba(128, 85, 15, .2);
+ }
+ 
+-.shell-pasir .btn-secondary {
++.shell-pasir main .btn-secondary {
+     border: 1px solid #dfcfb2;
+-    background: rgba(255, 255, 252, .88);
++    background: rgba(255, 255, 252, .9);
+     color: #39435c;
+ }
+ 
+-.shell-pasir .btn-secondary:hover {
++.shell-pasir main .btn-secondary:hover {
+     border-color: #c9a66a;
+     background: #fbf2e2;
+ }
+ 
+-.shell-pasir .tautan {
++.shell-pasir main .tautan {
+     color: #8b611c;
+ }
+ 
+-.shell-pasir .tautan:hover {
++.shell-pasir main .tautan:hover {
+     color: #62420d;
+ }
+ 
+-.shell-pasir .badge {
++.shell-pasir main .badge {
+     border-radius: 999px;
+     font-weight: 600;
+ }
+ 
+-.shell-pasir .alert {
++.shell-pasir main .alert {
+     border-radius: 14px;
+     box-shadow: 0 3px 12px rgba(128, 85, 15, .04);
+ }
+ 
+-.shell-pasir .dl-baris {
++.shell-pasir main .dl-baris {
+     border-bottom: 1px solid rgba(234, 215, 182, .55);
+ }
+ 
+-.shell-pasir .dl-baris:last-child {
++.shell-pasir main .dl-baris:last-child {
+     border-bottom: 0;
+ }
+ 
+-.shell-pasir input[type="checkbox"],
+-.shell-pasir input[type="radio"] {
++.shell-pasir main input[type="checkbox"],
++.shell-pasir main input[type="radio"] {
+     accent-color: #9a6a1c;
+ }
+ 
+-.shell-pasir nav[aria-label],
+-.shell-pasir .overflow-x-auto {
++.shell-pasir main .overflow-x-auto {
+     scrollbar-color: #d8c39e transparent;
+     scrollbar-width: thin;
+ }
+ 
+-.shell-pasir .pagination a,
+-.shell-pasir .pagination span,
+-.shell-pasir nav[role="navigation"] a,
+-.shell-pasir nav[role="navigation"] span {
++.shell-pasir main .pagination a,
++.shell-pasir main .pagination span {
+     border-radius: 9px;
+ }
+ 
+-@media (max-width: 1023.98px) {
+-    .shell-pasir .sidebar-pasir {
+-        background: #fffaf1;
+-        box-shadow: 14px 0 40px rgba(45, 35, 18, .15);
+-    }
+-}
+-
+ @media (max-width: 639.98px) {
+-    .shell-pasir header {
+-        min-height: 68px;
+-        padding-top: .7rem;
+-        padding-bottom: .7rem;
+-    }
+-
+     .shell-pasir main {
+         padding: 1.25rem 1rem 2rem;
+     }
+ 
+-    .shell-pasir .judul-halaman {
++    .shell-pasir main .judul-halaman {
+         font-size: 2rem;
+     }
+ 
+-    .shell-pasir .stat-card {
++    .shell-pasir main .stat-card {
+         min-height: 112px;
+         gap: .75rem;
+         padding: .85rem;
+     }
+ 
+-    .shell-pasir .stat-icon {
++    .shell-pasir main .stat-icon {
+         width: 2.9rem;
+         height: 2.9rem;
+         flex-basis: 2.9rem;
+     }
+ 
+-    .shell-pasir .stat-copy {
++    .shell-pasir main .stat-copy {
+         padding-left: .75rem;
+     }
+ 
+-    .shell-pasir .stat-angka {
++    .shell-pasir main .stat-angka {
+         font-size: 2rem;
+     }
+ }
+ 
+ @media (prefers-reduced-motion: reduce) {
+-    .shell-pasir *,
+-    .shell-pasir *::before,
+-    .shell-pasir *::after {
+-        scroll-behavior: auto !important;
++    .shell-pasir main *,
++    .shell-pasir main *::before,
++    .shell-pasir main *::after {
+         transition-duration: .01ms !important;
+         animation-duration: .01ms !important;
+         animation-iteration-count: 1 !important;

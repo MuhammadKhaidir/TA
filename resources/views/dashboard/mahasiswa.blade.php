@@ -83,11 +83,11 @@
         </div>
     </div>
 
-    <div class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <x-stat label="Total Pengajuan" :nilai="$pengajuan->count()" />
-        <x-stat label="Dalam Proses" :nilai="$dalamProses" hint="Diperiksa admin atau dosen" />
-        <x-stat label="Perlu Revisi" :nilai="$perluRevisi->count()" hint="Menunggu perbaikan dari Anda" />
-        <x-stat label="Selesai" :nilai="$selesai" hint="Sudah diarsipkan" />
+    <div class="mt-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
+        <x-kartu-stat icon="stack-solid" label="Total Pengajuan" :nilai="$pengajuan->count()" />
+        <x-kartu-stat icon="refresh-solid" label="Dalam Proses" :nilai="$dalamProses" hint="Diperiksa admin atau dosen" />
+        <x-kartu-stat icon="pencil-solid" label="Perlu Revisi" :nilai="$perluRevisi->count()" hint="Menunggu perbaikan dari Anda" />
+        <x-kartu-stat icon="check-solid" label="Selesai" :nilai="$selesai" hint="Sudah diarsipkan" />
     </div>
 
     @if ($suratPerluTindakan->isNotEmpty())
@@ -124,7 +124,7 @@
             <a href="{{ route('mahasiswa.status.index') }}" class="tautan text-sm">Lihat semua</a>
         </div>
         @if ($pengajuan->isEmpty())
-            <x-empty pesan="Belum ada pengajuan. Mulai dengan mengajukan KP atau TA." />
+            <x-kosong pesan="Belum ada pengajuan. Mulai dengan mengajukan KP atau TA." />
         @else
             <div class="overflow-x-auto">
                 <table class="tabel min-w-[34rem]">

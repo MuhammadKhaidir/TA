@@ -11,10 +11,12 @@
     $latar = file_exists(public_path('images/BackgroundDashboard.png')) ? asset('images/BackgroundDashboard.png') : null;
 @endphp
 
+<link rel="stylesheet" href="{{ asset('css/pasir-dashboard.css') }}">
+
 {{-- Latar halaman (tetap di tempat saat konten di-scroll) --}}
 <div class="pointer-events-none fixed inset-0 z-0 bg-gradient-to-br from-sand-50 via-sand-50 to-sand-100" aria-hidden="true">
     @if ($latar)
-        <div class="absolute inset-0 bg-cover bg-left-bottom bg-no-repeat" style="background-image: url('{{ $latar }}')"></div>
+        <div class="absolute inset-0 bg-no-repeat" style="background-image: url('{{ $latar }}'); background-size: auto 100%; background-position: right top; -webkit-mask-image: linear-gradient(to right, transparent 47%, #000 58%); mask-image: linear-gradient(to right, transparent 47%, #000 58%)"></div>
     @endif
 </div>
 
@@ -30,8 +32,13 @@
 
     {{-- Sidebar --}}
     <aside id="sidebar-pasir"
-           class="sidebar-pasir flex shrink-0 flex-col overflow-hidden border-r border-sand-200 {{ $latar ? 'bg-sand-100/40' : 'bg-sand-100/80' }} max-lg:bg-sand-50 max-lg:shadow-2xl"
+           class="sidebar-pasir flex shrink-0 flex-col overflow-hidden border-r border-sand-200 after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:w-[3px] after:bg-gradient-to-b after:from-transparent after:via-[#d8b878]/60 after:to-transparent {{ $latar ? 'bg-sand-100/40' : 'bg-sand-100/80' }} max-lg:bg-sand-50 max-lg:shadow-2xl"
            aria-label="Menu utama">
+
+        {{-- Gedung Fasilkom di dasar sidebar (memudar ke atas) --}}
+        @if ($latar)
+            <div class="pointer-events-none absolute inset-x-0 bottom-0 h-[22rem]" aria-hidden="true" style="background-image: url('{{ $latar }}'); background-repeat: no-repeat; background-position: left bottom; background-size: 730px auto; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 45%); mask-image: linear-gradient(to bottom, transparent 0, #000 45%)"></div>
+        @endif
 
         {{-- Dekorasi gelombang bila gambar latar belum ada --}}
         @unless ($latar)
@@ -49,17 +56,17 @@
                 <path d="M44 19v12" stroke="#765732" stroke-width="2" stroke-linecap="round" />
             </svg>
             <div class="leading-tight">
-                <p class="text-xl font-bold text-ink-900">Arsip KP &amp; TA</p>
-                <p class="text-sm text-ink-500">Fasilkom Unsri</p>
+                <p class="font-serif text-2xl font-bold text-ink-900">Arsip KP &amp; TA</p>
+                <p class="font-serif text-[15px] text-ink-600">Fasilkom Unsri</p>
             </div>
         </div>
 
         {{-- Menu --}}
-        <nav class="relative z-10 flex-1 space-y-2 overflow-y-auto px-4 py-3">
+        <nav class="relative z-10 flex-1 space-y-1 overflow-y-auto px-4 py-3">
             <p class="sub-label px-5 pb-1">{{ $pengguna->role->label() }}</p>
             @foreach ($menu as $butir)
                 <a href="{{ $butir['url'] }}"
-                   class="relative flex items-center gap-4 rounded-2xl px-5 py-3.5 text-[16px] font-medium transition-colors duration-200 {{ $butir['aktif'] ? 'bg-sand-300/60 font-semibold text-ink-900' : 'text-ink-700 hover:bg-sand-200/70 hover:text-ink-900' }}"
+                   class="relative flex items-center gap-4 rounded-2xl px-5 py-3 text-[16px] font-medium transition-colors duration-200 {{ $butir['aktif'] ? 'bg-gradient-to-r from-[#f1dfb8] to-[#f6ead2] font-semibold text-ink-900 shadow-[inset_0_0_0_1px_rgba(201,164,106,0.28)]' : 'text-ink-700 hover:bg-sand-200/70 hover:text-ink-900' }}"
                    @if ($butir['aktif']) aria-current="page" @endif>
                     @if ($butir['aktif'])
                         <span class="absolute -left-3 top-1/2 h-10 w-1.5 -translate-y-1/2 rounded-full bg-gradient-to-b from-[#c9a46a] to-[#98743f]" aria-hidden="true"></span>
@@ -71,7 +78,7 @@
         </nav>
 
         {{-- Profil dan keluar --}}
-        <div class="relative z-10 space-y-1 border-t border-sand-200/70 px-4 py-4">
+        <div class="relative z-10 space-y-1 border-t border-sand-200/70 bg-sand-50/30 px-4 py-4">
             <a href="{{ route('profil.show') }}"
                class="flex items-center gap-4 rounded-2xl px-5 py-2.5 text-[15px] font-medium transition-colors duration-200 {{ request()->routeIs('profil.*') ? 'bg-sand-300/60 font-semibold text-ink-900' : 'text-ink-700 hover:bg-sand-200/70 hover:text-ink-900' }}"
                @if (request()->routeIs('profil.*')) aria-current="page" @endif>

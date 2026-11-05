@@ -287,3 +287,90 @@
         transition: none !important;
     }
 }
+
+/*
+ * GAYA KREM-EMAS UNTUK SEMUA HALAMAN SETELAH LOGIN (mengikuti desain Dashboard Admin).
+ * Semua aturan dibatasi pada .shell-pasir (kerangka setelah login), jadi halaman login tidak ikut berubah.
+ * Sengaja tanpa @layer supaya menang atas kelas utilitas lama di markup (font-semibold, dsb.).
+ */
+.shell-pasir {
+    --ilustrasi-kosong: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 132' fill='none'%3E%3Cellipse cx='120' cy='116' rx='92' ry='10' fill='%23f1e2c2' opacity='.7'/%3E%3Cg stroke='%23d9b36b' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M54 112C40 96 40 76 52 62'/%3E%3Cpath d='M186 112C200 96 200 76 188 62'/%3E%3C/g%3E%3Cg fill='%23e3c98f' opacity='.85'%3E%3Cpath d='M52 62c-9-2-13-9-12-17 9 1 14 7 12 17Z'/%3E%3Cpath d='M44 88c-9 0-15-5-16-13 9-1 15 4 16 13Z'/%3E%3Cpath d='M188 62c9-2 13-9 12-17-9 1-14 7-12 17Z'/%3E%3Cpath d='M196 88c9 0 15-5 16-13-9-1-15 4-16 13Z'/%3E%3C/g%3E%3Cpath d='M88 20h42l22 22v62a5 5 0 0 1-5 5H88a5 5 0 0 1-5-5V25a5 5 0 0 1 5-5Z' fill='%23fbf3e3' stroke='%23a8793a' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M130 20v22h22' stroke='%23a8793a' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M96 62h48M96 76h48M96 90h30' stroke='%23d9c39a' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E");
+    --ikon-panah: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13.5 6.5 19 12l-5.5 5.5'/%3E%3C/svg%3E");
+    --ikon-dokumen: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M6.5 2.8h7.2l4.8 4.8v12.6a1 1 0 0 1-1 1H6.5a1 1 0 0 1-1-1V3.8a1 1 0 0 1 1-1ZM8.4 11.4h7.2V13H8.4ZM8.4 14.8h7.2v1.6H8.4Z'/%3E%3C/svg%3E");
+}
+
+.shell-pasir .judul-halaman {
+    @apply font-serif text-3xl font-bold leading-tight tracking-tight text-ink-900 sm:text-[2.75rem];
+}
+.shell-pasir .sub-halaman {
+    @apply mt-2 font-serif text-base text-ink-700 sm:text-lg;
+}
+
+/* Kartu: tepi emas tipis, latar krem-putih, bayangan hangat */
+.shell-pasir .card {
+    @apply rounded-2xl border-[1.5px] border-[#e8d6b0] bg-[#fffdf8]/70 shadow-[0_2px_10px_rgba(152,116,63,0.08)];
+}
+
+/* Kepala kartu: pita krem dengan ikon dokumen dan judul serif */
+.shell-pasir .card-header {
+    @apply rounded-t-[0.85rem] border-b border-[#ead9b8] bg-gradient-to-r from-[#f4e7cf] to-[#f8eedb] px-6 py-4;
+}
+.shell-pasir .card-header > h2 {
+    @apply flex items-center gap-3 font-serif text-xl font-bold text-ink-900;
+}
+.shell-pasir .card-header > h2:first-child::before {
+    content: '';
+    flex: none;
+    width: 1.5rem;
+    height: 1.5rem;
+    background-color: var(--color-sand-600);
+    -webkit-mask: var(--ikon-dokumen) center / contain no-repeat;
+    mask: var(--ikon-dokumen) center / contain no-repeat;
+}
+.shell-pasir .card-header .tautan {
+    @apply inline-flex items-center gap-2 font-serif text-[15px] font-medium text-ink-800 no-underline hover:text-sand-600 hover:no-underline;
+}
+.shell-pasir .card-header .tautan::after {
+    content: '';
+    width: 1.1rem;
+    height: 1.1rem;
+    background-color: var(--color-sand-600);
+    -webkit-mask: var(--ikon-panah) center / contain no-repeat;
+    mask: var(--ikon-panah) center / contain no-repeat;
+}
+
+/* Kartu ringkasan (komponen stat) */
+.shell-pasir .stat-angka {
+    @apply mt-1 font-serif text-[2.5rem] font-bold leading-none text-ink-900;
+}
+.shell-pasir a.kartu-stat:hover {
+    @apply border-sand-400 bg-white/90 shadow-[0_6px_18px_rgba(152,116,63,0.14)];
+}
+
+/* Judul kecil di dalam isi kartu */
+.shell-pasir .sub-label {
+    @apply font-serif text-[12px] tracking-[0.1em];
+}
+
+/* Tabel: kepala krem, garis pemisah emas pucat */
+.shell-pasir .tabel thead th {
+    @apply border-[#ead9b8] bg-[#f8eedb]/80 font-serif text-[12px] text-ink-700;
+}
+.shell-pasir .tabel tbody td {
+    @apply border-[#efe2c6]/80;
+}
+.shell-pasir .tabel tbody tr:hover td {
+    @apply bg-[#f8eedb]/40;
+}
+
+/* Keadaan kosong bawaan (komponen empty lama) di semua halaman: beri ilustrasi tanpa mengubah markup */
+.shell-pasir div.px-5.py-10.text-center {
+    @apply text-base text-ink-600;
+}
+.shell-pasir div.px-5.py-10.text-center::before {
+    content: '';
+    display: block;
+    height: 8rem;
+    margin: 0 auto 0.75rem;
+    background: var(--ilustrasi-kosong) center / contain no-repeat;
+}

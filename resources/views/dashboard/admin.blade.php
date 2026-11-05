@@ -10,15 +10,15 @@
 
     <x-page-header judul="Dashboard" sub="Ringkasan proses administrasi KP dan TA, data pengguna, dan pengaturan sistem." />
 
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <x-stat label="Perlu Pembimbing" :nilai="$jumlahPerluPembimbing" hint="Belum ada dosen pembimbing atau ditolak dosen" :href="route('admin.pengajuan.index', ['pembimbing' => 'perlu'])" />
-        <x-stat label="Perlu Verifikasi" :nilai="$hitungStatus('diajukan')" hint="Menunggu pemeriksaan administrasi" :href="route('admin.verifikasi.index')" />
-        <x-stat label="Surat Pengantar TA" :nilai="$jumlahPerluPengantar" hint="TA terverifikasi yang belum diterbitkan suratnya" :href="route('admin.dokumen-resmi.index')" />
-        <x-stat label="Surat Balasan TA" :nilai="$jumlahBalasanMenunggu" hint="Diunggah mahasiswa, menunggu diperiksa" :href="route('admin.dokumen-resmi.index')" />
-        <x-stat label="Diperiksa Dosen" :nilai="$hitungStatus('menunggu_dosen')" />
-        <x-stat label="Dalam Revisi" :nilai="$hitungStatus('revisi_administrasi') + $hitungStatus('revisi_akademik')" hint="Menunggu perbaikan mahasiswa" />
-        <x-stat label="Perlu Dokumen Resmi" :nilai="$hitungStatus('disetujui')" hint="Sudah disetujui dosen" :href="route('admin.dokumen-resmi.index')" />
-        <x-stat label="Diarsipkan" :nilai="$hitungStatus('diarsipkan')" :href="route('admin.arsip.index')" />
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <x-kartu-stat icon="pencil-solid" label="Perlu Pembimbing" :nilai="$jumlahPerluPembimbing" hint="Belum ada dosen pembimbing atau ditolak dosen" :href="route('admin.pengajuan.index', ['pembimbing' => 'perlu'])" />
+        <x-kartu-stat icon="check-solid" label="Perlu Verifikasi" :nilai="$hitungStatus('diajukan')" hint="Menunggu pemeriksaan administrasi" :href="route('admin.verifikasi.index')" />
+        <x-kartu-stat icon="send-solid" label="Surat Pengantar TA" :nilai="$jumlahPerluPengantar" hint="TA terverifikasi yang belum diterbitkan suratnya" :href="route('admin.dokumen-resmi.index')" />
+        <x-kartu-stat icon="download-solid" label="Surat Balasan TA" :nilai="$jumlahBalasanMenunggu" hint="Diunggah mahasiswa, menunggu diperiksa" :href="route('admin.dokumen-resmi.index')" />
+        <x-kartu-stat icon="shield-solid" label="Diperiksa Dosen" :nilai="$hitungStatus('menunggu_dosen')" />
+        <x-kartu-stat icon="refresh-solid" label="Dalam Revisi" :nilai="$hitungStatus('revisi_administrasi') + $hitungStatus('revisi_akademik')" hint="Menunggu perbaikan mahasiswa" />
+        <x-kartu-stat icon="doc-solid" label="Perlu Dokumen Resmi" :nilai="$hitungStatus('disetujui')" hint="Sudah disetujui dosen" :href="route('admin.dokumen-resmi.index')" />
+        <x-kartu-stat icon="calendar-solid" label="Diarsipkan" :nilai="$hitungStatus('diarsipkan')" :href="route('admin.arsip.index')" />
     </div>
 
     <div class="mt-6 grid gap-6 xl:grid-cols-2">
@@ -28,7 +28,7 @@
                 <a href="{{ route('admin.verifikasi.index') }}" class="tautan text-sm">Lihat semua</a>
             </div>
             @if ($antreanVerifikasi->isEmpty())
-                <x-empty pesan="Tidak ada pengajuan yang menunggu verifikasi." />
+                <x-kosong ikon="clipboard" pesan="Tidak ada pengajuan yang menunggu verifikasi." />
             @else
                 <div class="overflow-x-auto">
                     <table class="tabel">
@@ -57,7 +57,7 @@
                 <a href="{{ route('admin.dokumen-resmi.index') }}" class="tautan text-sm">Lihat semua</a>
             </div>
             @if ($antreanSurat->isEmpty())
-                <x-empty pesan="Tidak ada surat pengantar atau surat balasan TA yang menunggu." />
+                <x-kosong ikon="surat" pesan="Tidak ada surat pengantar atau surat balasan TA yang menunggu." />
             @else
                 <div class="overflow-x-auto">
                     <table class="tabel">
@@ -85,7 +85,7 @@
                 <a href="{{ route('admin.dokumen-resmi.index') }}" class="tautan text-sm">Lihat semua</a>
             </div>
             @if ($perluDokumenResmi->isEmpty())
-                <x-empty pesan="Tidak ada pengajuan yang menunggu dokumen resmi." />
+                <x-kosong pesan="Tidak ada pengajuan yang menunggu dokumen resmi." />
             @else
                 <div class="overflow-x-auto">
                     <table class="tabel">
@@ -114,7 +114,7 @@
                 <a href="{{ route('admin.pengajuan.index', ['pembimbing' => 'perlu']) }}" class="tautan text-sm">Lihat semua</a>
             </div>
             @if ($perluPembimbing->isEmpty())
-                <x-empty pesan="Semua pengajuan yang sudah dikirim memiliki dosen pembimbing atau sedang menunggu konfirmasi dosen." />
+                <x-kosong pesan="Semua pengajuan yang sudah dikirim memiliki dosen pembimbing atau sedang menunggu konfirmasi dosen." />
             @else
                 <div class="overflow-x-auto">
                     <table class="tabel">
@@ -141,12 +141,12 @@
         </section>
     </div>
 
-    <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <x-stat label="Mahasiswa" :nilai="$hitungRole('mahasiswa')" :href="route('admin.users.index', ['role' => 'mahasiswa'])" />
-        <x-stat label="Dosen" :nilai="$hitungRole('dosen')" :href="route('admin.users.index', ['role' => 'dosen'])" />
-        <x-stat label="Admin" :nilai="$hitungRole('admin')" :href="route('admin.users.index', ['role' => 'admin'])" />
-        <x-stat label="Program Studi" :nilai="$jumlahProdi" :href="route('admin.program-studi.index')" />
-        <x-stat label="Persyaratan Aktif" :nilai="$jumlahPersyaratan" hint="KP dan TA" :href="route('admin.persyaratan.index')" />
+    <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <x-kartu-stat icon="users-solid" label="Mahasiswa" :nilai="$hitungRole('mahasiswa')" :href="route('admin.users.index', ['role' => 'mahasiswa'])" />
+        <x-kartu-stat icon="users-solid" label="Dosen" :nilai="$hitungRole('dosen')" :href="route('admin.users.index', ['role' => 'dosen'])" />
+        <x-kartu-stat icon="shield-solid" label="Admin" :nilai="$hitungRole('admin')" :href="route('admin.users.index', ['role' => 'admin'])" />
+        <x-kartu-stat icon="stack-solid" label="Program Studi" :nilai="$jumlahProdi" :href="route('admin.program-studi.index')" />
+        <x-kartu-stat icon="doc-solid" label="Persyaratan Aktif" :nilai="$jumlahPersyaratan" hint="KP dan TA" :href="route('admin.persyaratan.index')" />
     </div>
 
     <section class="card mt-6">
@@ -155,7 +155,7 @@
             <a href="{{ route('admin.log.index') }}" class="tautan text-sm">Lihat semua</a>
         </div>
         @if ($logTerbaru->isEmpty())
-            <x-empty pesan="Belum ada aktivitas tercatat." />
+            <x-kosong pesan="Belum ada aktivitas tercatat." />
         @else
             <div class="overflow-x-auto">
                 <table class="tabel">

@@ -1,0 +1,460 @@
+diff --git a/resources/css/app.css b/resources/css/app.css
+index 6279185..4b9f303 100644
+--- a/resources/css/app.css
++++ b/resources/css/app.css
+@@ -287,3 +287,90 @@ @media (prefers-reduced-motion: reduce) {
+         transition: none !important;
+     }
+ }
++
++/*
++ * GAYA KREM-EMAS UNTUK SEMUA HALAMAN SETELAH LOGIN (mengikuti desain Dashboard Admin).
++ * Semua aturan dibatasi pada .shell-pasir (kerangka setelah login), jadi halaman login tidak ikut berubah.
++ * Sengaja tanpa @layer supaya menang atas kelas utilitas lama di markup (font-semibold, dsb.).
++ */
++.shell-pasir {
++    --ilustrasi-kosong: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 132' fill='none'%3E%3Cellipse cx='120' cy='116' rx='92' ry='10' fill='%23f1e2c2' opacity='.7'/%3E%3Cg stroke='%23d9b36b' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M54 112C40 96 40 76 52 62'/%3E%3Cpath d='M186 112C200 96 200 76 188 62'/%3E%3C/g%3E%3Cg fill='%23e3c98f' opacity='.85'%3E%3Cpath d='M52 62c-9-2-13-9-12-17 9 1 14 7 12 17Z'/%3E%3Cpath d='M44 88c-9 0-15-5-16-13 9-1 15 4 16 13Z'/%3E%3Cpath d='M188 62c9-2 13-9 12-17-9 1-14 7-12 17Z'/%3E%3Cpath d='M196 88c9 0 15-5 16-13-9-1-15 4-16 13Z'/%3E%3C/g%3E%3Cpath d='M88 20h42l22 22v62a5 5 0 0 1-5 5H88a5 5 0 0 1-5-5V25a5 5 0 0 1 5-5Z' fill='%23fbf3e3' stroke='%23a8793a' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M130 20v22h22' stroke='%23a8793a' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M96 62h48M96 76h48M96 90h30' stroke='%23d9c39a' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E");
++    --ikon-panah: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13.5 6.5 19 12l-5.5 5.5'/%3E%3C/svg%3E");
++    --ikon-dokumen: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M6.5 2.8h7.2l4.8 4.8v12.6a1 1 0 0 1-1 1H6.5a1 1 0 0 1-1-1V3.8a1 1 0 0 1 1-1ZM8.4 11.4h7.2V13H8.4ZM8.4 14.8h7.2v1.6H8.4Z'/%3E%3C/svg%3E");
++}
++
++.shell-pasir .judul-halaman {
++    @apply font-serif text-3xl font-bold leading-tight tracking-tight text-ink-900 sm:text-[2.75rem];
++}
++.shell-pasir .sub-halaman {
++    @apply mt-2 font-serif text-base text-ink-700 sm:text-lg;
++}
++
++/* Kartu: tepi emas tipis, latar krem-putih, bayangan hangat */
++.shell-pasir .card {
++    @apply rounded-2xl border-[1.5px] border-[#e8d6b0] bg-[#fffdf8]/70 shadow-[0_2px_10px_rgba(152,116,63,0.08)];
++}
++
++/* Kepala kartu: pita krem dengan ikon dokumen dan judul serif */
++.shell-pasir .card-header {
++    @apply rounded-t-[0.85rem] border-b border-[#ead9b8] bg-gradient-to-r from-[#f4e7cf] to-[#f8eedb] px-6 py-4;
++}
++.shell-pasir .card-header > h2 {
++    @apply flex items-center gap-3 font-serif text-xl font-bold text-ink-900;
++}
++.shell-pasir .card-header > h2:first-child::before {
++    content: '';
++    flex: none;
++    width: 1.5rem;
++    height: 1.5rem;
++    background-color: var(--color-sand-600);
++    -webkit-mask: var(--ikon-dokumen) center / contain no-repeat;
++    mask: var(--ikon-dokumen) center / contain no-repeat;
++}
++.shell-pasir .card-header .tautan {
++    @apply inline-flex items-center gap-2 font-serif text-[15px] font-medium text-ink-800 no-underline hover:text-sand-600 hover:no-underline;
++}
++.shell-pasir .card-header .tautan::after {
++    content: '';
++    width: 1.1rem;
++    height: 1.1rem;
++    background-color: var(--color-sand-600);
++    -webkit-mask: var(--ikon-panah) center / contain no-repeat;
++    mask: var(--ikon-panah) center / contain no-repeat;
++}
++
++/* Kartu ringkasan (komponen stat) */
++.shell-pasir .stat-angka {
++    @apply mt-1 font-serif text-[2.5rem] font-bold leading-none text-ink-900;
++}
++.shell-pasir a.kartu-stat:hover {
++    @apply border-sand-400 bg-white/90 shadow-[0_6px_18px_rgba(152,116,63,0.14)];
++}
++
++/* Judul kecil di dalam isi kartu */
++.shell-pasir .sub-label {
++    @apply font-serif text-[12px] tracking-[0.1em];
++}
++
++/* Tabel: kepala krem, garis pemisah emas pucat */
++.shell-pasir .tabel thead th {
++    @apply border-[#ead9b8] bg-[#f8eedb]/80 font-serif text-[12px] text-ink-700;
++}
++.shell-pasir .tabel tbody td {
++    @apply border-[#efe2c6]/80;
++}
++.shell-pasir .tabel tbody tr:hover td {
++    @apply bg-[#f8eedb]/40;
++}
++
++/* Keadaan kosong bawaan (komponen empty lama) di semua halaman: beri ilustrasi tanpa mengubah markup */
++.shell-pasir div.px-5.py-10.text-center {
++    @apply text-base text-ink-600;
++}
++.shell-pasir div.px-5.py-10.text-center::before {
++    content: '';
++    display: block;
++    height: 8rem;
++    margin: 0 auto 0.75rem;
++    background: var(--ilustrasi-kosong) center / contain no-repeat;
++}
+diff --git a/resources/views/components/kartu-stat.blade.php b/resources/views/components/kartu-stat.blade.php
+new file mode 100644
+index 0000000..3c7299c
+--- /dev/null
++++ b/resources/views/components/kartu-stat.blade.php
+@@ -0,0 +1,30 @@
++@props(['label', 'nilai', 'hint' => null, 'href' => null, 'icon' => 'stack-solid'])
++@if ($href)
++    <a href="{{ $href }}" class="card kartu-stat relative block overflow-hidden px-5 pb-4 pt-5 transition">
++@else
++    <div class="card kartu-stat relative overflow-hidden px-5 pb-4 pt-5">
++@endif
++        {{-- Gelombang hias di sudut kanan bawah --}}
++        <svg viewBox="0 0 160 70" class="pointer-events-none absolute bottom-0 right-0 h-16 w-36" fill="none" aria-hidden="true">
++            <path d="M0 70 C40 66 70 40 110 28 C130 22 148 22 160 24 V70Z" fill="#f1e2c2" opacity=".55" />
++            <path d="M20 70 C60 62 92 44 128 38 C142 36 152 36 160 38" stroke="#d9b36b" stroke-width="1.2" opacity=".6" />
++        </svg>
++
++        <div class="relative flex items-center gap-4">
++            <span class="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-b from-[#f6e8c8] to-[#efd8aa] text-sand-600 ring-1 ring-[#e3c98f]/70">
++                <x-pasir.icon :name="$icon" class="h-8 w-8" />
++            </span>
++            <span class="h-14 w-px shrink-0 bg-[#e3d0a8]" aria-hidden="true"></span>
++            <div class="min-w-0">
++                <div class="font-serif text-[15px] font-bold leading-tight text-ink-900">{{ $label }}</div>
++                <div class="stat-angka">{{ $nilai }}</div>
++            </div>
++        </div>
++        @if ($hint)
++            <div class="relative mt-3 text-[13px] leading-snug text-ink-600">{{ $hint }}</div>
++        @endif
++@if ($href)
++    </a>
++@else
++    </div>
++@endif
+diff --git a/resources/views/components/kosong.blade.php b/resources/views/components/kosong.blade.php
+new file mode 100644
+index 0000000..86de48d
+--- /dev/null
++++ b/resources/views/components/kosong.blade.php
+@@ -0,0 +1,42 @@
++@props(['pesan' => 'Belum ada data.', 'ikon' => 'berkas'])
++<div class="flex flex-col items-center px-5 py-9 text-center">
++    <svg viewBox="0 0 240 132" class="mb-3 h-32 w-auto" fill="none" aria-hidden="true">
++        {{-- Alas dan ranting hias --}}
++        <ellipse cx="120" cy="116" rx="92" ry="10" fill="#f1e2c2" opacity=".7" />
++        <g stroke="#d9b36b" stroke-width="1.4" stroke-linecap="round">
++            <path d="M54 112 C40 96 40 76 52 62" />
++            <path d="M186 112 C200 96 200 76 188 62" />
++        </g>
++        <g fill="#e3c98f" opacity=".85">
++            <path d="M52 62c-9-2-13-9-12-17 9 1 14 7 12 17Z" />
++            <path d="M44 88c-9 0-15-5-16-13 9-1 15 4 16 13Z" />
++            <path d="M188 62c9-2 13-9 12-17-9 1-14 7-12 17Z" />
++            <path d="M196 88c9 0 15-5 16-13-9-1-15 4-16 13Z" />
++        </g>
++        <path d="M30 40l2.4 5.6L38 48l-5.6 2.4L30 56l-2.4-5.6L22 48l5.6-2.4L30 40Z" fill="#d9b36b" />
++        <path d="M212 30l1.8 4.2L218 36l-4.2 1.8L212 42l-1.8-4.2L206 36l4.2-1.8L212 30Z" fill="#d9b36b" />
++
++        @if ($ikon === 'clipboard')
++            <rect x="82" y="22" width="64" height="84" rx="8" fill="#fbf3e3" stroke="#a8793a" stroke-width="3" />
++            <rect x="101" y="14" width="26" height="14" rx="5" fill="#e9d3a8" stroke="#a8793a" stroke-width="3" />
++            <g stroke="#a8793a" stroke-width="2.4" stroke-linecap="round">
++                <rect x="92" y="44" width="9" height="9" rx="2" />
++                <rect x="92" y="62" width="9" height="9" rx="2" />
++                <rect x="92" y="80" width="9" height="9" rx="2" />
++                <path d="M108 48h24M108 66h24M108 84h16" />
++            </g>
++            <circle cx="140" cy="84" r="17" fill="#fffdf8" fill-opacity=".85" stroke="#a8793a" stroke-width="4" />
++            <path d="M152 97l15 14" stroke="#a8793a" stroke-width="7" stroke-linecap="round" />
++        @elseif ($ikon === 'surat')
++            <rect x="92" y="26" width="56" height="48" rx="4" fill="#fdf9f0" stroke="#c9a46a" stroke-width="2.4" />
++            <path d="M101 38h38M101 47h38M101 56h24" stroke="#d9c39a" stroke-width="2.4" stroke-linecap="round" />
++            <rect x="72" y="50" width="96" height="58" rx="7" fill="#eed9ae" stroke="#b58a4a" stroke-width="3" />
++            <path d="M74 54l46 34 46-34" stroke="#b58a4a" stroke-width="3" stroke-linejoin="round" />
++        @else
++            <path d="M88 20h42l22 22v62a5 5 0 0 1-5 5H88a5 5 0 0 1-5-5V25a5 5 0 0 1 5-5Z" fill="#fbf3e3" stroke="#a8793a" stroke-width="3" stroke-linejoin="round" />
++            <path d="M130 20v22h22" stroke="#a8793a" stroke-width="3" stroke-linejoin="round" />
++            <path d="M96 62h48M96 76h48M96 90h30" stroke="#d9c39a" stroke-width="3" stroke-linecap="round" />
++        @endif
++    </svg>
++    <p class="max-w-md text-base text-ink-600">{{ $pesan }}</p>
++</div>
+diff --git a/resources/views/components/pasir/icon.blade.php b/resources/views/components/pasir/icon.blade.php
+index e521c33..747a5da 100644
+--- a/resources/views/components/pasir/icon.blade.php
++++ b/resources/views/components/pasir/icon.blade.php
+@@ -102,5 +102,61 @@
+         @case('logout')
+             <path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 8l-4 4 4 4M6 12h9" />
+             @break
++        {{-- Ikon padat untuk kartu ringkasan dashboard --}}
++        @case('pencil-solid')
++            <path d="M4 20.2 4.9 15 16.3 3.6a2 2 0 0 1 2.8 0l1.3 1.3a2 2 0 0 1 0 2.8L9 19.1 4 20.2Z" fill="currentColor" stroke="none" />
++            <path d="m14.5 5.4 4.1 4.1" stroke="#fff" stroke-width="1.5" />
++            @break
++        @case('check-solid')
++            <circle cx="12" cy="12" r="9.5" fill="currentColor" stroke="none" />
++            <path d="m7.6 12.4 3 3 5.8-6.3" stroke="#fff" stroke-width="2.2" />
++            @break
++        @case('send-solid')
++            <path d="M21 3 2.8 10.4l6.6 2.7 2.7 6.6L21 3Z" fill="currentColor" stroke="none" />
++            <path d="m9.4 13.1 5.2-5" stroke="#fff" stroke-width="1.5" />
++            @break
++        @case('download-solid')
++            <path d="M12 3.5v10.5M7.4 9.8 12 14.4l4.6-4.6" stroke-width="2.6" />
++            <path d="M4.5 15.5v3.2a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-3.2" stroke-width="2.6" />
++            @break
++        @case('shield-solid')
++            <path d="M12 2.8 4.6 5.9v5.6c0 4.5 3.1 8 7.4 9.7 4.3-1.7 7.4-5.2 7.4-9.7V5.9L12 2.8Z" fill="currentColor" stroke="none" />
++            <path d="m8.8 11.9 2.2 2.2 4.3-4.6" stroke="#fff" stroke-width="2" />
++            @break
++        @case('refresh-solid')
++            <path d="M19.5 10.5A7.6 7.6 0 0 0 6 7.2L4.5 9M4.5 4.5V9H9" stroke-width="2.3" />
++            <path d="M4.5 13.5A7.6 7.6 0 0 0 18 16.8l1.5-1.8M19.5 19.5V15H15" stroke-width="2.3" />
++            @break
++        @case('doc-solid')
++            <path d="M6.5 2.8h7.2l4.8 4.8v12.6a1 1 0 0 1-1 1H6.5a1 1 0 0 1-1-1V3.8a1 1 0 0 1 1-1Z" fill="currentColor" stroke="none" />
++            <path d="M13.7 2.8v4.8h4.8" stroke="#fff" stroke-width="1.2" opacity=".55" />
++            <path d="M8.6 12.2h6.8M8.6 15.6h6.8" stroke="#fff" stroke-width="1.7" />
++            @break
++        @case('calendar-solid')
++            <rect x="3" y="4.4" width="18" height="16.6" rx="3" fill="currentColor" stroke="none" />
++            <path d="M8 2.6v3.6M16 2.6v3.6" stroke-width="2" />
++            <path d="M3 9.6h18" stroke="#fff" stroke-width="1.5" />
++            <g fill="#fff" stroke="none">
++                <rect x="6.3" y="12" width="2.2" height="2.2" rx=".5" />
++                <rect x="10.9" y="12" width="2.2" height="2.2" rx=".5" />
++                <rect x="15.5" y="12" width="2.2" height="2.2" rx=".5" />
++                <rect x="6.3" y="16" width="2.2" height="2.2" rx=".5" />
++                <rect x="10.9" y="16" width="2.2" height="2.2" rx=".5" />
++                <rect x="15.5" y="16" width="2.2" height="2.2" rx=".5" />
++            </g>
++            @break
++        @case('users-solid')
++            <circle cx="9" cy="8" r="3.6" fill="currentColor" stroke="none" />
++            <path d="M2.5 20c0-3.7 2.9-6 6.5-6s6.5 2.3 6.5 6Z" fill="currentColor" stroke="none" />
++            <circle cx="17" cy="8.6" r="2.8" fill="currentColor" stroke="none" opacity=".65" />
++            <path d="M16.6 14.2c2.8.1 4.9 2 4.9 5.3h-4.2c0-2-.3-3.8-.7-5.3Z" fill="currentColor" stroke="none" opacity=".65" />
++            @break
++        @case('stack-solid')
++            <path d="m12 3 9.5 4.8L12 12.6 2.5 7.8 12 3Z" fill="currentColor" stroke="none" />
++            <path d="m2.5 12 9.5 4.8 9.5-4.8M2.5 16.2 12 21l9.5-4.8" stroke-width="2" />
++            @break
++        @case('arrow-right')
++            <path d="M5 12h14M13.5 6.5 19 12l-5.5 5.5" stroke-width="2" />
++            @break
+     @endswitch
+ </svg>
+diff --git a/resources/views/dashboard/admin.blade.php b/resources/views/dashboard/admin.blade.php
+index da32809..1b59bda 100644
+--- a/resources/views/dashboard/admin.blade.php
++++ b/resources/views/dashboard/admin.blade.php
+@@ -10,15 +10,15 @@
+ 
+     <x-page-header judul="Dashboard" sub="Ringkasan proses administrasi KP dan TA, data pengguna, dan pengaturan sistem." />
+ 
+-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+-        <x-stat label="Perlu Pembimbing" :nilai="$jumlahPerluPembimbing" hint="Belum ada dosen pembimbing atau ditolak dosen" :href="route('admin.pengajuan.index', ['pembimbing' => 'perlu'])" />
+-        <x-stat label="Perlu Verifikasi" :nilai="$hitungStatus('diajukan')" hint="Menunggu pemeriksaan administrasi" :href="route('admin.verifikasi.index')" />
+-        <x-stat label="Surat Pengantar TA" :nilai="$jumlahPerluPengantar" hint="TA terverifikasi yang belum diterbitkan suratnya" :href="route('admin.dokumen-resmi.index')" />
+-        <x-stat label="Surat Balasan TA" :nilai="$jumlahBalasanMenunggu" hint="Diunggah mahasiswa, menunggu diperiksa" :href="route('admin.dokumen-resmi.index')" />
+-        <x-stat label="Diperiksa Dosen" :nilai="$hitungStatus('menunggu_dosen')" />
+-        <x-stat label="Dalam Revisi" :nilai="$hitungStatus('revisi_administrasi') + $hitungStatus('revisi_akademik')" hint="Menunggu perbaikan mahasiswa" />
+-        <x-stat label="Perlu Dokumen Resmi" :nilai="$hitungStatus('disetujui')" hint="Sudah disetujui dosen" :href="route('admin.dokumen-resmi.index')" />
+-        <x-stat label="Diarsipkan" :nilai="$hitungStatus('diarsipkan')" :href="route('admin.arsip.index')" />
++    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
++        <x-kartu-stat icon="pencil-solid" label="Perlu Pembimbing" :nilai="$jumlahPerluPembimbing" hint="Belum ada dosen pembimbing atau ditolak dosen" :href="route('admin.pengajuan.index', ['pembimbing' => 'perlu'])" />
++        <x-kartu-stat icon="check-solid" label="Perlu Verifikasi" :nilai="$hitungStatus('diajukan')" hint="Menunggu pemeriksaan administrasi" :href="route('admin.verifikasi.index')" />
++        <x-kartu-stat icon="send-solid" label="Surat Pengantar TA" :nilai="$jumlahPerluPengantar" hint="TA terverifikasi yang belum diterbitkan suratnya" :href="route('admin.dokumen-resmi.index')" />
++        <x-kartu-stat icon="download-solid" label="Surat Balasan TA" :nilai="$jumlahBalasanMenunggu" hint="Diunggah mahasiswa, menunggu diperiksa" :href="route('admin.dokumen-resmi.index')" />
++        <x-kartu-stat icon="shield-solid" label="Diperiksa Dosen" :nilai="$hitungStatus('menunggu_dosen')" />
++        <x-kartu-stat icon="refresh-solid" label="Dalam Revisi" :nilai="$hitungStatus('revisi_administrasi') + $hitungStatus('revisi_akademik')" hint="Menunggu perbaikan mahasiswa" />
++        <x-kartu-stat icon="doc-solid" label="Perlu Dokumen Resmi" :nilai="$hitungStatus('disetujui')" hint="Sudah disetujui dosen" :href="route('admin.dokumen-resmi.index')" />
++        <x-kartu-stat icon="calendar-solid" label="Diarsipkan" :nilai="$hitungStatus('diarsipkan')" :href="route('admin.arsip.index')" />
+     </div>
+ 
+     <div class="mt-6 grid gap-6 xl:grid-cols-2">
+@@ -28,7 +28,7 @@
+                 <a href="{{ route('admin.verifikasi.index') }}" class="tautan text-sm">Lihat semua</a>
+             </div>
+             @if ($antreanVerifikasi->isEmpty())
+-                <x-empty pesan="Tidak ada pengajuan yang menunggu verifikasi." />
++                <x-kosong ikon="clipboard" pesan="Tidak ada pengajuan yang menunggu verifikasi." />
+             @else
+                 <div class="overflow-x-auto">
+                     <table class="tabel">
+@@ -57,7 +57,7 @@
+                 <a href="{{ route('admin.dokumen-resmi.index') }}" class="tautan text-sm">Lihat semua</a>
+             </div>
+             @if ($antreanSurat->isEmpty())
+-                <x-empty pesan="Tidak ada surat pengantar atau surat balasan TA yang menunggu." />
++                <x-kosong ikon="surat" pesan="Tidak ada surat pengantar atau surat balasan TA yang menunggu." />
+             @else
+                 <div class="overflow-x-auto">
+                     <table class="tabel">
+@@ -85,7 +85,7 @@
+                 <a href="{{ route('admin.dokumen-resmi.index') }}" class="tautan text-sm">Lihat semua</a>
+             </div>
+             @if ($perluDokumenResmi->isEmpty())
+-                <x-empty pesan="Tidak ada pengajuan yang menunggu dokumen resmi." />
++                <x-kosong pesan="Tidak ada pengajuan yang menunggu dokumen resmi." />
+             @else
+                 <div class="overflow-x-auto">
+                     <table class="tabel">
+@@ -114,7 +114,7 @@
+                 <a href="{{ route('admin.pengajuan.index', ['pembimbing' => 'perlu']) }}" class="tautan text-sm">Lihat semua</a>
+             </div>
+             @if ($perluPembimbing->isEmpty())
+-                <x-empty pesan="Semua pengajuan yang sudah dikirim memiliki dosen pembimbing atau sedang menunggu konfirmasi dosen." />
++                <x-kosong pesan="Semua pengajuan yang sudah dikirim memiliki dosen pembimbing atau sedang menunggu konfirmasi dosen." />
+             @else
+                 <div class="overflow-x-auto">
+                     <table class="tabel">
+@@ -141,12 +141,12 @@
+         </section>
+     </div>
+ 
+-    <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+-        <x-stat label="Mahasiswa" :nilai="$hitungRole('mahasiswa')" :href="route('admin.users.index', ['role' => 'mahasiswa'])" />
+-        <x-stat label="Dosen" :nilai="$hitungRole('dosen')" :href="route('admin.users.index', ['role' => 'dosen'])" />
+-        <x-stat label="Admin" :nilai="$hitungRole('admin')" :href="route('admin.users.index', ['role' => 'admin'])" />
+-        <x-stat label="Program Studi" :nilai="$jumlahProdi" :href="route('admin.program-studi.index')" />
+-        <x-stat label="Persyaratan Aktif" :nilai="$jumlahPersyaratan" hint="KP dan TA" :href="route('admin.persyaratan.index')" />
++    <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
++        <x-kartu-stat icon="users-solid" label="Mahasiswa" :nilai="$hitungRole('mahasiswa')" :href="route('admin.users.index', ['role' => 'mahasiswa'])" />
++        <x-kartu-stat icon="users-solid" label="Dosen" :nilai="$hitungRole('dosen')" :href="route('admin.users.index', ['role' => 'dosen'])" />
++        <x-kartu-stat icon="shield-solid" label="Admin" :nilai="$hitungRole('admin')" :href="route('admin.users.index', ['role' => 'admin'])" />
++        <x-kartu-stat icon="stack-solid" label="Program Studi" :nilai="$jumlahProdi" :href="route('admin.program-studi.index')" />
++        <x-kartu-stat icon="doc-solid" label="Persyaratan Aktif" :nilai="$jumlahPersyaratan" hint="KP dan TA" :href="route('admin.persyaratan.index')" />
+     </div>
+ 
+     <section class="card mt-6">
+@@ -155,7 +155,7 @@
+             <a href="{{ route('admin.log.index') }}" class="tautan text-sm">Lihat semua</a>
+         </div>
+         @if ($logTerbaru->isEmpty())
+-            <x-empty pesan="Belum ada aktivitas tercatat." />
++            <x-kosong pesan="Belum ada aktivitas tercatat." />
+         @else
+             <div class="overflow-x-auto">
+                 <table class="tabel">
+diff --git a/resources/views/dashboard/dosen.blade.php b/resources/views/dashboard/dosen.blade.php
+index 293cdc4..061a9a1 100644
+--- a/resources/views/dashboard/dosen.blade.php
++++ b/resources/views/dashboard/dosen.blade.php
+@@ -5,12 +5,12 @@
+ @section('konten')
+     <x-page-header judul="Dashboard" sub="Ringkasan pemeriksaan berkas dan bimbingan Anda." />
+ 
+-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+-        <x-stat label="Permintaan Pembimbing" :nilai="$permintaanPembimbing" hint="Pilihan mahasiswa TA, menunggu jawaban Anda" :href="route('dosen.bimbingan.index')" />
+-        <x-stat label="Menunggu Pemeriksaan" :nilai="$antrean->count()" hint="Berkas yang perlu Anda periksa" :href="route('dosen.pemeriksaan.index')" />
+-        <x-stat label="Mahasiswa Bimbingan" :nilai="$jumlahMahasiswa" :href="route('dosen.bimbingan.index')" />
+-        <x-stat label="Pengajuan Selesai" :nilai="$selesai" hint="Sudah diarsipkan" />
+-        <x-stat label="Dokumen Diperiksa" :nilai="$totalDiperiksa" hint="Seluruh riwayat pemeriksaan" :href="route('dosen.riwayat.index')" />
++    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
++        <x-kartu-stat icon="pencil-solid" label="Permintaan Pembimbing" :nilai="$permintaanPembimbing" hint="Pilihan mahasiswa TA, menunggu jawaban Anda" :href="route('dosen.bimbingan.index')" />
++        <x-kartu-stat icon="shield-solid" label="Menunggu Pemeriksaan" :nilai="$antrean->count()" hint="Berkas yang perlu Anda periksa" :href="route('dosen.pemeriksaan.index')" />
++        <x-kartu-stat icon="users-solid" label="Mahasiswa Bimbingan" :nilai="$jumlahMahasiswa" :href="route('dosen.bimbingan.index')" />
++        <x-kartu-stat icon="check-solid" label="Pengajuan Selesai" :nilai="$selesai" hint="Sudah diarsipkan" />
++        <x-kartu-stat icon="doc-solid" label="Dokumen Diperiksa" :nilai="$totalDiperiksa" hint="Seluruh riwayat pemeriksaan" :href="route('dosen.riwayat.index')" />
+     </div>
+ 
+     @if ($permintaanPembimbing > 0)
+@@ -26,7 +26,7 @@
+             <a href="{{ route('dosen.pemeriksaan.index') }}" class="tautan text-sm">Lihat semua</a>
+         </div>
+         @if ($antrean->isEmpty())
+-            <x-empty pesan="Tidak ada berkas yang menunggu pemeriksaan." />
++            <x-kosong pesan="Tidak ada berkas yang menunggu pemeriksaan." />
+         @else
+             <div class="overflow-x-auto">
+                 <table class="tabel">
+diff --git a/resources/views/dashboard/mahasiswa.blade.php b/resources/views/dashboard/mahasiswa.blade.php
+index 8fa799f..51f2ad0 100644
+--- a/resources/views/dashboard/mahasiswa.blade.php
++++ b/resources/views/dashboard/mahasiswa.blade.php
+@@ -83,11 +83,11 @@
+         </div>
+     </div>
+ 
+-    <div class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+-        <x-stat label="Total Pengajuan" :nilai="$pengajuan->count()" />
+-        <x-stat label="Dalam Proses" :nilai="$dalamProses" hint="Diperiksa admin atau dosen" />
+-        <x-stat label="Perlu Revisi" :nilai="$perluRevisi->count()" hint="Menunggu perbaikan dari Anda" />
+-        <x-stat label="Selesai" :nilai="$selesai" hint="Sudah diarsipkan" />
++    <div class="mt-5 grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
++        <x-kartu-stat icon="stack-solid" label="Total Pengajuan" :nilai="$pengajuan->count()" />
++        <x-kartu-stat icon="refresh-solid" label="Dalam Proses" :nilai="$dalamProses" hint="Diperiksa admin atau dosen" />
++        <x-kartu-stat icon="pencil-solid" label="Perlu Revisi" :nilai="$perluRevisi->count()" hint="Menunggu perbaikan dari Anda" />
++        <x-kartu-stat icon="check-solid" label="Selesai" :nilai="$selesai" hint="Sudah diarsipkan" />
+     </div>
+ 
+     @if ($suratPerluTindakan->isNotEmpty())
+@@ -124,7 +124,7 @@
+             <a href="{{ route('mahasiswa.status.index') }}" class="tautan text-sm">Lihat semua</a>
+         </div>
+         @if ($pengajuan->isEmpty())
+-            <x-empty pesan="Belum ada pengajuan. Mulai dengan mengajukan KP atau TA." />
++            <x-kosong pesan="Belum ada pengajuan. Mulai dengan mengajukan KP atau TA." />
+         @else
+             <div class="overflow-x-auto">
+                 <table class="tabel min-w-[34rem]">
+diff --git a/resources/views/partials/shell-pasir.blade.php b/resources/views/partials/shell-pasir.blade.php
+index 1e9994c..a561c25 100644
+--- a/resources/views/partials/shell-pasir.blade.php
++++ b/resources/views/partials/shell-pasir.blade.php
+@@ -14,7 +14,7 @@
+ {{-- Latar halaman (tetap di tempat saat konten di-scroll) --}}
+ <div class="pointer-events-none fixed inset-0 z-0 bg-gradient-to-br from-sand-50 via-sand-50 to-sand-100" aria-hidden="true">
+     @if ($latar)
+-        <div class="absolute inset-0 bg-cover bg-left-bottom bg-no-repeat" style="background-image: url('{{ $latar }}')"></div>
++        <div class="absolute inset-0 bg-no-repeat" style="background-image: url('{{ $latar }}'); background-size: auto 100%; background-position: right top; -webkit-mask-image: linear-gradient(to right, transparent 47%, #000 58%); mask-image: linear-gradient(to right, transparent 47%, #000 58%)"></div>
+     @endif
+ </div>
+ 
+@@ -30,9 +30,14 @@
+ 
+     {{-- Sidebar --}}
+     <aside id="sidebar-pasir"
+-           class="sidebar-pasir flex shrink-0 flex-col overflow-hidden border-r border-sand-200 {{ $latar ? 'bg-sand-100/40' : 'bg-sand-100/80' }} max-lg:bg-sand-50 max-lg:shadow-2xl"
++           class="sidebar-pasir flex shrink-0 flex-col overflow-hidden border-r border-sand-200 after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:w-[3px] after:bg-gradient-to-b after:from-transparent after:via-[#d8b878]/60 after:to-transparent {{ $latar ? 'bg-sand-100/40' : 'bg-sand-100/80' }} max-lg:bg-sand-50 max-lg:shadow-2xl"
+            aria-label="Menu utama">
+ 
++        {{-- Gedung Fasilkom di dasar sidebar (memudar ke atas) --}}
++        @if ($latar)
++            <div class="pointer-events-none absolute inset-x-0 bottom-0 h-[22rem]" aria-hidden="true" style="background-image: url('{{ $latar }}'); background-repeat: no-repeat; background-position: left bottom; background-size: 730px auto; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 45%); mask-image: linear-gradient(to bottom, transparent 0, #000 45%)"></div>
++        @endif
++
+         {{-- Dekorasi gelombang bila gambar latar belum ada --}}
+         @unless ($latar)
+             <svg class="pointer-events-none absolute inset-x-0 bottom-0 h-72 w-full" viewBox="0 0 288 288" preserveAspectRatio="none" aria-hidden="true">
+@@ -49,17 +54,17 @@ class="sidebar-pasir flex shrink-0 flex-col overflow-hidden border-r border-sand
+                 <path d="M44 19v12" stroke="#765732" stroke-width="2" stroke-linecap="round" />
+             </svg>
+             <div class="leading-tight">
+-                <p class="text-xl font-bold text-ink-900">Arsip KP &amp; TA</p>
+-                <p class="text-sm text-ink-500">Fasilkom Unsri</p>
++                <p class="font-serif text-2xl font-bold text-ink-900">Arsip KP &amp; TA</p>
++                <p class="font-serif text-[15px] text-ink-600">Fasilkom Unsri</p>
+             </div>
+         </div>
+ 
+         {{-- Menu --}}
+-        <nav class="relative z-10 flex-1 space-y-2 overflow-y-auto px-4 py-3">
++        <nav class="relative z-10 flex-1 space-y-1 overflow-y-auto px-4 py-3">
+             <p class="sub-label px-5 pb-1">{{ $pengguna->role->label() }}</p>
+             @foreach ($menu as $butir)
+                 <a href="{{ $butir['url'] }}"
+-                   class="relative flex items-center gap-4 rounded-2xl px-5 py-3.5 text-[16px] font-medium transition-colors duration-200 {{ $butir['aktif'] ? 'bg-sand-300/60 font-semibold text-ink-900' : 'text-ink-700 hover:bg-sand-200/70 hover:text-ink-900' }}"
++                   class="relative flex items-center gap-4 rounded-2xl px-5 py-3 text-[16px] font-medium transition-colors duration-200 {{ $butir['aktif'] ? 'bg-gradient-to-r from-[#f1dfb8] to-[#f6ead2] font-semibold text-ink-900 shadow-[inset_0_0_0_1px_rgba(201,164,106,0.28)]' : 'text-ink-700 hover:bg-sand-200/70 hover:text-ink-900' }}"
+                    @if ($butir['aktif']) aria-current="page" @endif>
+                     @if ($butir['aktif'])
+                         <span class="absolute -left-3 top-1/2 h-10 w-1.5 -translate-y-1/2 rounded-full bg-gradient-to-b from-[#c9a46a] to-[#98743f]" aria-hidden="true"></span>
+@@ -71,7 +76,7 @@ class="relative flex items-center gap-4 rounded-2xl px-5 py-3.5 text-[16px] font
+         </nav>
+ 
+         {{-- Profil dan keluar --}}
+-        <div class="relative z-10 space-y-1 border-t border-sand-200/70 px-4 py-4">
++        <div class="relative z-10 space-y-1 border-t border-sand-200/70 bg-sand-50/30 px-4 py-4">
+             <a href="{{ route('profil.show') }}"
+                class="flex items-center gap-4 rounded-2xl px-5 py-2.5 text-[15px] font-medium transition-colors duration-200 {{ request()->routeIs('profil.*') ? 'bg-sand-300/60 font-semibold text-ink-900' : 'text-ink-700 hover:bg-sand-200/70 hover:text-ink-900' }}"
+                @if (request()->routeIs('profil.*')) aria-current="page" @endif>

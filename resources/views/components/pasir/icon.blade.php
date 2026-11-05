@@ -102,5 +102,61 @@
         @case('logout')
             <path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 8l-4 4 4 4M6 12h9" />
             @break
+        {{-- Ikon padat untuk kartu ringkasan dashboard --}}
+        @case('pencil-solid')
+            <path d="M4 20.2 4.9 15 16.3 3.6a2 2 0 0 1 2.8 0l1.3 1.3a2 2 0 0 1 0 2.8L9 19.1 4 20.2Z" fill="currentColor" stroke="none" />
+            <path d="m14.5 5.4 4.1 4.1" stroke="#fff" stroke-width="1.5" />
+            @break
+        @case('check-solid')
+            <circle cx="12" cy="12" r="9.5" fill="currentColor" stroke="none" />
+            <path d="m7.6 12.4 3 3 5.8-6.3" stroke="#fff" stroke-width="2.2" />
+            @break
+        @case('send-solid')
+            <path d="M21 3 2.8 10.4l6.6 2.7 2.7 6.6L21 3Z" fill="currentColor" stroke="none" />
+            <path d="m9.4 13.1 5.2-5" stroke="#fff" stroke-width="1.5" />
+            @break
+        @case('download-solid')
+            <path d="M12 3.5v10.5M7.4 9.8 12 14.4l4.6-4.6" stroke-width="2.6" />
+            <path d="M4.5 15.5v3.2a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-3.2" stroke-width="2.6" />
+            @break
+        @case('shield-solid')
+            <path d="M12 2.8 4.6 5.9v5.6c0 4.5 3.1 8 7.4 9.7 4.3-1.7 7.4-5.2 7.4-9.7V5.9L12 2.8Z" fill="currentColor" stroke="none" />
+            <path d="m8.8 11.9 2.2 2.2 4.3-4.6" stroke="#fff" stroke-width="2" />
+            @break
+        @case('refresh-solid')
+            <path d="M19.5 10.5A7.6 7.6 0 0 0 6 7.2L4.5 9M4.5 4.5V9H9" stroke-width="2.3" />
+            <path d="M4.5 13.5A7.6 7.6 0 0 0 18 16.8l1.5-1.8M19.5 19.5V15H15" stroke-width="2.3" />
+            @break
+        @case('doc-solid')
+            <path d="M6.5 2.8h7.2l4.8 4.8v12.6a1 1 0 0 1-1 1H6.5a1 1 0 0 1-1-1V3.8a1 1 0 0 1 1-1Z" fill="currentColor" stroke="none" />
+            <path d="M13.7 2.8v4.8h4.8" stroke="#fff" stroke-width="1.2" opacity=".55" />
+            <path d="M8.6 12.2h6.8M8.6 15.6h6.8" stroke="#fff" stroke-width="1.7" />
+            @break
+        @case('calendar-solid')
+            <rect x="3" y="4.4" width="18" height="16.6" rx="3" fill="currentColor" stroke="none" />
+            <path d="M8 2.6v3.6M16 2.6v3.6" stroke-width="2" />
+            <path d="M3 9.6h18" stroke="#fff" stroke-width="1.5" />
+            <g fill="#fff" stroke="none">
+                <rect x="6.3" y="12" width="2.2" height="2.2" rx=".5" />
+                <rect x="10.9" y="12" width="2.2" height="2.2" rx=".5" />
+                <rect x="15.5" y="12" width="2.2" height="2.2" rx=".5" />
+                <rect x="6.3" y="16" width="2.2" height="2.2" rx=".5" />
+                <rect x="10.9" y="16" width="2.2" height="2.2" rx=".5" />
+                <rect x="15.5" y="16" width="2.2" height="2.2" rx=".5" />
+            </g>
+            @break
+        @case('users-solid')
+            <circle cx="9" cy="8" r="3.6" fill="currentColor" stroke="none" />
+            <path d="M2.5 20c0-3.7 2.9-6 6.5-6s6.5 2.3 6.5 6Z" fill="currentColor" stroke="none" />
+            <circle cx="17" cy="8.6" r="2.8" fill="currentColor" stroke="none" opacity=".65" />
+            <path d="M16.6 14.2c2.8.1 4.9 2 4.9 5.3h-4.2c0-2-.3-3.8-.7-5.3Z" fill="currentColor" stroke="none" opacity=".65" />
+            @break
+        @case('stack-solid')
+            <path d="m12 3 9.5 4.8L12 12.6 2.5 7.8 12 3Z" fill="currentColor" stroke="none" />
+            <path d="m2.5 12 9.5 4.8 9.5-4.8M2.5 16.2 12 21l9.5-4.8" stroke-width="2" />
+            @break
+        @case('arrow-right')
+            <path d="M5 12h14M13.5 6.5 19 12l-5.5 5.5" stroke-width="2" />
+            @break
     @endswitch
 </svg>

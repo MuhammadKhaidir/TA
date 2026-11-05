@@ -5,12 +5,12 @@
 @section('konten')
     <x-page-header judul="Dashboard" sub="Ringkasan pemeriksaan berkas dan bimbingan Anda." />
 
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <x-stat label="Permintaan Pembimbing" :nilai="$permintaanPembimbing" hint="Pilihan mahasiswa TA, menunggu jawaban Anda" :href="route('dosen.bimbingan.index')" />
-        <x-stat label="Menunggu Pemeriksaan" :nilai="$antrean->count()" hint="Berkas yang perlu Anda periksa" :href="route('dosen.pemeriksaan.index')" />
-        <x-stat label="Mahasiswa Bimbingan" :nilai="$jumlahMahasiswa" :href="route('dosen.bimbingan.index')" />
-        <x-stat label="Pengajuan Selesai" :nilai="$selesai" hint="Sudah diarsipkan" />
-        <x-stat label="Dokumen Diperiksa" :nilai="$totalDiperiksa" hint="Seluruh riwayat pemeriksaan" :href="route('dosen.riwayat.index')" />
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <x-kartu-stat icon="pencil-solid" label="Permintaan Pembimbing" :nilai="$permintaanPembimbing" hint="Pilihan mahasiswa TA, menunggu jawaban Anda" :href="route('dosen.bimbingan.index')" />
+        <x-kartu-stat icon="shield-solid" label="Menunggu Pemeriksaan" :nilai="$antrean->count()" hint="Berkas yang perlu Anda periksa" :href="route('dosen.pemeriksaan.index')" />
+        <x-kartu-stat icon="users-solid" label="Mahasiswa Bimbingan" :nilai="$jumlahMahasiswa" :href="route('dosen.bimbingan.index')" />
+        <x-kartu-stat icon="check-solid" label="Pengajuan Selesai" :nilai="$selesai" hint="Sudah diarsipkan" />
+        <x-kartu-stat icon="doc-solid" label="Dokumen Diperiksa" :nilai="$totalDiperiksa" hint="Seluruh riwayat pemeriksaan" :href="route('dosen.riwayat.index')" />
     </div>
 
     @if ($permintaanPembimbing > 0)
@@ -26,7 +26,7 @@
             <a href="{{ route('dosen.pemeriksaan.index') }}" class="tautan text-sm">Lihat semua</a>
         </div>
         @if ($antrean->isEmpty())
-            <x-empty pesan="Tidak ada berkas yang menunggu pemeriksaan." />
+            <x-kosong pesan="Tidak ada berkas yang menunggu pemeriksaan." />
         @else
             <div class="overflow-x-auto">
                 <table class="tabel">
