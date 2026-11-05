@@ -181,7 +181,6 @@ class PembimbingTest extends TestCase
         $this->assertDatabaseHas('riwayat_pembimbing', [
             'pengajuan_id' => $p->id, 'dosen_id' => $this->dosenA->id, 'user_id' => $this->dosenA->id, 'status' => 'diterima',
         ]);
-        $this->assertDatabaseHas('log_aktivitas', ['user_id' => $this->dosenA->id, 'aksi' => 'pembimbing.diterima']);
 
         // Kini menjadi mahasiswa bimbingan dan berwenang atas pengajuan.
         $this->actingAs($this->dosenA)->get(route('dosen.bimbingan.index'))

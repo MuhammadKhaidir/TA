@@ -282,23 +282,6 @@ alter table `arsip` add constraint `arsip_pengajuan_id_foreign` foreign key (`pe
 alter table `arsip` add constraint `arsip_diarsipkan_oleh_foreign` foreign key (`diarsipkan_oleh`) references `users` (`id`) on delete restrict;
 alter table `arsip` add unique `arsip_pengajuan_id_unique`(`pengajuan_id`);
 
--- Migrasi: 2026_10_22_000010_create_log_aktivitas_table
-create table `log_aktivitas` (
-  `id` bigint unsigned not null auto_increment primary key,
-  `user_id` bigint unsigned null,
-  `aksi` varchar(50) not null,
-  `deskripsi` text not null,
-  `subjek_type` varchar(255) null,
-  `subjek_id` bigint unsigned null,
-  `ip_address` varchar(45) null,
-  `created_at` timestamp null,
-  `updated_at` timestamp null
-) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
-alter table `log_aktivitas` add constraint `log_aktivitas_user_id_foreign` foreign key (`user_id`) references `users` (`id`) on delete set null;
-alter table `log_aktivitas` add index `log_aktivitas_subjek_type_subjek_id_index`(`subjek_type`, `subjek_id`);
-alter table `log_aktivitas` add index `log_aktivitas_created_at_index`(`created_at`);
-alter table `log_aktivitas` add index `log_aktivitas_aksi_index`(`aksi`);
-
 -- Migrasi: 2026_10_24_000001_add_pembimbing_to_pengajuan_table
 -- (pengisian ulang data pengajuan lama dihilangkan: database baru belum punya data)
 alter table `pengajuan` add `pembimbing_pilihan_id` bigint unsigned null after `pembimbing_id`;
@@ -399,6 +382,7 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
 ('2026_10_24_000001_add_pembimbing_to_pengajuan_table', 1),
 ('2026_10_24_000002_create_riwayat_pembimbing_table', 1),
 ('2026_10_26_000001_create_surat_balasan_table', 1),
-('2026_11_02_000001_gabungkan_operator_ke_admin', 1);
+('2026_11_02_000001_gabungkan_operator_ke_admin', 1),
+('2026_11_05_000001_hapus_tabel_log_aktivitas', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

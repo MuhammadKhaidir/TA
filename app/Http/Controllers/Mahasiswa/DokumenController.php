@@ -8,7 +8,6 @@ use App\Http\Controllers\Controller;
 use App\Models\DokumenPengajuan;
 use App\Models\Pengajuan;
 use App\Models\Persyaratan;
-use App\Support\Aktivitas;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -49,7 +48,7 @@ class DokumenController extends Controller
         $file = $request->file('berkas');
         $path = $file->store("pengajuan/{$pengajuan->id}", 'local');
 
-        $dokumen = DB::transaction(function () use ($pengajuan, $syarat, $file, $path, $request) {
+        DB::transaction(function () use ($pengajuan, $syarat, $file, $path, $request) {
             $versi = (int) $pengajuan->dokumen()->where('persyaratan_id', $syarat->id)->max('versi') + 1;
 
             $pengajuan->dokumen()->where('persyaratan_id', $syarat->id)->update(['terbaru' => false]);
@@ -67,12 +66,6 @@ class DokumenController extends Controller
                 'status' => StatusDokumen::Menunggu,
             ]);
         });
-
-        Aktivitas::catat(
-            'dokumen.unggah',
-            "Mengunggah {$syarat->nama} (versi {$dokumen->versi}) untuk pengajuan {$pengajuan->jenis->singkat()} #{$pengajuan->id}",
-            $dokumen,
-        );
 
         return redirect()->route('mahasiswa.pengajuan.show', $pengajuan)
             ->with('sukses', "{$syarat->nama} berhasil diunggah.");

@@ -12,7 +12,6 @@ use App\Models\Pengajuan;
 use App\Models\Persyaratan;
 use App\Models\RiwayatStatus;
 use App\Models\User;
-use App\Support\Aktivitas;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -71,13 +70,6 @@ class PengajuanWorkflow
             'status_baru' => $pengajuan->status,
             'catatan' => 'Pengajuan dibuat sebagai draft.',
         ]);
-
-        Aktivitas::catat(
-            'pengajuan.buat',
-            "Membuat pengajuan {$pengajuan->jenis->singkat()} #{$pengajuan->id}",
-            $pengajuan,
-            $oleh,
-        );
     }
 
     public function pindahStatus(Pengajuan $pengajuan, StatusPengajuan $baru, ?User $oleh, ?string $catatan = null): void
@@ -97,13 +89,6 @@ class PengajuanWorkflow
             'status_baru' => $baru,
             'catatan' => $catatan,
         ]);
-
-        Aktivitas::catat(
-            'pengajuan.status',
-            "Status pengajuan {$pengajuan->jenis->singkat()} #{$pengajuan->id}: {$lama->label()} menjadi {$baru->label()}",
-            $pengajuan,
-            $oleh,
-        );
     }
 
     /** Mahasiswa mengirim pengajuan (pertama kali) atau mengirim ulang setelah revisi. */

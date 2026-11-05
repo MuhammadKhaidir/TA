@@ -148,29 +148,4 @@
         <x-kartu-stat icon="stack-solid" label="Program Studi" :nilai="$jumlahProdi" :href="route('admin.program-studi.index')" />
         <x-kartu-stat icon="doc-solid" label="Persyaratan Aktif" :nilai="$jumlahPersyaratan" hint="KP dan TA" :href="route('admin.persyaratan.index')" />
     </div>
-
-    <section class="card mt-6">
-        <div class="card-header">
-            <h2 class="font-semibold text-slate-900">Aktivitas Terbaru</h2>
-            <a href="{{ route('admin.log.index') }}" class="tautan text-sm">Lihat semua</a>
-        </div>
-        @if ($logTerbaru->isEmpty())
-            <x-kosong pesan="Belum ada aktivitas tercatat." />
-        @else
-            <div class="overflow-x-auto">
-                <table class="tabel">
-                    <thead><tr><th>Waktu</th><th>Pengguna</th><th>Aktivitas</th></tr></thead>
-                    <tbody>
-                        @foreach ($logTerbaru as $log)
-                            <tr>
-                                <td class="whitespace-nowrap">{{ $log->created_at->translatedFormat('d M Y H:i') }}</td>
-                                <td>{{ $log->user?->name ?? 'Sistem' }}</td>
-                                <td>{{ $log->deskripsi }}</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        @endif
-    </section>
 @endsection

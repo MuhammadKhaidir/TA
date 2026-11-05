@@ -8,7 +8,6 @@ use App\Enums\StatusPembimbing;
 use App\Enums\StatusPengajuan;
 use App\Models\DokumenPengajuan;
 use App\Models\DokumenResmi;
-use App\Models\LogAktivitas;
 use App\Models\Pengajuan;
 use App\Models\Persyaratan;
 use App\Models\ProgramStudi;
@@ -175,7 +174,6 @@ class SuratTaTest extends TestCase
         $this->assertSame('010/UN9.FASILKOM/2026', $pengantar->nomor);
         Storage::disk('local')->assertExists($pengantar->path);
         $this->assertStringStartsWith("dokumen-resmi/{$p->id}/", $pengantar->path);
-        $this->assertDatabaseHas('log_aktivitas', ['aksi' => 'surat-pengantar.terbit']);
 
         // Surat pengantar hanya satu.
         $this->terbitkanPengantar($p)->assertForbidden();
@@ -266,11 +264,6 @@ class SuratTaTest extends TestCase
             ->assertOk()->assertSee('Surat Pengantar')->assertSee('SK Pembimbing')->assertSee('Versi surat balasan sebelumnya');
         $this->actingAs($this->mahasiswa)->get(route('mahasiswa.berkas.index'))
             ->assertOk()->assertSee('Surat Balasan TA yang Diunggah')->assertSee('010/UN9.FASILKOM/2026')->assertSee('055/UN9/SK/2026');
-
-        foreach (['surat-pengantar.terbit', 'surat-balasan.unggah', 'surat-balasan.periksa'] as $aksi) {
-            $this->assertTrue(LogAktivitas::where('aksi', $aksi)->exists(), "log {$aksi}");
-        }
-        $this->assertSame(2, LogAktivitas::where('aksi', 'surat-balasan.unggah')->count());
     }
 
     // ---------------------------------------------------------------- pintu SK
@@ -420,7 +413,6 @@ class SuratTaTest extends TestCase
         $this->actingAs($this->admin)->delete(route('admin.dokumen-resmi.destroy', [$p, $pengantar]))->assertSessionHasNoErrors();
         $this->assertNull($p->fresh()->suratPengantarTa());
         Storage::disk('local')->assertMissing($pengantar->path);
-        $this->assertDatabaseHas('log_aktivitas', ['aksi' => 'surat-pengantar.hapus']);
 
         // Boleh menerbitkan yang baru; setelah mahasiswa mengunggah balasan, tidak bisa ditarik lagi.
         $this->terbitkanPengantar($p)->assertSessionHasNoErrors();

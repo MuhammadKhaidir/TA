@@ -9,7 +9,6 @@ use App\Models\DokumenResmi;
 use App\Models\Pengajuan;
 use App\Services\PengajuanWorkflow;
 use App\Services\SuratTaService;
-use App\Support\Aktivitas;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -71,7 +70,7 @@ class DokumenResmiController extends Controller
         $file = $request->file('berkas');
         $path = $file->store("dokumen-resmi/{$pengajuan->id}", 'local');
 
-        $dokumen = DokumenResmi::create([
+        DokumenResmi::create([
             'pengajuan_id' => $pengajuan->id,
             'diunggah_oleh' => $request->user()->id,
             'jenis' => $data['jenis'],
@@ -82,12 +81,6 @@ class DokumenResmiController extends Controller
             'mime' => $file->getMimeType(),
             'ukuran' => $file->getSize(),
         ]);
-
-        Aktivitas::catat(
-            'dokumen-resmi.unggah',
-            "Mengunggah {$dokumen->jenisLabel()} nomor {$dokumen->nomor} untuk pengajuan {$pengajuan->jenis->singkat()} #{$pengajuan->id}",
-            $dokumen,
-        );
 
         return redirect()->route('admin.dokumen-resmi.show', $pengajuan)
             ->with('sukses', 'Dokumen resmi berhasil diunggah.');
@@ -131,12 +124,6 @@ class DokumenResmiController extends Controller
 
         Storage::disk('local')->delete($dokumenResmi->path);
         $dokumenResmi->delete();
-
-        Aktivitas::catat(
-            'dokumen-resmi.hapus',
-            "Menghapus dokumen resmi nomor {$dokumenResmi->nomor} dari pengajuan {$pengajuan->jenis->singkat()} #{$pengajuan->id}",
-            $pengajuan,
-        );
 
         return back()->with('sukses', 'Dokumen resmi dihapus.');
     }

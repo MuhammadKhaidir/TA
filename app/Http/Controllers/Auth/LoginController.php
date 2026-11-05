@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Support\Aktivitas;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -41,15 +40,11 @@ class LoginController extends Controller
 
         $request->session()->regenerate();
 
-        Aktivitas::catat('auth.login', 'Masuk ke sistem', null, Auth::user());
-
         return redirect()->route('dashboard');
     }
 
     public function destroy(Request $request): RedirectResponse
     {
-        Aktivitas::catat('auth.logout', 'Keluar dari sistem', null, $request->user());
-
         Auth::guard('web')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

@@ -26,7 +26,7 @@ class AksesPerRoleTest extends TestCase
             ],
             'admin' => [
                 '/admin/dashboard', '/admin/verifikasi', '/admin/pengajuan', '/admin/dokumen-resmi', '/admin/arsip',
-                '/admin/pengguna', '/admin/data-master/program-studi', '/admin/persyaratan', '/admin/log-aktivitas',
+                '/admin/pengguna', '/admin/data-master/program-studi', '/admin/persyaratan',
             ],
         ];
     }
@@ -125,7 +125,7 @@ class AksesPerRoleTest extends TestCase
             'dosen' => ['Dashboard', 'Pemeriksaan Berkas', 'Mahasiswa Bimbingan', 'Riwayat Pemeriksaan'],
             'admin' => [
                 'Dashboard', 'Verifikasi Administrasi', 'Pengelolaan KP/TA', 'Dokumen Resmi', 'Arsip Berkas',
-                'Manajemen Pengguna', 'Data Master', 'Pengaturan Persyaratan', 'Log Aktivitas',
+                'Manajemen Pengguna', 'Data Master', 'Pengaturan Persyaratan',
             ],
         ];
 

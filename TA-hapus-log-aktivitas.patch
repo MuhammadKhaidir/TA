@@ -1,0 +1,1013 @@
+diff --git a/README.md b/README.md
+index 1b4a71e..364f047 100644
+--- a/README.md
++++ b/README.md
+@@ -10,7 +10,7 @@ ## Peran pengguna
+ |---|---|
+ | Mahasiswa | Dashboard, Pengajuan KP, Pengajuan TA, Status Pengajuan, Berkas Saya |
+ | Dosen | Dashboard, Pemeriksaan Berkas, Mahasiswa Bimbingan, Riwayat Pemeriksaan |
+-| Admin | Dashboard, Verifikasi Administrasi, Pengelolaan KP/TA, Dokumen Resmi, Arsip Berkas, Manajemen Pengguna, Data Master, Pengaturan Persyaratan, Log Aktivitas |
++| Admin | Dashboard, Verifikasi Administrasi, Pengelolaan KP/TA, Dokumen Resmi, Arsip Berkas, Manajemen Pengguna, Data Master, Pengaturan Persyaratan |
+ 
+ Admin memegang seluruh fungsi administrasi akademik (verifikasi, penetapan dosen pembimbing, dokumen resmi, arsip) sekaligus pengelolaan sistem. Peran operator akademik sudah dihapus dan digabung ke admin.
+ 
+@@ -98,13 +98,13 @@ ## Alur sistem
+      revisi_administrasi   revisi_akademik
+ ```
+ 
+-Setiap perubahan status disimpan di tabel `riwayat_status` (siapa, kapan, catatan) dan tampil sebagai riwayat di halaman detail. Tindakan penting juga masuk ke Log Aktivitas.
++Setiap perubahan status disimpan di tabel `riwayat_status` (siapa, kapan, catatan) dan tampil sebagai riwayat di halaman detail.
+ 
+ Dokumen yang diunggah ulang disimpan sebagai versi baru; versi lama tetap ada sebagai jejak audit.
+ 
+ ## Berkas SQL database
+ 
+-Seluruh struktur database ada di migrasi (`database/migrations`, file PHP, itu cara Laravel membuat tabel). Untuk yang butuh file `.sql` biasa, tersedia `database/sql/arsip_kp_ta.sql`: struktur 20 tabel beserta data awal (3 program studi, 10 persyaratan, 5 akun contoh dengan kata sandi `password`).
++Seluruh struktur database ada di migrasi (`database/migrations`, file PHP, itu cara Laravel membuat tabel). Untuk yang butuh file `.sql` biasa, tersedia `database/sql/arsip_kp_ta.sql`: struktur 19 tabel beserta data awal (3 program studi, 10 persyaratan, 5 akun contoh dengan kata sandi `password`).
+ 
+ ```
+ mysql -u root -p < database/sql/arsip_kp_ta.sql
+@@ -175,7 +175,7 @@ ## Struktur kode
+ app/Policies         Hak akses per pengajuan, dokumen, dan dokumen resmi
+ app/Http/Middleware  EnsureRole, EnsureUserActive
+ app/Http/Controllers Dipisah per peran: Mahasiswa, Dosen, Admin
+-app/Support          Menu per peran, pencatat log aktivitas
++app/Support          Menu per peran
+ database/migrations  Skema (migrasi tambahan, tidak mengubah migrasi bawaan Laravel)
+ database/seeders     Program studi, persyaratan, dan akun contoh
+ database/sql         Dump SQL lengkap (struktur dan data awal) untuk impor langsung ke MySQL
+@@ -199,7 +199,7 @@ ## Menjalankan uji otomatis
+ - Alur KP lengkap dari draft sampai arsip, termasuk validasi unggahan (format dan ukuran), revisi administrasi dan akademik, versi dokumen, urutan riwayat status, dan penguncian setelah diarsipkan.
+ - Akses berkas privat: pemilik, pembimbing, dan admin dapat membuka; mahasiswa lain, dosen lain, dan tamu ditolak; tidak ada URL publik.
+ - Sinkronisasi data setelah admin mengubah mahasiswa, dosen, program studi, dan persyaratan.
+-- CRUD admin (pengguna, program studi, persyaratan), validasi, perlindungan data yang dipakai, log aktivitas, profil, dan ganti kata sandi.
++- CRUD admin (pengguna, program studi, persyaratan), validasi, perlindungan data yang dipakai, profil, dan ganti kata sandi.
+ - Alur dosen pembimbing: KP ditetapkan admin, TA dipilih mahasiswa lalu diterima atau ditolak dosen, penetapan pengganti dengan bimbingan paling sedikit, hak akses, dan dashboard mahasiswa.
+ - Alur surat TA: surat pengantar hanya setelah verifikasi, surat balasan hanya setelah surat pengantar, SK tertahan sampai balasan diterima dan dosen menyetujui, revisi dan unggah ulang, keputusan usang ditolak, arsip TA mewajibkan SK, hak akses tiap peran, privasi berkas surat balasan, dan KP tidak terpengaruh.
+ - Render semua halaman untuk setiap peran pada setiap status pengajuan dan status pembimbing, termasuk tujuh variasi keadaan surat TA.
+diff --git a/app/Http/Controllers/Admin/DokumenResmiController.php b/app/Http/Controllers/Admin/DokumenResmiController.php
+index 8e51c22..e25732a 100644
+--- a/app/Http/Controllers/Admin/DokumenResmiController.php
++++ b/app/Http/Controllers/Admin/DokumenResmiController.php
+@@ -9,7 +9,6 @@
+ use App\Models\Pengajuan;
+ use App\Services\PengajuanWorkflow;
+ use App\Services\SuratTaService;
+-use App\Support\Aktivitas;
+ use Illuminate\Http\RedirectResponse;
+ use Illuminate\Http\Request;
+ use Illuminate\Support\Facades\Storage;
+@@ -71,7 +70,7 @@ public function store(Request $request, Pengajuan $pengajuan): RedirectResponse
+         $file = $request->file('berkas');
+         $path = $file->store("dokumen-resmi/{$pengajuan->id}", 'local');
+ 
+-        $dokumen = DokumenResmi::create([
++        DokumenResmi::create([
+             'pengajuan_id' => $pengajuan->id,
+             'diunggah_oleh' => $request->user()->id,
+             'jenis' => $data['jenis'],
+@@ -83,12 +82,6 @@ public function store(Request $request, Pengajuan $pengajuan): RedirectResponse
+             'ukuran' => $file->getSize(),
+         ]);
+ 
+-        Aktivitas::catat(
+-            'dokumen-resmi.unggah',
+-            "Mengunggah {$dokumen->jenisLabel()} nomor {$dokumen->nomor} untuk pengajuan {$pengajuan->jenis->singkat()} #{$pengajuan->id}",
+-            $dokumen,
+-        );
+-
+         return redirect()->route('admin.dokumen-resmi.show', $pengajuan)
+             ->with('sukses', 'Dokumen resmi berhasil diunggah.');
+     }
+@@ -132,12 +125,6 @@ public function destroy(Pengajuan $pengajuan, DokumenResmi $dokumenResmi): Redir
+         Storage::disk('local')->delete($dokumenResmi->path);
+         $dokumenResmi->delete();
+ 
+-        Aktivitas::catat(
+-            'dokumen-resmi.hapus',
+-            "Menghapus dokumen resmi nomor {$dokumenResmi->nomor} dari pengajuan {$pengajuan->jenis->singkat()} #{$pengajuan->id}",
+-            $pengajuan,
+-        );
+-
+         return back()->with('sukses', 'Dokumen resmi dihapus.');
+     }
+ 
+diff --git a/app/Http/Controllers/Admin/LogAktivitasController.php b/app/Http/Controllers/Admin/LogAktivitasController.php
+deleted file mode 100644
+index f76a95d..0000000
+--- a/app/Http/Controllers/Admin/LogAktivitasController.php
++++ /dev/null
+@@ -1,44 +0,0 @@
+-<?php
+-
+-namespace App\Http\Controllers\Admin;
+-
+-use App\Http\Controllers\Controller;
+-use App\Models\LogAktivitas;
+-use Illuminate\Http\Request;
+-use Illuminate\View\View;
+-
+-class LogAktivitasController extends Controller
+-{
+-    public function index(Request $request): View
+-    {
+-        $filter = $request->validate([
+-            'aksi' => ['nullable', 'string', 'max:50'],
+-            'q' => ['nullable', 'string', 'max:100'],
+-        ]);
+-
+-        $daftar = LogAktivitas::with('user')
+-            ->when($filter['aksi'] ?? null, fn ($q, $v) => $q->where('aksi', 'like', $v.'%'))
+-            ->when($filter['q'] ?? null, function ($q, $kata) {
+-                $q->where(function ($w) use ($kata) {
+-                    $w->where('deskripsi', 'like', "%{$kata}%")
+-                        ->orWhereHas('user', fn ($u) => $u->where('name', 'like', "%{$kata}%"));
+-                });
+-            })
+-            ->orderByDesc('id')
+-            ->paginate(25)
+-            ->withQueryString();
+-
+-        $kelompok = [
+-            'auth' => 'Login dan logout',
+-            'pengguna' => 'Pengguna',
+-            'prodi' => 'Program studi',
+-            'persyaratan' => 'Persyaratan',
+-            'pengajuan' => 'Pengajuan dan status',
+-            'dokumen' => 'Dokumen persyaratan',
+-            'dokumen-resmi' => 'Dokumen resmi',
+-            'profil' => 'Profil',
+-        ];
+-
+-        return view('admin.log.index', compact('daftar', 'filter', 'kelompok'));
+-    }
+-}
+diff --git a/app/Http/Controllers/Admin/PersyaratanController.php b/app/Http/Controllers/Admin/PersyaratanController.php
+index 934290c..0c1da8f 100644
+--- a/app/Http/Controllers/Admin/PersyaratanController.php
++++ b/app/Http/Controllers/Admin/PersyaratanController.php
+@@ -6,7 +6,6 @@
+ use App\Enums\Role;
+ use App\Http\Controllers\Controller;
+ use App\Models\Persyaratan;
+-use App\Support\Aktivitas;
+ use Illuminate\Http\RedirectResponse;
+ use Illuminate\Http\Request;
+ use Illuminate\Validation\Rule;
+@@ -40,9 +39,7 @@ public function create(): View
+ 
+     public function store(Request $request): RedirectResponse
+     {
+-        $syarat = Persyaratan::create($this->validasi($request));
+-
+-        Aktivitas::catat('persyaratan.buat', "Menambah persyaratan {$syarat->nama} ({$syarat->jenis_pengajuan->singkat()})", $syarat);
++        Persyaratan::create($this->validasi($request));
+ 
+         return redirect()->route('admin.persyaratan.index')->with('sukses', 'Persyaratan ditambahkan.');
+     }
+@@ -56,8 +53,6 @@ public function update(Request $request, Persyaratan $persyaratan): RedirectResp
+     {
+         $persyaratan->update($this->validasi($request));
+ 
+-        Aktivitas::catat('persyaratan.ubah', "Mengubah persyaratan {$persyaratan->nama} ({$persyaratan->jenis_pengajuan->singkat()})", $persyaratan);
+-
+         return redirect()->route('admin.persyaratan.index')->with('sukses', 'Persyaratan diperbarui.');
+     }
+ 
+@@ -67,11 +62,8 @@ public function destroy(Persyaratan $persyaratan): RedirectResponse
+             return back()->with('galat', 'Persyaratan ini sudah memiliki dokumen yang diunggah mahasiswa. Nonaktifkan saja agar riwayat tetap utuh.');
+         }
+ 
+-        $nama = $persyaratan->nama;
+         $persyaratan->delete();
+ 
+-        Aktivitas::catat('persyaratan.hapus', "Menghapus persyaratan {$nama}");
+-
+         return redirect()->route('admin.persyaratan.index')->with('sukses', 'Persyaratan dihapus.');
+     }
+ 
+diff --git a/app/Http/Controllers/Admin/ProgramStudiController.php b/app/Http/Controllers/Admin/ProgramStudiController.php
+index 150d55e..805fdc5 100644
+--- a/app/Http/Controllers/Admin/ProgramStudiController.php
++++ b/app/Http/Controllers/Admin/ProgramStudiController.php
+@@ -4,7 +4,6 @@
+ 
+ use App\Http\Controllers\Controller;
+ use App\Models\ProgramStudi;
+-use App\Support\Aktivitas;
+ use Illuminate\Http\RedirectResponse;
+ use Illuminate\Http\Request;
+ use Illuminate\Validation\Rule;
+@@ -29,9 +28,7 @@ public function create(): View
+ 
+     public function store(Request $request): RedirectResponse
+     {
+-        $prodi = ProgramStudi::create($this->validasi($request));
+-
+-        Aktivitas::catat('prodi.buat', "Menambah program studi {$prodi->namaLengkap()}", $prodi);
++        ProgramStudi::create($this->validasi($request));
+ 
+         return redirect()->route('admin.program-studi.index')->with('sukses', 'Program studi ditambahkan.');
+     }
+@@ -45,8 +42,6 @@ public function update(Request $request, ProgramStudi $programStudi): RedirectRe
+     {
+         $programStudi->update($this->validasi($request, $programStudi));
+ 
+-        Aktivitas::catat('prodi.ubah', "Mengubah program studi {$programStudi->namaLengkap()}", $programStudi);
+-
+         return redirect()->route('admin.program-studi.index')->with('sukses', 'Program studi diperbarui.');
+     }
+ 
+@@ -56,11 +51,8 @@ public function destroy(ProgramStudi $programStudi): RedirectResponse
+             return back()->with('galat', 'Program studi masih dipakai pengguna. Nonaktifkan atau pindahkan penggunanya terlebih dahulu.');
+         }
+ 
+-        $nama = $programStudi->namaLengkap();
+         $programStudi->delete();
+ 
+-        Aktivitas::catat('prodi.hapus', "Menghapus program studi {$nama}");
+-
+         return redirect()->route('admin.program-studi.index')->with('sukses', 'Program studi dihapus.');
+     }
+ 
+diff --git a/app/Http/Controllers/Admin/UserController.php b/app/Http/Controllers/Admin/UserController.php
+index eece4ce..7eefeb7 100644
+--- a/app/Http/Controllers/Admin/UserController.php
++++ b/app/Http/Controllers/Admin/UserController.php
+@@ -6,7 +6,6 @@
+ use App\Http\Controllers\Controller;
+ use App\Models\ProgramStudi;
+ use App\Models\User;
+-use App\Support\Aktivitas;
+ use Illuminate\Database\QueryException;
+ use Illuminate\Http\RedirectResponse;
+ use Illuminate\Http\Request;
+@@ -57,9 +56,7 @@ public function store(Request $request): RedirectResponse
+     {
+         $data = $this->validasi($request);
+ 
+-        $user = User::create($data);
+-
+-        Aktivitas::catat('pengguna.buat', "Menambah pengguna {$user->name} ({$user->role->label()})", $user);
++        User::create($data);
+ 
+         return redirect()->route('admin.users.index')->with('sukses', 'Pengguna berhasil ditambahkan.');
+     }
+@@ -86,8 +83,6 @@ public function update(Request $request, User $user): RedirectResponse
+ 
+         $user->update($data);
+ 
+-        Aktivitas::catat('pengguna.ubah', "Mengubah data pengguna {$user->name}", $user);
+-
+         return redirect()->route('admin.users.index')->with('sukses', 'Data pengguna diperbarui.');
+     }
+ 
+@@ -105,8 +100,6 @@ public function destroy(Request $request, User $user): RedirectResponse
+             return back()->with('galat', "{$nama} sudah memiliki data pengajuan atau pemeriksaan sehingga tidak dapat dihapus. Nonaktifkan akunnya melalui menu ubah.");
+         }
+ 
+-        Aktivitas::catat('pengguna.hapus', "Menghapus pengguna {$nama}");
+-
+         return redirect()->route('admin.users.index')->with('sukses', 'Pengguna dihapus.');
+     }
+ 
+diff --git a/app/Http/Controllers/Auth/LoginController.php b/app/Http/Controllers/Auth/LoginController.php
+index e89a97c..e3a7e9c 100644
+--- a/app/Http/Controllers/Auth/LoginController.php
++++ b/app/Http/Controllers/Auth/LoginController.php
+@@ -3,7 +3,6 @@
+ namespace App\Http\Controllers\Auth;
+ 
+ use App\Http\Controllers\Controller;
+-use App\Support\Aktivitas;
+ use Illuminate\Http\RedirectResponse;
+ use Illuminate\Http\Request;
+ use Illuminate\Support\Facades\Auth;
+@@ -41,15 +40,11 @@ public function store(Request $request): RedirectResponse
+ 
+         $request->session()->regenerate();
+ 
+-        Aktivitas::catat('auth.login', 'Masuk ke sistem', null, Auth::user());
+-
+         return redirect()->route('dashboard');
+     }
+ 
+     public function destroy(Request $request): RedirectResponse
+     {
+-        Aktivitas::catat('auth.logout', 'Keluar dari sistem', null, $request->user());
+-
+         Auth::guard('web')->logout();
+         $request->session()->invalidate();
+         $request->session()->regenerateToken();
+diff --git a/app/Http/Controllers/DashboardController.php b/app/Http/Controllers/DashboardController.php
+index bc55d63..8415263 100644
+--- a/app/Http/Controllers/DashboardController.php
++++ b/app/Http/Controllers/DashboardController.php
+@@ -6,7 +6,6 @@
+ use App\Enums\StatusPembimbing;
+ use App\Enums\StatusPengajuan;
+ use App\Enums\StatusTahapSurat;
+-use App\Models\LogAktivitas;
+ use App\Models\Pemeriksaan;
+ use App\Models\Pengajuan;
+ use App\Models\Persyaratan;
+@@ -110,12 +109,11 @@ public function admin(): View
+         $perRole = User::selectRaw('role, count(*) as total')->groupBy('role')->pluck('total', 'role');
+         $jumlahProdi = ProgramStudi::count();
+         $jumlahPersyaratan = Persyaratan::aktif()->count();
+-        $logTerbaru = LogAktivitas::with('user')->orderByDesc('id')->limit(8)->get();
+ 
+         return view('dashboard.admin', compact(
+             'jumlah', 'antreanVerifikasi', 'perluDokumenResmi', 'jumlahPerluPembimbing', 'perluPembimbing',
+             'jumlahPerluPengantar', 'jumlahBalasanMenunggu', 'antreanSurat',
+-            'perRole', 'jumlahProdi', 'jumlahPersyaratan', 'logTerbaru',
++            'perRole', 'jumlahProdi', 'jumlahPersyaratan',
+         ));
+     }
+ }
+diff --git a/app/Http/Controllers/Mahasiswa/DokumenController.php b/app/Http/Controllers/Mahasiswa/DokumenController.php
+index da362f6..b49c69c 100644
+--- a/app/Http/Controllers/Mahasiswa/DokumenController.php
++++ b/app/Http/Controllers/Mahasiswa/DokumenController.php
+@@ -8,7 +8,6 @@
+ use App\Models\DokumenPengajuan;
+ use App\Models\Pengajuan;
+ use App\Models\Persyaratan;
+-use App\Support\Aktivitas;
+ use Illuminate\Http\RedirectResponse;
+ use Illuminate\Http\Request;
+ use Illuminate\Support\Facades\DB;
+@@ -49,7 +48,7 @@ public function store(Request $request, Pengajuan $pengajuan): RedirectResponse
+         $file = $request->file('berkas');
+         $path = $file->store("pengajuan/{$pengajuan->id}", 'local');
+ 
+-        $dokumen = DB::transaction(function () use ($pengajuan, $syarat, $file, $path, $request) {
++        DB::transaction(function () use ($pengajuan, $syarat, $file, $path, $request) {
+             $versi = (int) $pengajuan->dokumen()->where('persyaratan_id', $syarat->id)->max('versi') + 1;
+ 
+             $pengajuan->dokumen()->where('persyaratan_id', $syarat->id)->update(['terbaru' => false]);
+@@ -68,12 +67,6 @@ public function store(Request $request, Pengajuan $pengajuan): RedirectResponse
+             ]);
+         });
+ 
+-        Aktivitas::catat(
+-            'dokumen.unggah',
+-            "Mengunggah {$syarat->nama} (versi {$dokumen->versi}) untuk pengajuan {$pengajuan->jenis->singkat()} #{$pengajuan->id}",
+-            $dokumen,
+-        );
+-
+         return redirect()->route('mahasiswa.pengajuan.show', $pengajuan)
+             ->with('sukses', "{$syarat->nama} berhasil diunggah.");
+     }
+diff --git a/app/Http/Controllers/Mahasiswa/PengajuanController.php b/app/Http/Controllers/Mahasiswa/PengajuanController.php
+index d2849a8..1d8959a 100644
+--- a/app/Http/Controllers/Mahasiswa/PengajuanController.php
++++ b/app/Http/Controllers/Mahasiswa/PengajuanController.php
+@@ -11,7 +11,6 @@
+ use App\Models\User;
+ use App\Services\PembimbingService;
+ use App\Services\PengajuanWorkflow;
+-use App\Support\Aktivitas;
+ use Illuminate\Database\Eloquent\Collection;
+ use Illuminate\Http\RedirectResponse;
+ use Illuminate\Http\Request;
+@@ -138,8 +137,6 @@ public function update(Request $request, Pengajuan $pengajuan): RedirectResponse
+             }
+         });
+ 
+-        Aktivitas::catat('pengajuan.ubah', "Mengubah data pengajuan {$pengajuan->jenis->singkat()} #{$pengajuan->id}", $pengajuan);
+-
+         return redirect()->route('mahasiswa.pengajuan.show', $pengajuan)->with('sukses', 'Data pengajuan diperbarui.');
+     }
+ 
+@@ -163,8 +160,6 @@ public function destroy(Pengajuan $pengajuan): RedirectResponse
+         Storage::disk('local')->deleteDirectory("pengajuan/{$id}");
+         $pengajuan->delete();
+ 
+-        Aktivitas::catat('pengajuan.hapus', "Menghapus draft pengajuan {$jenis->singkat()} #{$id}");
+-
+         return redirect()->route('mahasiswa.pengajuan.index', $jenis->value)->with('sukses', 'Draft pengajuan dihapus.');
+     }
+ 
+diff --git a/app/Http/Controllers/ProfilController.php b/app/Http/Controllers/ProfilController.php
+index 9d4cc4a..745d232 100644
+--- a/app/Http/Controllers/ProfilController.php
++++ b/app/Http/Controllers/ProfilController.php
+@@ -2,7 +2,6 @@
+ 
+ namespace App\Http\Controllers;
+ 
+-use App\Support\Aktivitas;
+ use Illuminate\Http\RedirectResponse;
+ use Illuminate\Http\Request;
+ use Illuminate\View\View;
+@@ -29,8 +28,6 @@ public function update(Request $request): RedirectResponse
+ 
+         $request->user()->update(['no_hp' => $data['no_hp'] ?? null]);
+ 
+-        Aktivitas::catat('profil.ubah', 'Memperbarui nomor HP pada profil', $request->user());
+-
+         return back()->with('sukses', 'Profil berhasil diperbarui.');
+     }
+ 
+@@ -43,8 +40,6 @@ public function password(Request $request): RedirectResponse
+ 
+         $request->user()->update(['password' => $request->input('password')]);
+ 
+-        Aktivitas::catat('profil.password', 'Mengganti kata sandi', $request->user());
+-
+         return back()->with('sukses', 'Kata sandi berhasil diganti.');
+     }
+ }
+diff --git a/app/Models/LogAktivitas.php b/app/Models/LogAktivitas.php
+deleted file mode 100644
+index 7d31078..0000000
+--- a/app/Models/LogAktivitas.php
++++ /dev/null
+@@ -1,24 +0,0 @@
+-<?php
+-
+-namespace App\Models;
+-
+-use Illuminate\Database\Eloquent\Model;
+-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+-use Illuminate\Database\Eloquent\Relations\MorphTo;
+-
+-class LogAktivitas extends Model
+-{
+-    protected $table = 'log_aktivitas';
+-
+-    protected $fillable = ['user_id', 'aksi', 'deskripsi', 'subjek_type', 'subjek_id', 'ip_address'];
+-
+-    public function user(): BelongsTo
+-    {
+-        return $this->belongsTo(User::class, 'user_id');
+-    }
+-
+-    public function subjek(): MorphTo
+-    {
+-        return $this->morphTo('subjek');
+-    }
+-}
+diff --git a/app/Services/PembimbingService.php b/app/Services/PembimbingService.php
+index b5f9faf..f167c6d 100644
+--- a/app/Services/PembimbingService.php
++++ b/app/Services/PembimbingService.php
+@@ -9,7 +9,6 @@
+ use App\Models\Pengajuan;
+ use App\Models\RiwayatPembimbing;
+ use App\Models\User;
+-use App\Support\Aktivitas;
+ use Illuminate\Support\Collection;
+ use Illuminate\Support\Facades\DB;
+ use Illuminate\Validation\ValidationException;
+@@ -53,8 +52,7 @@ public function pilih(Pengajuan $pengajuan, User $dosen, User $oleh): void
+                 'status_pembimbing' => StatusPembimbing::Menunggu,
+             ])->save();
+ 
+-            $this->catat($pengajuan, $dosen, $oleh, StatusPembimbing::Menunggu, null,
+-                "Memilih {$dosen->name} sebagai calon pembimbing TA #{$pengajuan->id}");
++            $this->catat($pengajuan, $dosen, $oleh, StatusPembimbing::Menunggu, null);
+         });
+     }
+ 
+@@ -86,7 +84,6 @@ public function konfirmasi(Pengajuan $pengajuan, User $dosen, bool $terima, ?str
+                 $dosen,
+                 $terima ? StatusPembimbing::Diterima : StatusPembimbing::Ditolak,
+                 $catatan,
+-                ($terima ? 'Menerima' : 'Menolak')." permintaan pembimbing TA #{$pengajuan->id}",
+             );
+         });
+     }
+@@ -127,8 +124,7 @@ public function tetapkan(Pengajuan $pengajuan, User $dosen, User $admin, ?string
+                 'status_pembimbing' => StatusPembimbing::Ditetapkan,
+             ])->save();
+ 
+-            $this->catat($pengajuan, $dosen, $admin, StatusPembimbing::Ditetapkan, $catatan,
+-                "Menetapkan {$dosen->name} sebagai pembimbing {$pengajuan->jenis->singkat()} #{$pengajuan->id}");
++            $this->catat($pengajuan, $dosen, $admin, StatusPembimbing::Ditetapkan, $catatan);
+         });
+     }
+ 
+@@ -163,7 +159,7 @@ private function idDosenYangMenolak(Pengajuan $pengajuan): Collection
+             ->map(fn ($id) => (int) $id);
+     }
+ 
+-    private function catat(Pengajuan $pengajuan, ?User $dosen, ?User $oleh, StatusPembimbing $status, ?string $catatan, string $aktivitas): void
++    private function catat(Pengajuan $pengajuan, ?User $dosen, ?User $oleh, StatusPembimbing $status, ?string $catatan): void
+     {
+         RiwayatPembimbing::create([
+             'pengajuan_id' => $pengajuan->id,
+@@ -172,7 +168,5 @@ private function catat(Pengajuan $pengajuan, ?User $dosen, ?User $oleh, StatusPe
+             'status' => $status,
+             'catatan' => $catatan,
+         ]);
+-
+-        Aktivitas::catat('pembimbing.'.$status->value, $aktivitas, $pengajuan, $oleh);
+     }
+ }
+diff --git a/app/Services/PengajuanWorkflow.php b/app/Services/PengajuanWorkflow.php
+index 86c2b66..576c0ee 100644
+--- a/app/Services/PengajuanWorkflow.php
++++ b/app/Services/PengajuanWorkflow.php
+@@ -12,7 +12,6 @@
+ use App\Models\Persyaratan;
+ use App\Models\RiwayatStatus;
+ use App\Models\User;
+-use App\Support\Aktivitas;
+ use Illuminate\Support\Collection;
+ use Illuminate\Support\Facades\DB;
+ use Illuminate\Validation\ValidationException;
+@@ -71,13 +70,6 @@ public function catatAwal(Pengajuan $pengajuan, User $oleh): void
+             'status_baru' => $pengajuan->status,
+             'catatan' => 'Pengajuan dibuat sebagai draft.',
+         ]);
+-
+-        Aktivitas::catat(
+-            'pengajuan.buat',
+-            "Membuat pengajuan {$pengajuan->jenis->singkat()} #{$pengajuan->id}",
+-            $pengajuan,
+-            $oleh,
+-        );
+     }
+ 
+     public function pindahStatus(Pengajuan $pengajuan, StatusPengajuan $baru, ?User $oleh, ?string $catatan = null): void
+@@ -97,13 +89,6 @@ public function pindahStatus(Pengajuan $pengajuan, StatusPengajuan $baru, ?User
+             'status_baru' => $baru,
+             'catatan' => $catatan,
+         ]);
+-
+-        Aktivitas::catat(
+-            'pengajuan.status',
+-            "Status pengajuan {$pengajuan->jenis->singkat()} #{$pengajuan->id}: {$lama->label()} menjadi {$baru->label()}",
+-            $pengajuan,
+-            $oleh,
+-        );
+     }
+ 
+     /** Mahasiswa mengirim pengajuan (pertama kali) atau mengirim ulang setelah revisi. */
+diff --git a/app/Services/SuratTaService.php b/app/Services/SuratTaService.php
+index b857a96..6be1ea8 100644
+--- a/app/Services/SuratTaService.php
++++ b/app/Services/SuratTaService.php
+@@ -8,7 +8,6 @@
+ use App\Models\Pengajuan;
+ use App\Models\SuratBalasan;
+ use App\Models\User;
+-use App\Support\Aktivitas;
+ use Carbon\CarbonInterface;
+ use Illuminate\Http\UploadedFile;
+ use Illuminate\Support\Facades\DB;
+@@ -18,7 +17,7 @@
+ 
+ /**
+  * Alur surat Tugas Akhir. Hak melakukan tiap langkah diputuskan PengajuanPolicy sebelum
+- * kelas ini dipanggil; kelas ini mengerjakan penyimpanan berkas, pencatatan, dan log.
++ * kelas ini dipanggil; kelas ini mengerjakan penyimpanan berkas dan pencatatan.
+  *
+  *   surat pengantar (admin) -> surat balasan (mahasiswa) -> pemeriksaan admin -> SK pembimbing
+  */
+@@ -43,13 +42,6 @@ public function terbitkanPengantar(Pengajuan $pengajuan, User $admin, string $no
+ 
+         $pengajuan->unsetRelation('dokumenResmi');
+ 
+-        Aktivitas::catat(
+-            'surat-pengantar.terbit',
+-            "Menerbitkan surat pengantar TA nomor {$nomor} untuk pengajuan TA #{$pengajuan->id}",
+-            $dokumen,
+-            $admin,
+-        );
+-
+         return $dokumen;
+     }
+ 
+@@ -59,13 +51,6 @@ public function hapusPengantar(Pengajuan $pengajuan, DokumenResmi $pengantar, Us
+         Storage::disk('local')->delete($pengantar->path);
+         $pengantar->delete();
+         $pengajuan->unsetRelation('dokumenResmi');
+-
+-        Aktivitas::catat(
+-            'surat-pengantar.hapus',
+-            "Menarik surat pengantar TA nomor {$pengantar->nomor} dari pengajuan TA #{$pengajuan->id}",
+-            $pengajuan,
+-            $admin,
+-        );
+     }
+ 
+     /**
+@@ -96,13 +81,6 @@ public function unggahBalasan(Pengajuan $pengajuan, User $mahasiswa, UploadedFil
+ 
+         $pengajuan->unsetRelation('suratBalasan');
+ 
+-        Aktivitas::catat(
+-            'surat-balasan.unggah',
+-            "Mengunggah surat balasan TA (versi {$balasan->versi}) untuk pengajuan TA #{$pengajuan->id}",
+-            $balasan,
+-            $mahasiswa,
+-        );
+-
+         return $balasan;
+     }
+ 
+@@ -136,13 +114,6 @@ public function periksaBalasan(Pengajuan $pengajuan, User $admin, int $balasanId
+ 
+         $pengajuan->unsetRelation('suratBalasan');
+ 
+-        Aktivitas::catat(
+-            'surat-balasan.periksa',
+-            "Surat balasan TA (versi {$balasan->versi}) pengajuan TA #{$pengajuan->id}: {$keputusan->label()}",
+-            $balasan,
+-            $admin,
+-        );
+-
+         return $balasan;
+     }
+ }
+diff --git a/app/Support/Aktivitas.php b/app/Support/Aktivitas.php
+deleted file mode 100644
+index c66685a..0000000
+--- a/app/Support/Aktivitas.php
++++ /dev/null
+@@ -1,27 +0,0 @@
+-<?php
+-
+-namespace App\Support;
+-
+-use App\Models\LogAktivitas;
+-use App\Models\User;
+-use Illuminate\Database\Eloquent\Model;
+-
+-/**
+- * Pencatat log aktivitas. Dipanggil dari controller dan service pada tindakan penting.
+- */
+-class Aktivitas
+-{
+-    public static function catat(string $aksi, string $deskripsi, ?Model $subjek = null, ?User $user = null): void
+-    {
+-        $user ??= auth()->user();
+-
+-        LogAktivitas::create([
+-            'user_id' => $user?->getKey(),
+-            'aksi' => $aksi,
+-            'deskripsi' => $deskripsi,
+-            'subjek_type' => $subjek?->getMorphClass(),
+-            'subjek_id' => $subjek?->getKey(),
+-            'ip_address' => request()->ip(),
+-        ]);
+-    }
+-}
+diff --git a/app/Support/Menu.php b/app/Support/Menu.php
+index 368f0f6..4fa033d 100644
+--- a/app/Support/Menu.php
++++ b/app/Support/Menu.php
+@@ -40,7 +40,6 @@ public static function untuk(User $user): array
+                 ['Manajemen Pengguna', route('admin.users.index'), 'users', request()->routeIs('admin.users.*')],
+                 ['Data Master', route('admin.program-studi.index'), 'database', request()->routeIs('admin.program-studi.*')],
+                 ['Pengaturan Persyaratan', route('admin.persyaratan.index'), 'sliders', request()->routeIs('admin.persyaratan.*')],
+-                ['Log Aktivitas', route('admin.log.index'), 'activity', request()->routeIs('admin.log.*')],
+             ],
+         };
+ 
+diff --git a/database/migrations/2026_11_05_000001_hapus_tabel_log_aktivitas.php b/database/migrations/2026_11_05_000001_hapus_tabel_log_aktivitas.php
+new file mode 100644
+index 0000000..efbca57
+--- /dev/null
++++ b/database/migrations/2026_11_05_000001_hapus_tabel_log_aktivitas.php
+@@ -0,0 +1,32 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\Schema;
++
++/**
++ * Fitur log aktivitas dihapus dari aplikasi, jadi tabelnya ikut dibuang.
++ * Migrasi pembuatnya (2026_10_22_000010) sengaja tidak diubah supaya riwayat migrasi tetap utuh.
++ */
++return new class extends Migration
++{
++    public function up(): void
++    {
++        Schema::dropIfExists('log_aktivitas');
++    }
++
++    public function down(): void
++    {
++        Schema::create('log_aktivitas', function (Blueprint $table) {
++            $table->id();
++            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
++            $table->string('aksi', 50)->index();
++            $table->text('deskripsi');
++            $table->nullableMorphs('subjek');
++            $table->string('ip_address', 45)->nullable();
++            $table->timestamps();
++
++            $table->index('created_at');
++        });
++    }
++};
+diff --git a/database/sql/arsip_kp_ta.sql b/database/sql/arsip_kp_ta.sql
+index 75d8b46..0c9d1b0 100644
+--- a/database/sql/arsip_kp_ta.sql
++++ b/database/sql/arsip_kp_ta.sql
+@@ -282,23 +282,6 @@ alter table `arsip` add constraint `arsip_pengajuan_id_foreign` foreign key (`pe
+ alter table `arsip` add constraint `arsip_diarsipkan_oleh_foreign` foreign key (`diarsipkan_oleh`) references `users` (`id`) on delete restrict;
+ alter table `arsip` add unique `arsip_pengajuan_id_unique`(`pengajuan_id`);
+ 
+--- Migrasi: 2026_10_22_000010_create_log_aktivitas_table
+-create table `log_aktivitas` (
+-  `id` bigint unsigned not null auto_increment primary key,
+-  `user_id` bigint unsigned null,
+-  `aksi` varchar(50) not null,
+-  `deskripsi` text not null,
+-  `subjek_type` varchar(255) null,
+-  `subjek_id` bigint unsigned null,
+-  `ip_address` varchar(45) null,
+-  `created_at` timestamp null,
+-  `updated_at` timestamp null
+-) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
+-alter table `log_aktivitas` add constraint `log_aktivitas_user_id_foreign` foreign key (`user_id`) references `users` (`id`) on delete set null;
+-alter table `log_aktivitas` add index `log_aktivitas_subjek_type_subjek_id_index`(`subjek_type`, `subjek_id`);
+-alter table `log_aktivitas` add index `log_aktivitas_created_at_index`(`created_at`);
+-alter table `log_aktivitas` add index `log_aktivitas_aksi_index`(`aksi`);
+-
+ -- Migrasi: 2026_10_24_000001_add_pembimbing_to_pengajuan_table
+ -- (pengisian ulang data pengajuan lama dihilangkan: database baru belum punya data)
+ alter table `pengajuan` add `pembimbing_pilihan_id` bigint unsigned null after `pembimbing_id`;
+@@ -399,6 +382,7 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
+ ('2026_10_24_000001_add_pembimbing_to_pengajuan_table', 1),
+ ('2026_10_24_000002_create_riwayat_pembimbing_table', 1),
+ ('2026_10_26_000001_create_surat_balasan_table', 1),
+-('2026_11_02_000001_gabungkan_operator_ke_admin', 1);
++('2026_11_02_000001_gabungkan_operator_ke_admin', 1),
++('2026_11_05_000001_hapus_tabel_log_aktivitas', 1);
+ 
+ SET FOREIGN_KEY_CHECKS = 1;
+diff --git a/resources/views/admin/log/index.blade.php b/resources/views/admin/log/index.blade.php
+deleted file mode 100644
+index 3055dbf..0000000
+--- a/resources/views/admin/log/index.blade.php
++++ /dev/null
+@@ -1,53 +0,0 @@
+-@extends('layouts.app')
+-
+-@section('judul', 'Log Aktivitas')
+-
+-@section('konten')
+-    <x-page-header judul="Log Aktivitas" sub="Jejak tindakan penting pengguna di dalam sistem." />
+-
+-    <form method="GET" class="card card-body mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+-        <div class="lg:col-span-2">
+-            <label for="q" class="label">Cari</label>
+-            <input id="q" name="q" type="text" value="{{ $filter['q'] ?? '' }}" placeholder="Nama pengguna atau isi aktivitas" class="input">
+-        </div>
+-        <div>
+-            <label for="aksi" class="label">Kelompok aktivitas</label>
+-            <select id="aksi" name="aksi" class="input">
+-                <option value="">Semua</option>
+-                @foreach ($kelompok as $nilai => $label)
+-                    <option value="{{ $nilai }}" @selected(($filter['aksi'] ?? '') === $nilai)>{{ $label }}</option>
+-                @endforeach
+-            </select>
+-        </div>
+-        <div class="flex items-end gap-2">
+-            <button type="submit" class="btn btn-primary">Terapkan</button>
+-            <a href="{{ route('admin.log.index') }}" class="btn btn-secondary">Reset</a>
+-        </div>
+-    </form>
+-
+-    <section class="card">
+-        @if ($daftar->isEmpty())
+-            <x-empty pesan="Tidak ada aktivitas yang cocok." />
+-        @else
+-            <div class="overflow-x-auto">
+-                <table class="tabel">
+-                    <thead><tr><th>Waktu</th><th>Pengguna</th><th>Aksi</th><th>Keterangan</th><th>IP</th></tr></thead>
+-                    <tbody>
+-                        @foreach ($daftar as $log)
+-                            <tr>
+-                                <td class="whitespace-nowrap">{{ $log->created_at->translatedFormat('d M Y H:i:s') }}</td>
+-                                <td>{{ $log->user?->name ?? 'Sistem' }}</td>
+-                                <td class="whitespace-nowrap text-xs text-slate-500">{{ $log->aksi }}</td>
+-                                <td>{{ $log->deskripsi }}</td>
+-                                <td class="whitespace-nowrap text-xs text-slate-500">{{ $log->ip_address ?? '-' }}</td>
+-                            </tr>
+-                        @endforeach
+-                    </tbody>
+-                </table>
+-            </div>
+-            @if ($daftar->hasPages())
+-                <div class="border-t border-slate-200 px-5 py-3">{{ $daftar->links() }}</div>
+-            @endif
+-        @endif
+-    </section>
+-@endsection
+diff --git a/resources/views/dashboard/admin.blade.php b/resources/views/dashboard/admin.blade.php
+index 1b59bda..7d238a8 100644
+--- a/resources/views/dashboard/admin.blade.php
++++ b/resources/views/dashboard/admin.blade.php
+@@ -148,29 +148,4 @@
+         <x-kartu-stat icon="stack-solid" label="Program Studi" :nilai="$jumlahProdi" :href="route('admin.program-studi.index')" />
+         <x-kartu-stat icon="doc-solid" label="Persyaratan Aktif" :nilai="$jumlahPersyaratan" hint="KP dan TA" :href="route('admin.persyaratan.index')" />
+     </div>
+-
+-    <section class="card mt-6">
+-        <div class="card-header">
+-            <h2 class="font-semibold text-slate-900">Aktivitas Terbaru</h2>
+-            <a href="{{ route('admin.log.index') }}" class="tautan text-sm">Lihat semua</a>
+-        </div>
+-        @if ($logTerbaru->isEmpty())
+-            <x-kosong pesan="Belum ada aktivitas tercatat." />
+-        @else
+-            <div class="overflow-x-auto">
+-                <table class="tabel">
+-                    <thead><tr><th>Waktu</th><th>Pengguna</th><th>Aktivitas</th></tr></thead>
+-                    <tbody>
+-                        @foreach ($logTerbaru as $log)
+-                            <tr>
+-                                <td class="whitespace-nowrap">{{ $log->created_at->translatedFormat('d M Y H:i') }}</td>
+-                                <td>{{ $log->user?->name ?? 'Sistem' }}</td>
+-                                <td>{{ $log->deskripsi }}</td>
+-                            </tr>
+-                        @endforeach
+-                    </tbody>
+-                </table>
+-            </div>
+-        @endif
+-    </section>
+ @endsection
+diff --git a/routes/web.php b/routes/web.php
+index e5a8ba9..dcd7f16 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -101,7 +101,7 @@
+         Route::get('/arsip', [Admin\ArsipController::class, 'index'])->name('arsip.index');
+         Route::get('/arsip/{pengajuan}', [Admin\ArsipController::class, 'show'])->name('arsip.show');
+ 
+-        // Manajemen pengguna, data master, persyaratan, dan log aktivitas.
++        // Manajemen pengguna, data master, dan persyaratan.
+         Route::resource('pengguna', Admin\UserController::class)
+             ->except('show')
+             ->parameters(['pengguna' => 'user'])
+@@ -118,7 +118,5 @@
+             ->except('show')
+             ->parameters(['persyaratan' => 'persyaratan'])
+             ->names('persyaratan');
+-
+-        Route::get('/log-aktivitas', [Admin\LogAktivitasController::class, 'index'])->name('log.index');
+     });
+ });
+diff --git a/tests/Feature/AdminDanProfilTest.php b/tests/Feature/AdminDanProfilTest.php
+index 0676c7a..c586813 100644
+--- a/tests/Feature/AdminDanProfilTest.php
++++ b/tests/Feature/AdminDanProfilTest.php
+@@ -166,19 +166,6 @@ public function test_crud_persyaratan_validasi_ekstensi_dan_perlindungan_dokumen
+         $this->assertDatabaseMissing('persyaratan', ['id' => $kosong->id]);
+     }
+ 
+-    public function test_log_aktivitas_mencatat_tindakan_admin_dan_dapat_difilter(): void
+-    {
+-        $this->actingAs($this->admin)->post(route('admin.program-studi.store'), [
+-            'kode' => 'LG', 'nama' => 'Program Log Uji', 'jenjang' => 'S1', 'aktif' => 1,
+-        ]);
+-
+-        $this->assertDatabaseHas('log_aktivitas', ['user_id' => $this->admin->id, 'aksi' => 'prodi.buat']);
+-
+-        $this->actingAs($this->admin)->get(route('admin.log.index'))->assertOk()->assertSee('Program Log Uji');
+-        $this->actingAs($this->admin)->get(route('admin.log.index', ['aksi' => 'prodi']))->assertOk()->assertSee('Program Log Uji');
+-        $this->actingAs($this->admin)->get(route('admin.log.index', ['aksi' => 'auth']))->assertOk()->assertDontSee('Program Log Uji');
+-    }
+-
+     public function test_dashboard_admin_menampilkan_jumlah_dari_database(): void
+     {
+         User::factory()->mahasiswa()->count(3)->create();
+diff --git a/tests/Feature/AksesPerRoleTest.php b/tests/Feature/AksesPerRoleTest.php
+index d18ecf4..56ac3ca 100644
+--- a/tests/Feature/AksesPerRoleTest.php
++++ b/tests/Feature/AksesPerRoleTest.php
+@@ -26,7 +26,7 @@ private function halamanPerRole(): array
+             ],
+             'admin' => [
+                 '/admin/dashboard', '/admin/verifikasi', '/admin/pengajuan', '/admin/dokumen-resmi', '/admin/arsip',
+-                '/admin/pengguna', '/admin/data-master/program-studi', '/admin/persyaratan', '/admin/log-aktivitas',
++                '/admin/pengguna', '/admin/data-master/program-studi', '/admin/persyaratan',
+             ],
+         ];
+     }
+@@ -125,7 +125,7 @@ public function test_menu_sidebar_sesuai_role_dan_ada_profil_serta_logout(): voi
+             'dosen' => ['Dashboard', 'Pemeriksaan Berkas', 'Mahasiswa Bimbingan', 'Riwayat Pemeriksaan'],
+             'admin' => [
+                 'Dashboard', 'Verifikasi Administrasi', 'Pengelolaan KP/TA', 'Dokumen Resmi', 'Arsip Berkas',
+-                'Manajemen Pengguna', 'Data Master', 'Pengaturan Persyaratan', 'Log Aktivitas',
++                'Manajemen Pengguna', 'Data Master', 'Pengaturan Persyaratan',
+             ],
+         ];
+ 
+diff --git a/tests/Feature/AlurPengajuanTest.php b/tests/Feature/AlurPengajuanTest.php
+index aade53b..e556052 100644
+--- a/tests/Feature/AlurPengajuanTest.php
++++ b/tests/Feature/AlurPengajuanTest.php
+@@ -244,7 +244,6 @@ public function test_alur_lengkap_kp_dari_pengajuan_sampai_arsip(): void
+             'revisi_akademik', 'menunggu_dosen', 'disetujui', 'diarsipkan',
+         ], $this->urutanStatus($p));
+         $this->assertSame($this->admin->id, (int) $p->riwayat->last()->user_id);
+-        $this->assertDatabaseHas('log_aktivitas', ['aksi' => 'pengajuan.status']);
+ 
+         // 11. Setelah diarsipkan: mahasiswa tidak dapat mengubah apa pun; arsip tampil bagi yang berwenang.
+         $this->unggah($p, $wajib->first())->assertForbidden();
+diff --git a/tests/Feature/AuthTest.php b/tests/Feature/AuthTest.php
+index 7b78b51..b3d5684 100644
+--- a/tests/Feature/AuthTest.php
++++ b/tests/Feature/AuthTest.php
+@@ -3,7 +3,6 @@
+ namespace Tests\Feature;
+ 
+ use App\Enums\Role;
+-use App\Models\LogAktivitas;
+ use App\Models\User;
+ use Illuminate\Foundation\Testing\RefreshDatabase;
+ use Tests\TestCase;
+@@ -87,18 +86,6 @@ public function test_akun_yang_dinonaktifkan_saat_login_langsung_dikeluarkan():
+         $this->assertGuest();
+     }
+ 
+-    public function test_login_dan_logout_tercatat_di_log_aktivitas(): void
+-    {
+-        $user = User::factory()->admin()->create();
+-
+-        $this->post('/login', ['login' => $user->email, 'password' => 'password']);
+-        $this->post('/logout');
+-
+-        $this->assertDatabaseHas('log_aktivitas', ['user_id' => $user->id, 'aksi' => 'auth.login']);
+-        $this->assertDatabaseHas('log_aktivitas', ['user_id' => $user->id, 'aksi' => 'auth.logout']);
+-        $this->assertSame(2, LogAktivitas::count());
+-    }
+-
+     public function test_pengguna_login_tidak_dapat_membuka_halaman_login_lagi(): void
+     {
+         $this->actingAs(User::factory()->create())->get('/login')->assertRedirect(route('dashboard'));
+diff --git a/tests/Feature/PembimbingTest.php b/tests/Feature/PembimbingTest.php
+index 7bb7f2e..8e408f7 100644
+--- a/tests/Feature/PembimbingTest.php
++++ b/tests/Feature/PembimbingTest.php
+@@ -181,7 +181,6 @@ public function test_dosen_menerima_permintaan_ta(): void
+         $this->assertDatabaseHas('riwayat_pembimbing', [
+             'pengajuan_id' => $p->id, 'dosen_id' => $this->dosenA->id, 'user_id' => $this->dosenA->id, 'status' => 'diterima',
+         ]);
+-        $this->assertDatabaseHas('log_aktivitas', ['user_id' => $this->dosenA->id, 'aksi' => 'pembimbing.diterima']);
+ 
+         // Kini menjadi mahasiswa bimbingan dan berwenang atas pengajuan.
+         $this->actingAs($this->dosenA)->get(route('dosen.bimbingan.index'))
+diff --git a/tests/Feature/RenderHalamanTest.php b/tests/Feature/RenderHalamanTest.php
+index 3309526..71fbb97 100644
+--- a/tests/Feature/RenderHalamanTest.php
++++ b/tests/Feature/RenderHalamanTest.php
+@@ -176,7 +176,7 @@ public function test_semua_halaman_tampil_untuk_setiap_role_pada_semua_status():
+                 route('admin.users.edit', $dosen), route('admin.users.edit', $admin),
+                 route('admin.program-studi.index'), route('admin.program-studi.create'), route('admin.program-studi.edit', $prodi),
+                 route('admin.persyaratan.index'), route('admin.persyaratan.create'), route('admin.persyaratan.edit', $syarat),
+-                route('admin.log.index'), route('profil.show'),
++                route('profil.show'),
+             ],
+         ];
+ 
+diff --git a/tests/Feature/SuratTaTest.php b/tests/Feature/SuratTaTest.php
+index c39ee41..1c2a143 100644
+--- a/tests/Feature/SuratTaTest.php
++++ b/tests/Feature/SuratTaTest.php
+@@ -8,7 +8,6 @@
+ use App\Enums\StatusPengajuan;
+ use App\Models\DokumenPengajuan;
+ use App\Models\DokumenResmi;
+-use App\Models\LogAktivitas;
+ use App\Models\Pengajuan;
+ use App\Models\Persyaratan;
+ use App\Models\ProgramStudi;
+@@ -175,7 +174,6 @@ public function test_alur_lengkap_ta_dari_verifikasi_sampai_sk_dan_arsip(): void
+         $this->assertSame('010/UN9.FASILKOM/2026', $pengantar->nomor);
+         Storage::disk('local')->assertExists($pengantar->path);
+         $this->assertStringStartsWith("dokumen-resmi/{$p->id}/", $pengantar->path);
+-        $this->assertDatabaseHas('log_aktivitas', ['aksi' => 'surat-pengantar.terbit']);
+ 
+         // Surat pengantar hanya satu.
+         $this->terbitkanPengantar($p)->assertForbidden();
+@@ -266,11 +264,6 @@ public function test_alur_lengkap_ta_dari_verifikasi_sampai_sk_dan_arsip(): void
+             ->assertOk()->assertSee('Surat Pengantar')->assertSee('SK Pembimbing')->assertSee('Versi surat balasan sebelumnya');
+         $this->actingAs($this->mahasiswa)->get(route('mahasiswa.berkas.index'))
+             ->assertOk()->assertSee('Surat Balasan TA yang Diunggah')->assertSee('010/UN9.FASILKOM/2026')->assertSee('055/UN9/SK/2026');
+-
+-        foreach (['surat-pengantar.terbit', 'surat-balasan.unggah', 'surat-balasan.periksa'] as $aksi) {
+-            $this->assertTrue(LogAktivitas::where('aksi', $aksi)->exists(), "log {$aksi}");
+-        }
+-        $this->assertSame(2, LogAktivitas::where('aksi', 'surat-balasan.unggah')->count());
+     }
+ 
+     // ---------------------------------------------------------------- pintu SK
+@@ -420,7 +413,6 @@ public function test_surat_pengantar_dapat_ditarik_hanya_selama_belum_ada_balasa
+         $this->actingAs($this->admin)->delete(route('admin.dokumen-resmi.destroy', [$p, $pengantar]))->assertSessionHasNoErrors();
+         $this->assertNull($p->fresh()->suratPengantarTa());
+         Storage::disk('local')->assertMissing($pengantar->path);
+-        $this->assertDatabaseHas('log_aktivitas', ['aksi' => 'surat-pengantar.hapus']);
+ 
+         // Boleh menerbitkan yang baru; setelah mahasiswa mengunggah balasan, tidak bisa ditarik lagi.
+         $this->terbitkanPengantar($p)->assertSessionHasNoErrors();

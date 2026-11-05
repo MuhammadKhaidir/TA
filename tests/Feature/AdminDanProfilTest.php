@@ -166,19 +166,6 @@ class AdminDanProfilTest extends TestCase
         $this->assertDatabaseMissing('persyaratan', ['id' => $kosong->id]);
     }
 
-    public function test_log_aktivitas_mencatat_tindakan_admin_dan_dapat_difilter(): void
-    {
-        $this->actingAs($this->admin)->post(route('admin.program-studi.store'), [
-            'kode' => 'LG', 'nama' => 'Program Log Uji', 'jenjang' => 'S1', 'aktif' => 1,
-        ]);
-
-        $this->assertDatabaseHas('log_aktivitas', ['user_id' => $this->admin->id, 'aksi' => 'prodi.buat']);
-
-        $this->actingAs($this->admin)->get(route('admin.log.index'))->assertOk()->assertSee('Program Log Uji');
-        $this->actingAs($this->admin)->get(route('admin.log.index', ['aksi' => 'prodi']))->assertOk()->assertSee('Program Log Uji');
-        $this->actingAs($this->admin)->get(route('admin.log.index', ['aksi' => 'auth']))->assertOk()->assertDontSee('Program Log Uji');
-    }
-
     public function test_dashboard_admin_menampilkan_jumlah_dari_database(): void
     {
         User::factory()->mahasiswa()->count(3)->create();

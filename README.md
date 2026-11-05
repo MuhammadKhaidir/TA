@@ -10,7 +10,7 @@ Dibangun dengan Laravel 13, Blade, Tailwind CSS v4 (lewat Vite), dan MySQL.
 |---|---|
 | Mahasiswa | Dashboard, Pengajuan KP, Pengajuan TA, Status Pengajuan, Berkas Saya |
 | Dosen | Dashboard, Pemeriksaan Berkas, Mahasiswa Bimbingan, Riwayat Pemeriksaan |
-| Admin | Dashboard, Verifikasi Administrasi, Pengelolaan KP/TA, Dokumen Resmi, Arsip Berkas, Manajemen Pengguna, Data Master, Pengaturan Persyaratan, Log Aktivitas |
+| Admin | Dashboard, Verifikasi Administrasi, Pengelolaan KP/TA, Dokumen Resmi, Arsip Berkas, Manajemen Pengguna, Data Master, Pengaturan Persyaratan |
 
 Admin memegang seluruh fungsi administrasi akademik (verifikasi, penetapan dosen pembimbing, dokumen resmi, arsip) sekaligus pengelolaan sistem. Peran operator akademik sudah dihapus dan digabung ke admin.
 
@@ -98,13 +98,13 @@ draft -> diajukan -> menunggu_dosen -> disetujui -> diarsipkan
      revisi_administrasi   revisi_akademik
 ```
 
-Setiap perubahan status disimpan di tabel `riwayat_status` (siapa, kapan, catatan) dan tampil sebagai riwayat di halaman detail. Tindakan penting juga masuk ke Log Aktivitas.
+Setiap perubahan status disimpan di tabel `riwayat_status` (siapa, kapan, catatan) dan tampil sebagai riwayat di halaman detail.
 
 Dokumen yang diunggah ulang disimpan sebagai versi baru; versi lama tetap ada sebagai jejak audit.
 
 ## Berkas SQL database
 
-Seluruh struktur database ada di migrasi (`database/migrations`, file PHP, itu cara Laravel membuat tabel). Untuk yang butuh file `.sql` biasa, tersedia `database/sql/arsip_kp_ta.sql`: struktur 20 tabel beserta data awal (3 program studi, 10 persyaratan, 5 akun contoh dengan kata sandi `password`).
+Seluruh struktur database ada di migrasi (`database/migrations`, file PHP, itu cara Laravel membuat tabel). Untuk yang butuh file `.sql` biasa, tersedia `database/sql/arsip_kp_ta.sql`: struktur 19 tabel beserta data awal (3 program studi, 10 persyaratan, 5 akun contoh dengan kata sandi `password`).
 
 ```
 mysql -u root -p < database/sql/arsip_kp_ta.sql
@@ -175,7 +175,7 @@ app/Services         PengajuanWorkflow: seluruh perpindahan status ada di sini
 app/Policies         Hak akses per pengajuan, dokumen, dan dokumen resmi
 app/Http/Middleware  EnsureRole, EnsureUserActive
 app/Http/Controllers Dipisah per peran: Mahasiswa, Dosen, Admin
-app/Support          Menu per peran, pencatat log aktivitas
+app/Support          Menu per peran
 database/migrations  Skema (migrasi tambahan, tidak mengubah migrasi bawaan Laravel)
 database/seeders     Program studi, persyaratan, dan akun contoh
 database/sql         Dump SQL lengkap (struktur dan data awal) untuk impor langsung ke MySQL
@@ -199,7 +199,7 @@ Jalankan perintah di atas untuk melihat hasil terkini. Cakupannya:
 - Alur KP lengkap dari draft sampai arsip, termasuk validasi unggahan (format dan ukuran), revisi administrasi dan akademik, versi dokumen, urutan riwayat status, dan penguncian setelah diarsipkan.
 - Akses berkas privat: pemilik, pembimbing, dan admin dapat membuka; mahasiswa lain, dosen lain, dan tamu ditolak; tidak ada URL publik.
 - Sinkronisasi data setelah admin mengubah mahasiswa, dosen, program studi, dan persyaratan.
-- CRUD admin (pengguna, program studi, persyaratan), validasi, perlindungan data yang dipakai, log aktivitas, profil, dan ganti kata sandi.
+- CRUD admin (pengguna, program studi, persyaratan), validasi, perlindungan data yang dipakai, profil, dan ganti kata sandi.
 - Alur dosen pembimbing: KP ditetapkan admin, TA dipilih mahasiswa lalu diterima atau ditolak dosen, penetapan pengganti dengan bimbingan paling sedikit, hak akses, dan dashboard mahasiswa.
 - Alur surat TA: surat pengantar hanya setelah verifikasi, surat balasan hanya setelah surat pengantar, SK tertahan sampai balasan diterima dan dosen menyetujui, revisi dan unggah ulang, keputusan usang ditolak, arsip TA mewajibkan SK, hak akses tiap peran, privasi berkas surat balasan, dan KP tidak terpengaruh.
 - Render semua halaman untuk setiap peran pada setiap status pengajuan dan status pembimbing, termasuk tujuh variasi keadaan surat TA.

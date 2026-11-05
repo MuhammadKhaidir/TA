@@ -9,7 +9,6 @@ use App\Enums\StatusPengajuan;
 use App\Models\Pengajuan;
 use App\Models\RiwayatPembimbing;
 use App\Models\User;
-use App\Support\Aktivitas;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -53,8 +52,7 @@ class PembimbingService
                 'status_pembimbing' => StatusPembimbing::Menunggu,
             ])->save();
 
-            $this->catat($pengajuan, $dosen, $oleh, StatusPembimbing::Menunggu, null,
-                "Memilih {$dosen->name} sebagai calon pembimbing TA #{$pengajuan->id}");
+            $this->catat($pengajuan, $dosen, $oleh, StatusPembimbing::Menunggu, null);
         });
     }
 
@@ -86,7 +84,6 @@ class PembimbingService
                 $dosen,
                 $terima ? StatusPembimbing::Diterima : StatusPembimbing::Ditolak,
                 $catatan,
-                ($terima ? 'Menerima' : 'Menolak')." permintaan pembimbing TA #{$pengajuan->id}",
             );
         });
     }
@@ -127,8 +124,7 @@ class PembimbingService
                 'status_pembimbing' => StatusPembimbing::Ditetapkan,
             ])->save();
 
-            $this->catat($pengajuan, $dosen, $admin, StatusPembimbing::Ditetapkan, $catatan,
-                "Menetapkan {$dosen->name} sebagai pembimbing {$pengajuan->jenis->singkat()} #{$pengajuan->id}");
+            $this->catat($pengajuan, $dosen, $admin, StatusPembimbing::Ditetapkan, $catatan);
         });
     }
 
@@ -163,7 +159,7 @@ class PembimbingService
             ->map(fn ($id) => (int) $id);
     }
 
-    private function catat(Pengajuan $pengajuan, ?User $dosen, ?User $oleh, StatusPembimbing $status, ?string $catatan, string $aktivitas): void
+    private function catat(Pengajuan $pengajuan, ?User $dosen, ?User $oleh, StatusPembimbing $status, ?string $catatan): void
     {
         RiwayatPembimbing::create([
             'pengajuan_id' => $pengajuan->id,
@@ -172,7 +168,5 @@ class PembimbingService
             'status' => $status,
             'catatan' => $catatan,
         ]);
-
-        Aktivitas::catat('pembimbing.'.$status->value, $aktivitas, $pengajuan, $oleh);
     }
 }

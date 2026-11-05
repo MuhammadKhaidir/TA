@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ProgramStudi;
-use App\Support\Aktivitas;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -29,9 +28,7 @@ class ProgramStudiController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $prodi = ProgramStudi::create($this->validasi($request));
-
-        Aktivitas::catat('prodi.buat', "Menambah program studi {$prodi->namaLengkap()}", $prodi);
+        ProgramStudi::create($this->validasi($request));
 
         return redirect()->route('admin.program-studi.index')->with('sukses', 'Program studi ditambahkan.');
     }
@@ -45,8 +42,6 @@ class ProgramStudiController extends Controller
     {
         $programStudi->update($this->validasi($request, $programStudi));
 
-        Aktivitas::catat('prodi.ubah', "Mengubah program studi {$programStudi->namaLengkap()}", $programStudi);
-
         return redirect()->route('admin.program-studi.index')->with('sukses', 'Program studi diperbarui.');
     }
 
@@ -56,10 +51,7 @@ class ProgramStudiController extends Controller
             return back()->with('galat', 'Program studi masih dipakai pengguna. Nonaktifkan atau pindahkan penggunanya terlebih dahulu.');
         }
 
-        $nama = $programStudi->namaLengkap();
         $programStudi->delete();
-
-        Aktivitas::catat('prodi.hapus', "Menghapus program studi {$nama}");
 
         return redirect()->route('admin.program-studi.index')->with('sukses', 'Program studi dihapus.');
     }

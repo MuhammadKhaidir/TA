@@ -6,7 +6,6 @@ use App\Enums\JenisPengajuan;
 use App\Enums\StatusPembimbing;
 use App\Enums\StatusPengajuan;
 use App\Enums\StatusTahapSurat;
-use App\Models\LogAktivitas;
 use App\Models\Pemeriksaan;
 use App\Models\Pengajuan;
 use App\Models\Persyaratan;
@@ -110,12 +109,11 @@ class DashboardController extends Controller
         $perRole = User::selectRaw('role, count(*) as total')->groupBy('role')->pluck('total', 'role');
         $jumlahProdi = ProgramStudi::count();
         $jumlahPersyaratan = Persyaratan::aktif()->count();
-        $logTerbaru = LogAktivitas::with('user')->orderByDesc('id')->limit(8)->get();
 
         return view('dashboard.admin', compact(
             'jumlah', 'antreanVerifikasi', 'perluDokumenResmi', 'jumlahPerluPembimbing', 'perluPembimbing',
             'jumlahPerluPengantar', 'jumlahBalasanMenunggu', 'antreanSurat',
-            'perRole', 'jumlahProdi', 'jumlahPersyaratan', 'logTerbaru',
+            'perRole', 'jumlahProdi', 'jumlahPersyaratan',
         ));
     }
 }

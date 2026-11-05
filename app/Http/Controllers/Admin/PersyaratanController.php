@@ -6,7 +6,6 @@ use App\Enums\JenisPengajuan;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\Persyaratan;
-use App\Support\Aktivitas;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -40,9 +39,7 @@ class PersyaratanController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $syarat = Persyaratan::create($this->validasi($request));
-
-        Aktivitas::catat('persyaratan.buat', "Menambah persyaratan {$syarat->nama} ({$syarat->jenis_pengajuan->singkat()})", $syarat);
+        Persyaratan::create($this->validasi($request));
 
         return redirect()->route('admin.persyaratan.index')->with('sukses', 'Persyaratan ditambahkan.');
     }
@@ -56,8 +53,6 @@ class PersyaratanController extends Controller
     {
         $persyaratan->update($this->validasi($request));
 
-        Aktivitas::catat('persyaratan.ubah', "Mengubah persyaratan {$persyaratan->nama} ({$persyaratan->jenis_pengajuan->singkat()})", $persyaratan);
-
         return redirect()->route('admin.persyaratan.index')->with('sukses', 'Persyaratan diperbarui.');
     }
 
@@ -67,10 +62,7 @@ class PersyaratanController extends Controller
             return back()->with('galat', 'Persyaratan ini sudah memiliki dokumen yang diunggah mahasiswa. Nonaktifkan saja agar riwayat tetap utuh.');
         }
 
-        $nama = $persyaratan->nama;
         $persyaratan->delete();
-
-        Aktivitas::catat('persyaratan.hapus', "Menghapus persyaratan {$nama}");
 
         return redirect()->route('admin.persyaratan.index')->with('sukses', 'Persyaratan dihapus.');
     }

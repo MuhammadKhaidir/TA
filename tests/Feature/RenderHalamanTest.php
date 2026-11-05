@@ -176,7 +176,7 @@ class RenderHalamanTest extends TestCase
                 route('admin.users.edit', $dosen), route('admin.users.edit', $admin),
                 route('admin.program-studi.index'), route('admin.program-studi.create'), route('admin.program-studi.edit', $prodi),
                 route('admin.persyaratan.index'), route('admin.persyaratan.create'), route('admin.persyaratan.edit', $syarat),
-                route('admin.log.index'), route('profil.show'),
+                route('profil.show'),
             ],
         ];
 

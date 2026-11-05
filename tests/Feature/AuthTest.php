@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Enums\Role;
-use App\Models\LogAktivitas;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -85,18 +84,6 @@ class AuthTest extends TestCase
 
         $this->get('/mahasiswa/dashboard')->assertRedirect(route('login'));
         $this->assertGuest();
-    }
-
-    public function test_login_dan_logout_tercatat_di_log_aktivitas(): void
-    {
-        $user = User::factory()->admin()->create();
-
-        $this->post('/login', ['login' => $user->email, 'password' => 'password']);
-        $this->post('/logout');
-
-        $this->assertDatabaseHas('log_aktivitas', ['user_id' => $user->id, 'aksi' => 'auth.login']);
-        $this->assertDatabaseHas('log_aktivitas', ['user_id' => $user->id, 'aksi' => 'auth.logout']);
-        $this->assertSame(2, LogAktivitas::count());
     }
 
     public function test_pengguna_login_tidak_dapat_membuka_halaman_login_lagi(): void

@@ -244,7 +244,6 @@ class AlurPengajuanTest extends TestCase
             'revisi_akademik', 'menunggu_dosen', 'disetujui', 'diarsipkan',
         ], $this->urutanStatus($p));
         $this->assertSame($this->admin->id, (int) $p->riwayat->last()->user_id);
-        $this->assertDatabaseHas('log_aktivitas', ['aksi' => 'pengajuan.status']);
 
         // 11. Setelah diarsipkan: mahasiswa tidak dapat mengubah apa pun; arsip tampil bagi yang berwenang.
         $this->unggah($p, $wajib->first())->assertForbidden();

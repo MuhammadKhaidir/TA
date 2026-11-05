@@ -11,7 +11,6 @@ use App\Models\Persyaratan;
 use App\Models\User;
 use App\Services\PembimbingService;
 use App\Services\PengajuanWorkflow;
-use App\Support\Aktivitas;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -138,8 +137,6 @@ class PengajuanController extends Controller
             }
         });
 
-        Aktivitas::catat('pengajuan.ubah', "Mengubah data pengajuan {$pengajuan->jenis->singkat()} #{$pengajuan->id}", $pengajuan);
-
         return redirect()->route('mahasiswa.pengajuan.show', $pengajuan)->with('sukses', 'Data pengajuan diperbarui.');
     }
 
@@ -162,8 +159,6 @@ class PengajuanController extends Controller
 
         Storage::disk('local')->deleteDirectory("pengajuan/{$id}");
         $pengajuan->delete();
-
-        Aktivitas::catat('pengajuan.hapus', "Menghapus draft pengajuan {$jenis->singkat()} #{$id}");
 
         return redirect()->route('mahasiswa.pengajuan.index', $jenis->value)->with('sukses', 'Draft pengajuan dihapus.');
     }

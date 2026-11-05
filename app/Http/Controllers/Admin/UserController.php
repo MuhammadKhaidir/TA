@@ -6,7 +6,6 @@ use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\ProgramStudi;
 use App\Models\User;
-use App\Support\Aktivitas;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -57,9 +56,7 @@ class UserController extends Controller
     {
         $data = $this->validasi($request);
 
-        $user = User::create($data);
-
-        Aktivitas::catat('pengguna.buat', "Menambah pengguna {$user->name} ({$user->role->label()})", $user);
+        User::create($data);
 
         return redirect()->route('admin.users.index')->with('sukses', 'Pengguna berhasil ditambahkan.');
     }
@@ -86,8 +83,6 @@ class UserController extends Controller
 
         $user->update($data);
 
-        Aktivitas::catat('pengguna.ubah', "Mengubah data pengguna {$user->name}", $user);
-
         return redirect()->route('admin.users.index')->with('sukses', 'Data pengguna diperbarui.');
     }
 
@@ -104,8 +99,6 @@ class UserController extends Controller
         } catch (QueryException) {
             return back()->with('galat', "{$nama} sudah memiliki data pengajuan atau pemeriksaan sehingga tidak dapat dihapus. Nonaktifkan akunnya melalui menu ubah.");
         }
-
-        Aktivitas::catat('pengguna.hapus', "Menghapus pengguna {$nama}");
 
         return redirect()->route('admin.users.index')->with('sukses', 'Pengguna dihapus.');
     }

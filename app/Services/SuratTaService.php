@@ -8,7 +8,6 @@ use App\Models\DokumenResmi;
 use App\Models\Pengajuan;
 use App\Models\SuratBalasan;
 use App\Models\User;
-use App\Support\Aktivitas;
 use Carbon\CarbonInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +17,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Alur surat Tugas Akhir. Hak melakukan tiap langkah diputuskan PengajuanPolicy sebelum
- * kelas ini dipanggil; kelas ini mengerjakan penyimpanan berkas, pencatatan, dan log.
+ * kelas ini dipanggil; kelas ini mengerjakan penyimpanan berkas dan pencatatan.
  *
  *   surat pengantar (admin) -> surat balasan (mahasiswa) -> pemeriksaan admin -> SK pembimbing
  */
@@ -43,13 +42,6 @@ class SuratTaService
 
         $pengajuan->unsetRelation('dokumenResmi');
 
-        Aktivitas::catat(
-            'surat-pengantar.terbit',
-            "Menerbitkan surat pengantar TA nomor {$nomor} untuk pengajuan TA #{$pengajuan->id}",
-            $dokumen,
-            $admin,
-        );
-
         return $dokumen;
     }
 
@@ -59,13 +51,6 @@ class SuratTaService
         Storage::disk('local')->delete($pengantar->path);
         $pengantar->delete();
         $pengajuan->unsetRelation('dokumenResmi');
-
-        Aktivitas::catat(
-            'surat-pengantar.hapus',
-            "Menarik surat pengantar TA nomor {$pengantar->nomor} dari pengajuan TA #{$pengajuan->id}",
-            $pengajuan,
-            $admin,
-        );
     }
 
     /**
@@ -95,13 +80,6 @@ class SuratTaService
         });
 
         $pengajuan->unsetRelation('suratBalasan');
-
-        Aktivitas::catat(
-            'surat-balasan.unggah',
-            "Mengunggah surat balasan TA (versi {$balasan->versi}) untuk pengajuan TA #{$pengajuan->id}",
-            $balasan,
-            $mahasiswa,
-        );
 
         return $balasan;
     }
@@ -135,13 +113,6 @@ class SuratTaService
         ]);
 
         $pengajuan->unsetRelation('suratBalasan');
-
-        Aktivitas::catat(
-            'surat-balasan.periksa',
-            "Surat balasan TA (versi {$balasan->versi}) pengajuan TA #{$pengajuan->id}: {$keputusan->label()}",
-            $balasan,
-            $admin,
-        );
 
         return $balasan;
     }

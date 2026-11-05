@@ -101,7 +101,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/arsip', [Admin\ArsipController::class, 'index'])->name('arsip.index');
         Route::get('/arsip/{pengajuan}', [Admin\ArsipController::class, 'show'])->name('arsip.show');
 
-        // Manajemen pengguna, data master, persyaratan, dan log aktivitas.
+        // Manajemen pengguna, data master, dan persyaratan.
         Route::resource('pengguna', Admin\UserController::class)
             ->except('show')
             ->parameters(['pengguna' => 'user'])
@@ -118,7 +118,5 @@ Route::middleware('auth')->group(function () {
             ->except('show')
             ->parameters(['persyaratan' => 'persyaratan'])
             ->names('persyaratan');
-
-        Route::get('/log-aktivitas', [Admin\LogAktivitasController::class, 'index'])->name('log.index');
     });
 });

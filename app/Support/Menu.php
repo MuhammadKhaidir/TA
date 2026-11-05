@@ -40,7 +40,6 @@ class Menu
                 ['Manajemen Pengguna', route('admin.users.index'), 'users', request()->routeIs('admin.users.*')],
                 ['Data Master', route('admin.program-studi.index'), 'database', request()->routeIs('admin.program-studi.*')],
                 ['Pengaturan Persyaratan', route('admin.persyaratan.index'), 'sliders', request()->routeIs('admin.persyaratan.*')],
-                ['Log Aktivitas', route('admin.log.index'), 'activity', request()->routeIs('admin.log.*')],
             ],
         };
 

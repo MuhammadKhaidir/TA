@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Support\Aktivitas;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -29,8 +28,6 @@ class ProfilController extends Controller
 
         $request->user()->update(['no_hp' => $data['no_hp'] ?? null]);
 
-        Aktivitas::catat('profil.ubah', 'Memperbarui nomor HP pada profil', $request->user());
-
         return back()->with('sukses', 'Profil berhasil diperbarui.');
     }
 
@@ -42,8 +39,6 @@ class ProfilController extends Controller
         ]);
 
         $request->user()->update(['password' => $request->input('password')]);
-
-        Aktivitas::catat('profil.password', 'Mengganti kata sandi', $request->user());
 
         return back()->with('sukses', 'Kata sandi berhasil diganti.');
     }
