@@ -1,0 +1,29 @@
+diff --git a/README.md b/README.md
+index 1b4a71e..faea472 100644
+--- a/README.md
++++ b/README.md
+@@ -74,7 +74,7 @@ ## Akun contoh
+ |---|---|
+ | Admin | admin@fasilkom.test |
+ | Dosen | dosen1@fasilkom.test, dosen2@fasilkom.test |
+-| Mahasiswa | mahasiswa1@fasilkom.test, mahasiswa2@fasilkom.test |
++| Mahasiswa | mahasiswa1@fasilkom.test, mahasiswa2@fasilkom.test, mahasiswa3@fasilkom.test |
+ 
+ Bila database Anda dibuat sebelum peran operator digabung ke admin, jalankan `php artisan migrate`: migrasi `gabungkan_operator_ke_admin` mengubah akun operator lama menjadi admin (akun, kata sandi, dan riwayat kerjanya tetap).
+ 
+diff --git a/database/seeders/UserSeeder.php b/database/seeders/UserSeeder.php
+index ef0b878..43cc9ee 100644
+--- a/database/seeders/UserSeeder.php
++++ b/database/seeders/UserSeeder.php
+@@ -40,6 +40,11 @@ public function run(): void
+                 'role' => Role::Mahasiswa, 'nomor_induk' => '09021282227002',
+                 'program_studi_id' => $prodi['SI'] ?? null, 'angkatan' => 2022,
+             ],
++            [
++                'name' => 'Dimas Saputra', 'email' => 'mahasiswa3@fasilkom.test',
++                'role' => Role::Mahasiswa, 'nomor_induk' => '09021282328003',
++                'program_studi_id' => $prodi['SK'] ?? null, 'angkatan' => 2023,
++            ],
+         ];
+ 
+         foreach ($akun as $data) {

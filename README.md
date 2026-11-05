@@ -74,7 +74,7 @@ Dibuat oleh `php artisan migrate --seed`. Kata sandi semuanya `password`.
 |---|---|
 | Admin | admin@fasilkom.test |
 | Dosen | dosen1@fasilkom.test, dosen2@fasilkom.test |
-| Mahasiswa | mahasiswa1@fasilkom.test, mahasiswa2@fasilkom.test |
+| Mahasiswa | mahasiswa1@fasilkom.test, mahasiswa2@fasilkom.test, mahasiswa3@fasilkom.test |
 
 Bila database Anda dibuat sebelum peran operator digabung ke admin, jalankan `php artisan migrate`: migrasi `gabungkan_operator_ke_admin` mengubah akun operator lama menjadi admin (akun, kata sandi, dan riwayat kerjanya tetap).
 

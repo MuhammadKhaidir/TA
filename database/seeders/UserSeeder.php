@@ -40,6 +40,11 @@ class UserSeeder extends Seeder
                 'role' => Role::Mahasiswa, 'nomor_induk' => '09021282227002',
                 'program_studi_id' => $prodi['SI'] ?? null, 'angkatan' => 2022,
             ],
+            [
+                'name' => 'Dimas Saputra', 'email' => 'mahasiswa3@fasilkom.test',
+                'role' => Role::Mahasiswa, 'nomor_induk' => '09021282328003',
+                'program_studi_id' => $prodi['SK'] ?? null, 'angkatan' => 2023,
+            ],
         ];
 
         foreach ($akun as $data) {
