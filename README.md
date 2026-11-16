@@ -2,7 +2,7 @@
 
 Aplikasi web untuk mengelola pengajuan, pemeriksaan, dan pengarsipan berkas Kerja Praktik (KP) dan Tugas Akhir (TA) di Fakultas Ilmu Komputer, Universitas Sriwijaya.
 
-Dibangun dengan Laravel 13, Blade, Tailwind CSS v4 (lewat Vite), dan MySQL.
+Dibangun dengan Laravel 13, Blade, Tailwind CSS v4 (lewat Vite), dan SQLite (MySQL tetap bisa dipakai).
 
 ## Peran pengguna
 
@@ -18,10 +18,10 @@ Semua peran juga punya Profil dan Logout. Hak akses dijaga di backend (middlewar
 
 ## Kebutuhan
 
-- PHP 8.3 atau lebih baru, dengan ekstensi `pdo_mysql`, `mbstring`, `fileinfo`, `openssl`, `ctype`, `tokenizer`, `xml`
+- PHP 8.3 atau lebih baru, dengan ekstensi `pdo_sqlite`, `mbstring`, `fileinfo`, `openssl`, `ctype`, `tokenizer`, `xml`
 - Composer 2
 - Node.js 20.19+ atau 22.12+ (untuk Vite 8) dan npm
-- MySQL 8 atau MariaDB 10.6+
+- Opsional: MySQL 8 atau MariaDB 10.6+ (hanya bila tidak memakai SQLite; tambah ekstensi `pdo_mysql`)
 
 ## Cara menjalankan
 
@@ -35,13 +35,9 @@ composer install
 cp .env.example .env
 php artisan key:generate
 
-# 3. Buat database kosong di MySQL, mis. lewat phpMyAdmin atau:
-#    CREATE DATABASE arsip_kp_ta CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-#    lalu sesuaikan DB_USERNAME dan DB_PASSWORD di file .env
-
-# 4. Buat tabel dan isi data awal
-php artisan migrate --seed
-#    (alternatif tanpa artisan: impor database/sql/arsip_kp_ta.sql, lihat bagian "Berkas SQL database")
+# 3. Database: tidak ada yang perlu dibuat. database/database.sqlite sudah berisi tabel dan data awal
+#    (bisa dibuka langsung di DB Browser for SQLite). Pastikan .env memakai DB_CONNECTION=sqlite.
+#    Memakai MySQL? Lihat bagian "Berkas SQL database".
 
 # 5. Pasang dan bangun aset Tailwind
 npm install
@@ -102,7 +98,19 @@ Setiap perubahan status disimpan di tabel `riwayat_status` (siapa, kapan, catata
 
 Dokumen yang diunggah ulang disimpan sebagai versi baru; versi lama tetap ada sebagai jejak audit.
 
-## Berkas SQL database
+## Database SQLite (yang dipakai aplikasi)
+
+Aplikasi memakai `database/database.sqlite`, sudah berisi struktur 19 tabel dan data awal (3 program studi, 10 persyaratan, 6 akun contoh dengan kata sandi `password`). Buka file itu di DB Browser for SQLite (File > Open Database). Tutup atau klik Write Changes di DB Browser sebelum menjalankan aplikasi supaya database tidak terkunci.
+
+Untuk mengembalikan ke kondisi awal (semua data yang sudah ditambahkan hilang):
+
+```
+git checkout -- database/database.sqlite
+```
+
+Atau bangun ulang dari nol lewat Laravel: hapus isi file itu, lalu `php artisan migrate:fresh --seed`. Cadangan dalam bentuk teks ada di `database/sql/arsip_kp_ta.sqlite.sql` (impor lewat DB Browser: File > Import > Database from SQL file, atau `sqlite3 database/database.sqlite < database/sql/arsip_kp_ta.sqlite.sql` pada file kosong).
+
+## Berkas SQL database (MySQL)
 
 Seluruh struktur database ada di migrasi (`database/migrations`, file PHP, itu cara Laravel membuat tabel). Untuk yang butuh file `.sql` biasa, tersedia `database/sql/arsip_kp_ta.sql`: struktur 19 tabel beserta data awal (3 program studi, 10 persyaratan, 5 akun contoh dengan kata sandi `password`).
 
@@ -178,7 +186,8 @@ app/Http/Controllers Dipisah per peran: Mahasiswa, Dosen, Admin
 app/Support          Menu per peran
 database/migrations  Skema (migrasi tambahan, tidak mengubah migrasi bawaan Laravel)
 database/seeders     Program studi, persyaratan, dan akun contoh
-database/sql         Dump SQL lengkap (struktur dan data awal) untuk impor langsung ke MySQL
+database/database.sqlite  Database SQLite yang dipakai aplikasi (struktur dan data awal)
+database/sql         Dump SQL lengkap (struktur dan data awal): MySQL (arsip_kp_ta.sql) dan SQLite (arsip_kp_ta.sqlite.sql)
 resources/views      Blade: layouts, partials, components, halaman per peran
 lang/id              Terjemahan validasi dan teks antarmuka
 tests/Feature        Uji otomatis
@@ -190,7 +199,7 @@ tests/Feature        Uji otomatis
 php artisan test
 ```
 
-Uji memakai SQLite in-memory (butuh ekstensi `pdo_sqlite`), jadi tidak menyentuh database MySQL Anda.
+Uji memakai SQLite in-memory (butuh ekstensi `pdo_sqlite`), jadi tidak menyentuh database/database.sqlite Anda.
 
 Jalankan perintah di atas untuk melihat hasil terkini. Cakupannya:
 

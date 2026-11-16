@@ -1,5 +1,7 @@
 * text=auto eol=lf
 
+*.sqlite binary
+
 *.blade.php diff=html
 *.css diff=css
 *.html diff=html
