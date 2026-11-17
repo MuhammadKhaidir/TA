@@ -1,0 +1,85 @@
+diff --git a/api/index.php b/api/index.php
+index 30063aa..2fae4ce 100644
+--- a/api/index.php
++++ b/api/index.php
+@@ -19,6 +19,80 @@
+ | di Vercel; mode demo otomatis tidak dipakai dan sesi/cache memakai database.
+ */
+ 
++/*
++| Berkas statis (aset Vite di public/build, gambar, css). Berkas hasil `composer vercel` ada di bundel
++| fungsi tetapi tidak otomatis disajikan CDN Vercel, jadi disajikan di sini sebelum Laravel menyala.
++| Hanya berkas di dalam public/ dengan ekstensi yang diizinkan; berkas .php dan dotfile tidak pernah.
++*/
++(static function (): void {
++    $metode = $_SERVER['REQUEST_METHOD'] ?? 'GET';
++
++    if (! in_array($metode, ['GET', 'HEAD'], true)) {
++        return;
++    }
++
++    $jalur = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
++
++    if (! is_string($jalur) || $jalur === '/') {
++        return;
++    }
++
++    $jalur = rawurldecode($jalur);
++
++    if (str_contains($jalur, "\0") || str_contains($jalur, '..') || preg_match('#(^|/)\.#', $jalur) === 1) {
++        return;
++    }
++
++    $tipe = [
++        'css' => 'text/css; charset=utf-8',
++        'js' => 'text/javascript; charset=utf-8',
++        'mjs' => 'text/javascript; charset=utf-8',
++        'json' => 'application/json',
++        'map' => 'application/json',
++        'png' => 'image/png',
++        'jpg' => 'image/jpeg',
++        'jpeg' => 'image/jpeg',
++        'gif' => 'image/gif',
++        'webp' => 'image/webp',
++        'avif' => 'image/avif',
++        'svg' => 'image/svg+xml',
++        'ico' => 'image/x-icon',
++        'woff' => 'font/woff',
++        'woff2' => 'font/woff2',
++        'ttf' => 'font/ttf',
++        'otf' => 'font/otf',
++        'txt' => 'text/plain; charset=utf-8',
++    ];
++
++    $ekstensi = strtolower(pathinfo($jalur, PATHINFO_EXTENSION));
++
++    if (! isset($tipe[$ekstensi])) {
++        return;
++    }
++
++    $akar = realpath(__DIR__.'/../public');
++    $berkas = $akar === false ? false : realpath($akar.$jalur);
++
++    if ($berkas === false || ! str_starts_with($berkas, $akar.DIRECTORY_SEPARATOR) || ! is_file($berkas)) {
++        return;
++    }
++
++    // Nama berkas di build/assets memuat hash isinya, jadi aman di-cache selamanya.
++    $abadi = str_starts_with($jalur, '/build/assets/');
++    $umur = $abadi ? 31536000 : 3600;
++
++    header('Content-Type: '.$tipe[$ekstensi]);
++    header('X-Content-Type-Options: nosniff');
++    header("Cache-Control: public, max-age={$umur}, s-maxage={$umur}".($abadi ? ', immutable' : ''));
++    header('Content-Length: '.filesize($berkas));
++
++    if ($metode === 'GET') {
++        readfile($berkas);
++    }
++
++    exit;
++})();
++
+ define('LARAVEL_START', microtime(true));
+ 
+ $ambil = static function (string $kunci): ?string {
