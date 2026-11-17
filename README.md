@@ -120,7 +120,9 @@ Atau bangun ulang dari nol lewat Laravel: hapus isi file itu, lalu `php artisan 
 
 ### Data tidak muncul di DB Browser?
 
-Gejala: pengajuan dan dokumen terlihat di aplikasi (misalnya di dashboard admin), tetapi tabel `pengajuan` atau `dokumen_pengajuan` di DB Browser kosong. Aplikasi hanya menulis ke database yang ditunjuk `.env`, dan `.env` tidak ikut git (lihat `.gitignore`). Versi lama proyek ini memakai MySQL, jadi `.env` yang dibuat saat itu tetap memakai MySQL walaupun `.env.example` sudah SQLite. Penyebab lain yang umum: aplikasi dijalankan dari folder salinan lain, atau DB Browser belum di-refresh.
+Gejala: pengajuan dan dokumen terlihat di aplikasi (misalnya di dashboard admin), tetapi tabel `pengajuan` atau `dokumen_pengajuan` di DB Browser kosong. Aplikasi hanya menulis ke database yang ditunjuk `.env`, dan `.env` tidak ikut git (lihat `.gitignore`). Versi lama proyek ini memakai MySQL, jadi `.env` yang dibuat saat itu tidak berubah sendiri walaupun `.env.example` sudah SQLite.
+
+Penyebab yang paling sering: `DB_CONNECTION` sudah diganti ke `sqlite`, tetapi baris `DB_DATABASE=arsip_kp_ta` masih tertinggal. Pada SQLite, nilai itu dibaca sebagai nama berkas database. Laravel lalu memakai berkas bernama `arsip_kp_ta` di folder proyek, bukan `database/database.sqlite`. Berkas itu bisa muncul sendiri: `php artisan migrate` menawarkan membuatnya ("Would you like to create it?"), lalu mengisinya dengan tabel dan data awal. Cirinya, ada berkas `arsip_kp_ta` tanpa ekstensi di folder proyek (terlihat sebagai untracked di `git status`). Penyebab lain: konfigurasi lama masih tersimpan (`config:cache`), aplikasi dijalankan dari folder salinan lain, atau DB Browser belum di-refresh.
 
 Periksa database yang sedang dipakai aplikasi, dari folder proyek:
 
@@ -130,11 +132,11 @@ php artisan db:show
 
 Hasilnya harus menunjukkan SQLite dengan lokasi `database/database.sqlite` di folder yang sama dengan yang dibuka di DB Browser. Bila tidak:
 
-1. Di `.env`, ubah menjadi `DB_CONNECTION=sqlite`, lalu hapus atau beri tanda `#` pada `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, dan `DB_PASSWORD`.
+1. Di `.env`, pastikan `DB_CONNECTION=sqlite`, lalu hapus atau beri tanda `#` pada `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, dan `DB_PASSWORD`.
 2. Jalankan `php artisan config:clear`, lalu hentikan dan jalankan ulang `php artisan serve`.
 3. Di DB Browser, klik tombol Refresh di tab Browse Data (DB Browser tidak memperbarui tampilan sendiri).
 
-Data yang sudah tersimpan di MySQL tidak berpindah ke SQLite. Daftar dan ajukan ulang akun uji, atau pindahkan datanya lebih dulu.
+Data yang sudah tersimpan di berkas `arsip_kp_ta` atau di MySQL tidak berpindah ke `database/database.sqlite`. Untuk berkas `arsip_kp_ta`: hentikan `php artisan serve`, tutup DB Browser, lalu salin berkas itu menimpa `database/database.sqlite` (Windows: `copy /Y arsip_kp_ta database\database.sqlite`). Hapus `arsip_kp_ta` setelah yakin datanya sudah ada di tempat baru. Untuk MySQL: daftar dan ajukan ulang akun uji.
 
 ## Berkas SQL database (MySQL)
 

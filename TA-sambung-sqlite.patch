@@ -1,0 +1,40 @@
+diff --git a/config/database.php b/config/database.php
+index abbb88e..a5008dc 100644
+--- a/config/database.php
++++ b/config/database.php
+@@ -3,6 +3,26 @@
+ use Illuminate\Support\Str;
+ use Pdo\Mysql;
+ 
++/*
++| Berkas database SQLite. DB_DATABASE hanya dipakai bila berupa jalur berkas (database/data.sqlite,
++| C:\...\data.sqlite), ":memory:" (dipakai phpunit), atau URI "file:". Sisa konfigurasi MySQL seperti
++| DB_DATABASE=arsip_kp_ta diabaikan: Laravel akan membacanya sebagai nama berkas SQLite, lalu diam-diam
++| memakai (atau lewat "php artisan migrate" membuat) berkas bernama arsip_kp_ta di folder proyek, bukan
++| database/database.sqlite. Koneksi mysql, mariadb, dan pgsql tetap memakai DB_DATABASE apa adanya.
++*/
++$sqliteDatabase = env('DB_DATABASE');
++
++if (! is_string($sqliteDatabase) || ! (
++    $sqliteDatabase === ':memory:'
++    || str_contains($sqliteDatabase, 'mode=memory')
++    || str_starts_with($sqliteDatabase, 'file:')
++    || str_contains($sqliteDatabase, '/')
++    || str_contains($sqliteDatabase, '\\')
++    || preg_match('/\.(sqlite3?|db)$/i', $sqliteDatabase) === 1
++)) {
++    $sqliteDatabase = database_path('database.sqlite');
++}
++
+ return [
+ 
+     /*
+@@ -35,7 +55,7 @@
+         'sqlite' => [
+             'driver' => 'sqlite',
+             'url' => env('DB_URL'),
+-            'database' => env('DB_DATABASE', database_path('database.sqlite')),
++            'database' => $sqliteDatabase,
+             'prefix' => '',
+             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
+             'busy_timeout' => null,
