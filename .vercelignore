@@ -1,0 +1,12 @@
+/.git
+/.env
+/.env.*
+/node_modules
+/vendor
+/tests
+/storage/logs
+/database/sql
+/public/hot
+/public/index.php
+/public/.htaccess
+*.patch

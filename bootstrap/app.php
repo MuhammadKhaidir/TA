@@ -30,6 +30,11 @@ return Application::configure(basePath: dirname(__DIR__))
             prepend: EnsureRole::class,
         );
 
+        // Di Vercel, TLS dihentikan oleh proxy Vercel. Tanpa ini, URL aset dan redirect dibuat dengan http://.
+        if (env('VERCEL')) {
+            $middleware->trustProxies(at: '*');
+        }
+
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo(fn () => route('dashboard'));
     })

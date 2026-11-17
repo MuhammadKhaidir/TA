@@ -260,3 +260,21 @@ Hal berikut belum bisa diuji di lingkungan pengembangan dan sebaiknya Anda cek s
 ## Menempelkan ke proyek Laravel yang sudah ada
 
 Kode ini ditulis untuk Laravel 13 dan Tailwind v4. Jika Anda sudah punya proyek Laravel 13 dengan skeleton standar, salin folder `app`, `database`, `lang`, `resources`, `routes`, `tests`, serta file `bootstrap/app.php`, `config/app.php`, `config/filesystems.php`, `vite.config.js`, `phpunit.xml`, dan `.env.example` (cocokkan isinya dengan milik Anda, jangan menimpa begitu saja jika sudah ada perubahan). Migrasi bersifat tambahan: tabel `users` ditambah kolom, bukan dibuat ulang. Setelah itu jalankan `php artisan migrate --seed`.
+
+## Deploy ke Vercel
+
+Konfigurasinya sudah ada di repo: `vercel.json` (runtime `vercel-php@0.8.0`, PHP 8.4), `api/index.php` (pintu masuk Laravel di Vercel), `.vercelignore`, dan skrip `vercel` di `composer.json` (membangun aset Vite ke dalam bundel fungsi).
+
+1. Di Vercel: Add New > Project, impor repo ini. Framework Preset dan Build Command dibiarkan, sudah diatur oleh `vercel.json`.
+2. Di Settings > Environment Variables isi `APP_KEY` (hasil `php artisan key:generate --show`) dan `APP_URL` (alamat situs di Vercel).
+3. Deploy.
+
+Tanpa pengaturan lain, aplikasi berjalan dalam **mode demo**: `database/database.sqlite` disalin ke `/tmp`, sesi memakai cookie, dan berkas unggahan disimpan di `/tmp`. Isi `/tmp` hilang saat instance fungsi berganti dan tidak dibagi antar-instance, jadi data baru (akun, pengajuan, dokumen) tidak permanen. Cukup untuk demo atau presentasi.
+
+Untuk data permanen, isi `DB_CONNECTION` (`mysql` atau `pgsql`) beserta `DB_URL` atau `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` di Vercel. Mode demo otomatis tidak dipakai, sesi dan cache memakai database. Muat dulu struktur dan data awal ke database itu (untuk MySQL: `database/sql/arsip_kp_ta.sql`, atau `php artisan migrate --seed` dari komputer Anda dengan `.env` yang menunjuk ke database tersebut).
+
+Batasan di Vercel:
+
+- Berkas unggahan masih di `/tmp` (disk `local`), jadi tidak permanen walaupun database sudah permanen. Penyimpanan permanen perlu disk S3 dan perubahan kode, karena aplikasi memanggil `Storage::disk('local')` secara langsung.
+- Batas ukuran request ke fungsi Vercel adalah 4,5 MB, lebih kecil dari batas dokumen 5 MB di Pengaturan Persyaratan.
+- Perubahan skema harus dipasang sendiri ke database yang dipakai; Vercel tidak menjalankan `migrate`. Pada mode demo, perbarui `database/database.sqlite` di repo.
