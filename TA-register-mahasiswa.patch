@@ -1,0 +1,430 @@
+diff --git a/README.md b/README.md
+index 06f6fa3..4bea917 100644
+--- a/README.md
++++ b/README.md
+@@ -76,6 +76,12 @@ ## Akun contoh
+ 
+ Login juga bisa memakai nomor induk (NIM/NIP). **Ganti kata sandi atau hapus akun ini sebelum aplikasi dipakai sungguhan.**
+ 
++## Pendaftaran mahasiswa
++
++Mahasiswa bisa membuat akun sendiri di `/daftar` (tautan "Daftar" ada di halaman login). Yang diisi: nama, email, NIM (angka saja), angkatan, program studi (hanya prodi aktif), dan kata sandi minimal 8 karakter. Akun yang jadi selalu berperan mahasiswa dan langsung aktif, lalu pendaftar otomatis masuk ke dashboard. Email disimpan huruf kecil, dan email atau NIM yang sudah terdaftar ditolak.
++
++Akun dosen dan admin tidak bisa dibuat lewat halaman ini; admin membuatnya di Manajemen Pengguna. Akun mahasiswa hasil pendaftaran muncul di Manajemen Pengguna dan bisa dinonaktifkan admin lewat menu ubah.
++
+ Seeder memakai `firstOrCreate`, jadi aman dijalankan ulang dan tidak menimpa data yang sudah diubah admin. Program studi dan persyaratan contoh di seeder dapat diubah dari menu Admin.
+ 
+ ## Alur sistem
+diff --git a/app/Http/Controllers/Auth/RegisterController.php b/app/Http/Controllers/Auth/RegisterController.php
+new file mode 100644
+index 0000000..cc97357
+--- /dev/null
++++ b/app/Http/Controllers/Auth/RegisterController.php
+@@ -0,0 +1,75 @@
++<?php
++
++namespace App\Http\Controllers\Auth;
++
++use App\Enums\Role;
++use App\Http\Controllers\Controller;
++use App\Models\ProgramStudi;
++use App\Models\User;
++use Illuminate\Database\UniqueConstraintViolationException;
++use Illuminate\Http\RedirectResponse;
++use Illuminate\Http\Request;
++use Illuminate\Support\Facades\Auth;
++use Illuminate\Validation\Rule;
++use Illuminate\Validation\ValidationException;
++use Illuminate\View\View;
++
++/**
++ * Pendaftaran mandiri khusus mahasiswa. Akun dosen dan admin tetap dibuat admin lewat Manajemen Pengguna.
++ *
++ * Role dan status aktif ditetapkan di sini (bukan dari input), jadi pendaftar tidak bisa
++ * membuat akun dengan role lain meskipun mengirim field "role" secara manual.
++ */
++class RegisterController extends Controller
++{
++    public function create(): View
++    {
++        return view('auth.register', [
++            'prodi' => ProgramStudi::aktif()->orderBy('nama')->get(),
++        ]);
++    }
++
++    public function store(Request $request): RedirectResponse
++    {
++        // Email disimpan huruf kecil supaya pengecekan unik tidak bisa dilewati dengan beda huruf besar/kecil.
++        $request->merge(['email' => mb_strtolower((string) $request->input('email'))]);
++
++        $data = $request->validate([
++            'name' => ['required', 'string', 'max:255'],
++            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
++            'nomor_induk' => ['required', 'string', 'max:30', 'regex:/^[0-9]+$/', Rule::unique('users', 'nomor_induk')],
++            'program_studi_id' => ['required', 'integer', Rule::exists('program_studi', 'id')->where('aktif', true)],
++            'angkatan' => ['required', 'integer', 'min:1990', 'max:'.now()->year],
++            'password' => ['required', 'string', 'min:8', 'confirmed'],
++        ], [
++            'nomor_induk.regex' => 'NIM hanya boleh berisi angka.',
++            'nomor_induk.unique' => 'NIM ini sudah terdaftar. Jika Anda belum pernah mendaftar, hubungi admin.',
++        ], [
++            'nomor_induk' => 'NIM',
++        ]);
++
++        try {
++            $user = User::create([
++                'name' => $data['name'],
++                'email' => $data['email'],
++                'nomor_induk' => $data['nomor_induk'],
++                'program_studi_id' => $data['program_studi_id'],
++                'angkatan' => $data['angkatan'],
++                'password' => $data['password'],
++                'role' => Role::Mahasiswa,
++                'aktif' => true,
++            ]);
++        } catch (UniqueConstraintViolationException) {
++            // Dua pendaftaran dengan data sama yang masuk bersamaan: pengecekan di atas lolos untuk keduanya.
++            throw ValidationException::withMessages([
++                'nomor_induk' => 'NIM atau email ini baru saja didaftarkan. Silakan masuk, atau hubungi admin.',
++            ]);
++        }
++
++        Auth::login($user);
++        $request->session()->regenerate();
++
++        // Langsung ke dashboard mahasiswa (bukan lewat /dashboard yang meneruskan lagi), supaya pesan sukses tidak hilang.
++        return redirect()->route('mahasiswa.dashboard')->with('sukses', 'Akun berhasil dibuat. Selamat datang, '.$user->name.'.');
++    }
++}
+diff --git a/resources/views/auth/login.blade.php b/resources/views/auth/login.blade.php
+index 8277ea0..f3decee 100644
+--- a/resources/views/auth/login.blade.php
++++ b/resources/views/auth/login.blade.php
+@@ -58,4 +58,9 @@ class="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-ink-500 t
+ 
+         <button type="submit" class="btn btn-primary w-full rounded-lg py-[clamp(0.5rem,1.6vh,0.75rem)] font-serif">Masuk</button>
+     </form>
++
++    <p class="mt-[clamp(0.75rem,2.5vh,1.25rem)] text-center font-serif text-sm text-ink-700">
++        Mahasiswa dan belum punya akun?
++        <a href="{{ route('register') }}" class="tautan font-semibold underline underline-offset-2">Daftar</a>
++    </p>
+ @endsection
+diff --git a/resources/views/auth/register.blade.php b/resources/views/auth/register.blade.php
+new file mode 100644
+index 0000000..e6d159c
+--- /dev/null
++++ b/resources/views/auth/register.blade.php
+@@ -0,0 +1,75 @@
++@extends('layouts.auth')
++
++@section('judul', 'Daftar')
++
++@section('konten')
++    <h2 class="font-serif text-[length:clamp(1.5rem,4vh,2.25rem)] font-bold leading-tight text-ink-900">Daftar akun mahasiswa</h2>
++    <p class="mt-1.5 text-pretty text-[length:clamp(0.8125rem,1.9vh,1rem)] text-ink-600">Isi data diri Anda. Akun dosen dan admin dibuat oleh admin sistem.</p>
++
++    <form method="POST" action="{{ route('register.store') }}" class="mt-5 grid gap-4 sm:grid-cols-2">
++        @csrf
++
++        <div class="sm:col-span-2">
++            <label for="name" class="label font-serif font-semibold text-ink-900">Nama lengkap</label>
++            <input id="name" name="name" type="text" value="{{ old('name') }}" required autofocus autocomplete="name"
++                   class="input rounded-lg bg-sand-50 px-4 py-2.5">
++            @error('name')
++                <p class="galat">{{ $message }}</p>
++            @enderror
++        </div>
++
++        <div class="sm:col-span-2">
++            <label for="email" class="label font-serif font-semibold text-ink-900">Email</label>
++            <input id="email" name="email" type="email" value="{{ old('email') }}" required autocomplete="email"
++                   class="input rounded-lg bg-sand-50 px-4 py-2.5">
++            @error('email')
++                <p class="galat">{{ $message }}</p>
++            @enderror
++        </div>
++
++        <div>
++            <label for="nomor_induk" class="label font-serif font-semibold text-ink-900">NIM</label>
++            <input id="nomor_induk" name="nomor_induk" type="text" inputmode="numeric" value="{{ old('nomor_induk') }}" required maxlength="30" autocomplete="off"
++                   class="input rounded-lg bg-sand-50 px-4 py-2.5">
++            @error('nomor_induk')
++                <p class="galat">{{ $message }}</p>
++            @enderror
++        </div>
++
++        <div>
++            <label for="angkatan" class="label font-serif font-semibold text-ink-900">Angkatan</label>
++            <input id="angkatan" name="angkatan" type="number" min="1990" max="{{ now()->year }}" value="{{ old('angkatan') }}" required placeholder="{{ now()->year }}"
++                   class="input rounded-lg bg-sand-50 px-4 py-2.5">
++            @error('angkatan')
++                <p class="galat">{{ $message }}</p>
++            @enderror
++        </div>
++
++        <div class="sm:col-span-2">
++            <label for="program_studi_id" class="label font-serif font-semibold text-ink-900">Program studi</label>
++            <select id="program_studi_id" name="program_studi_id" required class="input rounded-lg bg-sand-50 px-4 py-2.5">
++                <option value="">Pilih program studi</option>
++                @foreach ($prodi as $ps)
++                    <option value="{{ $ps->id }}" @selected((string) old('program_studi_id') === (string) $ps->id)>{{ $ps->namaLengkap() }}</option>
++                @endforeach
++            </select>
++            @error('program_studi_id')
++                <p class="galat">{{ $message }}</p>
++            @enderror
++        </div>
++
++        <x-input-sandi id="password" label="Kata sandi" />
++        <x-input-sandi id="password_confirmation" label="Ulangi kata sandi" />
++
++        <p class="hint -mt-2 sm:col-span-2">Kata sandi minimal 8 karakter.</p>
++
++        <div class="sm:col-span-2">
++            <button type="submit" class="btn btn-primary w-full rounded-lg py-2.5 font-serif">Daftar</button>
++        </div>
++    </form>
++
++    <p class="mt-5 text-center font-serif text-sm text-ink-700">
++        Sudah punya akun?
++        <a href="{{ route('login') }}" class="tautan font-semibold underline underline-offset-2">Masuk</a>
++    </p>
++@endsection
+diff --git a/resources/views/components/input-sandi.blade.php b/resources/views/components/input-sandi.blade.php
+new file mode 100644
+index 0000000..669653c
+--- /dev/null
++++ b/resources/views/components/input-sandi.blade.php
+@@ -0,0 +1,34 @@
++{{--
++    Kolom kata sandi dengan tombol tampil/sembunyikan (skripnya di resources/js/app.js, lewat data-toggle-password).
++    Dipakai di halaman daftar. Atribut: id (wajib), label (wajib), name (bawaan: sama dengan id), autocomplete.
++--}}
++@props(['id', 'label', 'name' => null, 'autocomplete' => 'new-password'])
++
++@php($nama = $name ?? $id)
++
++<div>
++    <label for="{{ $id }}" class="label font-serif font-semibold text-ink-900">{{ $label }}</label>
++    <div class="relative">
++        <svg class="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
++            <rect x="5" y="10.5" width="14" height="10" rx="2.5" />
++            <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
++        </svg>
++        <input id="{{ $id }}" name="{{ $nama }}" type="password" required autocomplete="{{ $autocomplete }}"
++               class="input rounded-lg bg-sand-50 py-2.5 pl-11 pr-11">
++        <button type="button" data-toggle-password="{{ $id }}" aria-label="Tampilkan kata sandi" aria-pressed="false"
++                class="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-ink-500 transition hover:text-ink-800 focus:outline-none focus:ring-2 focus:ring-sand-400">
++            <svg data-eye="show" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
++                <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
++                <circle cx="12" cy="12" r="2.8" />
++            </svg>
++            <svg data-eye="hide" class="hidden h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
++                <path d="M4 4l16 16" />
++                <path d="M10.6 6.1A9.6 9.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a16 16 0 0 1-3 3.8M6.5 7.6A16 16 0 0 0 2.5 12S6 18.5 12 18.5a9.4 9.4 0 0 0 4-.9" />
++                <path d="M9.9 9.9a2.8 2.8 0 0 0 4 4" />
++            </svg>
++        </button>
++    </div>
++    @error($nama)
++        <p class="galat">{{ $message }}</p>
++    @enderror
++</div>
+diff --git a/routes/web.php b/routes/web.php
+index dcd7f16..db7f8fd 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -2,6 +2,7 @@
+ 
+ use App\Http\Controllers\Admin;
+ use App\Http\Controllers\Auth\LoginController;
++use App\Http\Controllers\Auth\RegisterController;
+ use App\Http\Controllers\BerkasController;
+ use App\Http\Controllers\DashboardController;
+ use App\Http\Controllers\Dosen;
+@@ -17,6 +18,10 @@
+ Route::middleware('guest')->group(function () {
+     Route::get('/login', [LoginController::class, 'create'])->name('login');
+     Route::post('/login', [LoginController::class, 'store'])->middleware('throttle:6,1')->name('login.store');
++
++    // Pendaftaran mandiri, hanya untuk mahasiswa.
++    Route::get('/daftar', [RegisterController::class, 'create'])->name('register');
++    Route::post('/daftar', [RegisterController::class, 'store'])->middleware('throttle:6,1')->name('register.store');
+ });
+ 
+ /*
+diff --git a/tests/Feature/RegistrasiMahasiswaTest.php b/tests/Feature/RegistrasiMahasiswaTest.php
+new file mode 100644
+index 0000000..e6fd848
+--- /dev/null
++++ b/tests/Feature/RegistrasiMahasiswaTest.php
+@@ -0,0 +1,168 @@
++<?php
++
++namespace Tests\Feature;
++
++use App\Enums\Role;
++use App\Models\ProgramStudi;
++use App\Models\User;
++use Illuminate\Foundation\Testing\RefreshDatabase;
++use Illuminate\Support\Facades\Hash;
++use Tests\TestCase;
++
++class RegistrasiMahasiswaTest extends TestCase
++{
++    use RefreshDatabase;
++
++    private ProgramStudi $prodi;
++
++    protected function setUp(): void
++    {
++        parent::setUp();
++
++        $this->prodi = ProgramStudi::create(['kode' => 'TI', 'nama' => 'Teknik Informatika', 'jenjang' => 'S1', 'aktif' => true]);
++    }
++
++    /** @return array<string, mixed> */
++    private function data(array $ubah = []): array
++    {
++        return array_merge([
++            'name' => 'Budi Pendaftar',
++            'email' => 'budi@contoh.test',
++            'nomor_induk' => '09021282126123',
++            'program_studi_id' => $this->prodi->id,
++            'angkatan' => 2022,
++            'password' => 'rahasia123',
++            'password_confirmation' => 'rahasia123',
++        ], $ubah);
++    }
++
++    public function test_halaman_daftar_tampil_dan_hanya_memuat_prodi_aktif(): void
++    {
++        ProgramStudi::create(['kode' => 'XX', 'nama' => 'Prodi Ditutup', 'jenjang' => 'S1', 'aktif' => false]);
++
++        $this->get('/daftar')
++            ->assertOk()
++            ->assertSee('Daftar akun mahasiswa')
++            ->assertSee('Teknik Informatika')
++            ->assertDontSee('Prodi Ditutup');
++    }
++
++    public function test_halaman_login_punya_tautan_ke_halaman_daftar(): void
++    {
++        $this->get('/login')->assertOk()->assertSee(route('register'), false);
++    }
++
++    public function test_pendaftaran_membuat_akun_mahasiswa_aktif_dan_langsung_masuk(): void
++    {
++        $this->post('/daftar', $this->data())->assertRedirect(route('mahasiswa.dashboard'));
++
++        $user = User::where('email', 'budi@contoh.test')->firstOrFail();
++        $this->assertSame(Role::Mahasiswa, $user->role);
++        $this->assertTrue($user->aktif);
++        $this->assertSame('09021282126123', $user->nomor_induk);
++        $this->assertSame($this->prodi->id, $user->program_studi_id);
++        $this->assertSame(2022, $user->angkatan);
++        $this->assertTrue(Hash::check('rahasia123', $user->password));
++        $this->assertNotSame('rahasia123', $user->password);
++
++        $this->assertAuthenticatedAs($user);
++        $this->get(route('mahasiswa.dashboard'))->assertOk()->assertSee('Akun berhasil dibuat. Selamat datang, Budi Pendaftar.');
++    }
++
++    public function test_akun_baru_dapat_masuk_lagi_dengan_email_maupun_nim(): void
++    {
++        $this->post('/daftar', $this->data());
++        $this->post('/logout');
++        $this->assertGuest();
++
++        $this->post('/login', ['login' => 'budi@contoh.test', 'password' => 'rahasia123'])->assertRedirect(route('dashboard'));
++        $this->post('/logout');
++
++        $this->post('/login', ['login' => '09021282126123', 'password' => 'rahasia123'])->assertRedirect(route('dashboard'));
++        $this->assertAuthenticated();
++    }
++
++    public function test_pendaftar_tidak_bisa_menentukan_role_atau_status_aktif(): void
++    {
++        $this->post('/daftar', $this->data(['role' => 'admin', 'aktif' => 0]))->assertRedirect(route('mahasiswa.dashboard'));
++
++        $user = User::where('email', 'budi@contoh.test')->firstOrFail();
++        $this->assertSame(Role::Mahasiswa, $user->role);
++        $this->assertTrue($user->aktif);
++
++        $this->get(route('admin.dashboard'))->assertForbidden();
++    }
++
++    public function test_email_dibuat_huruf_kecil_dan_duplikat_beda_huruf_ditolak(): void
++    {
++        $this->post('/daftar', $this->data(['email' => 'Budi@Contoh.TEST']));
++        $this->assertDatabaseHas('users', ['email' => 'budi@contoh.test']);
++        $this->post('/logout');
++
++        $this->from('/daftar')
++            ->post('/daftar', $this->data(['email' => 'BUDI@contoh.test', 'nomor_induk' => '09021282126999']))
++            ->assertRedirect('/daftar')
++            ->assertSessionHasErrors('email');
++
++        $this->assertSame(1, User::where('role', Role::Mahasiswa->value)->count());
++    }
++
++    public function test_nim_yang_sudah_terdaftar_ditolak(): void
++    {
++        User::factory()->mahasiswa()->create(['nomor_induk' => '09021282126123']);
++
++        $this->from('/daftar')
++            ->post('/daftar', $this->data())
++            ->assertRedirect('/daftar')
++            ->assertSessionHasErrors('nomor_induk');
++
++        $this->assertGuest();
++        $this->assertDatabaseMissing('users', ['email' => 'budi@contoh.test']);
++    }
++
++    public function test_nim_harus_angka(): void
++    {
++        $this->post('/daftar', $this->data(['nomor_induk' => 'ABC123']))->assertSessionHasErrors('nomor_induk');
++        $this->assertDatabaseMissing('users', ['email' => 'budi@contoh.test']);
++    }
++
++    public function test_program_studi_nonaktif_atau_tidak_ada_ditolak(): void
++    {
++        $tutup = ProgramStudi::create(['kode' => 'XX', 'nama' => 'Prodi Ditutup', 'jenjang' => 'S1', 'aktif' => false]);
++
++        $this->post('/daftar', $this->data(['program_studi_id' => $tutup->id]))->assertSessionHasErrors('program_studi_id');
++        $this->post('/daftar', $this->data(['program_studi_id' => 9999]))->assertSessionHasErrors('program_studi_id');
++        $this->assertDatabaseMissing('users', ['email' => 'budi@contoh.test']);
++    }
++
++    public function test_angkatan_diluar_rentang_ditolak(): void
++    {
++        $this->post('/daftar', $this->data(['angkatan' => now()->year + 1]))->assertSessionHasErrors('angkatan');
++        $this->post('/daftar', $this->data(['angkatan' => 1980]))->assertSessionHasErrors('angkatan');
++    }
++
++    public function test_kata_sandi_harus_8_karakter_dan_cocok_dengan_konfirmasi(): void
++    {
++        $this->post('/daftar', $this->data(['password' => 'pendek', 'password_confirmation' => 'pendek']))
++            ->assertSessionHasErrors('password');
++        $this->post('/daftar', $this->data(['password_confirmation' => 'beda-sekali']))
++            ->assertSessionHasErrors('password');
++
++        $this->assertDatabaseMissing('users', ['email' => 'budi@contoh.test']);
++    }
++
++    public function test_semua_isian_wajib_diisi(): void
++    {
++        $this->post('/daftar', [])->assertSessionHasErrors(['name', 'email', 'nomor_induk', 'program_studi_id', 'angkatan', 'password']);
++        $this->assertGuest();
++    }
++
++    public function test_pengguna_yang_sudah_login_tidak_dapat_membuka_halaman_daftar(): void
++    {
++        $this->actingAs(User::factory()->create());
++
++        $this->get('/daftar')->assertRedirect(route('dashboard'));
++        $this->post('/daftar', $this->data())->assertRedirect(route('dashboard'));
++        $this->assertDatabaseMissing('users', ['email' => 'budi@contoh.test']);
++    }
++}

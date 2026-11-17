@@ -58,4 +58,9 @@
 
         <button type="submit" class="btn btn-primary w-full rounded-lg py-[clamp(0.5rem,1.6vh,0.75rem)] font-serif">Masuk</button>
     </form>
+
+    <p class="mt-[clamp(0.75rem,2.5vh,1.25rem)] text-center font-serif text-sm text-ink-700">
+        Mahasiswa dan belum punya akun?
+        <a href="{{ route('register') }}" class="tautan font-semibold underline underline-offset-2">Daftar</a>
+    </p>
 @endsection

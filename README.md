@@ -76,6 +76,12 @@ Bila database Anda dibuat sebelum peran operator digabung ke admin, jalankan `ph
 
 Login juga bisa memakai nomor induk (NIM/NIP). **Ganti kata sandi atau hapus akun ini sebelum aplikasi dipakai sungguhan.**
 
+## Pendaftaran mahasiswa
+
+Mahasiswa bisa membuat akun sendiri di `/daftar` (tautan "Daftar" ada di halaman login). Yang diisi: nama, email, NIM (angka saja), angkatan, program studi (hanya prodi aktif), dan kata sandi minimal 8 karakter. Akun yang jadi selalu berperan mahasiswa dan langsung aktif, lalu pendaftar otomatis masuk ke dashboard. Email disimpan huruf kecil, dan email atau NIM yang sudah terdaftar ditolak.
+
+Akun dosen dan admin tidak bisa dibuat lewat halaman ini; admin membuatnya di Manajemen Pengguna. Akun mahasiswa hasil pendaftaran muncul di Manajemen Pengguna dan bisa dinonaktifkan admin lewat menu ubah.
+
 Seeder memakai `firstOrCreate`, jadi aman dijalankan ulang dan tidak menimpa data yang sudah diubah admin. Program studi dan persyaratan contoh di seeder dapat diubah dari menu Admin.
 
 ## Alur sistem
