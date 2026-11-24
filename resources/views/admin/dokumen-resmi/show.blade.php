@@ -188,7 +188,7 @@
             @elseif ($ta && $suratTa)
                 <div class="alert alert-info">
                     SK pembimbing dan arsip baru dapat diproses setelah pengajuan disetujui dosen (status saat ini: {{ $pengajuan->status->label() }}).
-                    Surat pengantar dan surat balasan sudah bisa dikerjakan sekarang.
+                    Surat pengantar dan surat balasan sudah dapat diproses sekarang.
                 </div>
             @else
                 <div class="alert alert-info">

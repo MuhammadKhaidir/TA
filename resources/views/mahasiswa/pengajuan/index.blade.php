@@ -15,7 +15,7 @@
 
     <section class="card">
         @if ($daftar->isEmpty())
-            <x-empty :pesan="'Belum ada pengajuan '.$jenis->label().'. Klik tombol Buat Pengajuan untuk memulai.'" />
+            <x-empty :pesan="'Belum ada pengajuan '.$jenis->label().'. Pilih tombol Buat Pengajuan untuk memulai.'" />
         @else
             <div class="overflow-x-auto">
                 <table class="tabel">
