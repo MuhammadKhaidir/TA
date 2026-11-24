@@ -18,7 +18,7 @@
             @endif
             <div class="leading-tight">
                 <div class="font-serif text-base font-bold text-ink-900">Arsip Berkas KP dan TA</div>
-                <div class="text-sm text-ink-600">Fasilkom Universitas Sriwijaya</div>
+                <div class="text-sm text-ink-600">Fakultas Ilmu Komputer\n Universitas Sriwijaya</div>
             </div>
         </div>
 

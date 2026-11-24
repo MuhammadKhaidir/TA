@@ -1,0 +1,78 @@
+diff --git a/database/sql/arsip_kp_ta.sql b/database/sql/arsip_kp_ta.sql
+index 0c9d1b0..cca1d0e 100644
+--- a/database/sql/arsip_kp_ta.sql
++++ b/database/sql/arsip_kp_ta.sql
+@@ -1,5 +1,5 @@
+ -- ============================================================================
+--- Sistem Pengumpulan dan Arsip Digital Berkas KP dan TA (Fasilkom Unsri)
++-- Sistem Pengumpulan dan Arsip Digital Berkas KP dan TA (Fakultas Ilmu Komputer Universitas Sriwijaya)
+ -- Database MySQL: arsip_kp_ta
+ --
+ -- Isi file: struktur seluruh tabel + data awal (program studi, persyaratan, akun contoh).
+diff --git a/database/sql/arsip_kp_ta.sqlite.sql b/database/sql/arsip_kp_ta.sqlite.sql
+index e8b1778..2e33fa3 100644
+--- a/database/sql/arsip_kp_ta.sqlite.sql
++++ b/database/sql/arsip_kp_ta.sqlite.sql
+@@ -1,4 +1,4 @@
+--- Dump SQLite: Sistem Arsip Berkas KP dan TA (Fasilkom Unsri)
++-- Dump SQLite: Sistem Arsip Berkas KP dan TA (Fakultas Ilmu Komputer Universitas Sriwijaya)
+ -- Struktur seluruh tabel + data awal. Sama isinya dengan database/database.sqlite.
+ -- Impor ke file baru:  sqlite3 database/database.sqlite < database/sql/arsip_kp_ta.sqlite.sql
+ --   atau DB Browser for SQLite: File > Import > Database from SQL file.
+diff --git a/resources/views/layouts/auth.blade.php b/resources/views/layouts/auth.blade.php
+index 5c7f207..02360f3 100644
+--- a/resources/views/layouts/auth.blade.php
++++ b/resources/views/layouts/auth.blade.php
+@@ -115,7 +115,7 @@ class="col-start-1 row-start-1 self-end transition-opacity duration-1000 ease-in
+                 @endif
+                 <div class="h-10 w-px bg-ink-800/50"></div>
+                 <div class="leading-tight">
+-                    <p class="text-base text-ink-700">Fasilkom Universitas Sriwijaya</p>
++                    <p class="text-base text-ink-700">Fakultas Ilmu Komputer<br>Universitas Sriwijaya</p>
+                 </div>
+             </div>
+ 
+@@ -147,7 +147,7 @@ class="col-start-1 row-start-1 self-end transition-opacity duration-1000 ease-in
+                     @else
+                         <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ink-800 text-sm font-bold text-white">FK</div>
+                     @endif
+-                    <p class="font-serif text-lg font-bold text-ink-900">Fasilkom Universitas Sriwijaya</p>
++                    <p class="font-serif text-lg font-bold leading-tight text-ink-900">Fakultas Ilmu Komputer<br>Universitas Sriwijaya</p>
+                 </div>
+ 
+                 <div class="rounded-xl border border-sand-200 bg-white px-[clamp(1.5rem,3.5vw,3rem)] py-[clamp(1.25rem,4vh,2.5rem)] shadow-[0_28px_56px_-14px_rgba(70,50,25,0.30),0_10px_22px_-8px_rgba(70,50,25,0.16),0_0_0_1px_rgba(118,87,50,0.06)]">
+diff --git a/resources/views/layouts/guest.blade.php b/resources/views/layouts/guest.blade.php
+index 581d31e..e306b95 100644
+--- a/resources/views/layouts/guest.blade.php
++++ b/resources/views/layouts/guest.blade.php
+@@ -18,7 +18,7 @@
+             @endif
+             <div class="leading-tight">
+                 <div class="font-serif text-base font-bold text-ink-900">Arsip Berkas KP dan TA</div>
+-                <div class="text-sm text-ink-600">Fasilkom Universitas Sriwijaya</div>
++                <div class="text-sm text-ink-600">Fakultas Ilmu Komputer<br>Universitas Sriwijaya</div>
+             </div>
+         </div>
+ 
+diff --git a/resources/views/partials/shell-pasir.blade.php b/resources/views/partials/shell-pasir.blade.php
+index 261bcbe..51c6a10 100644
+--- a/resources/views/partials/shell-pasir.blade.php
++++ b/resources/views/partials/shell-pasir.blade.php
+@@ -35,7 +35,7 @@
+            class="sidebar-pasir flex shrink-0 flex-col overflow-hidden border-r border-sand-200 after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:w-[3px] after:bg-gradient-to-b after:from-transparent after:via-[#d8b878]/60 after:to-transparent {{ $latar ? 'bg-sand-100/40' : 'bg-sand-100/80' }} max-lg:bg-sand-50 max-lg:shadow-2xl"
+            aria-label="Menu utama">
+ 
+-        {{-- Gedung Fasilkom di dasar sidebar (memudar ke atas) --}}
++        {{-- Gedung Fakultas Ilmu Komputer di dasar sidebar (memudar ke atas) --}}
+         @if ($latar)
+             <div class="pointer-events-none absolute inset-x-0 bottom-0 h-[22rem]" aria-hidden="true" style="background-image: url('{{ $latar }}'); background-repeat: no-repeat; background-position: left bottom; background-size: 730px auto; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 45%); mask-image: linear-gradient(to bottom, transparent 0, #000 45%)"></div>
+         @endif
+@@ -57,7 +57,7 @@ class="sidebar-pasir flex shrink-0 flex-col overflow-hidden border-r border-sand
+             </svg>
+             <div class="leading-tight">
+                 <p class="font-serif text-2xl font-bold text-ink-900">Arsip KP &amp; TA</p>
+-                <p class="font-serif text-[15px] text-ink-600">Fasilkom Unsri</p>
++                <p class="font-serif text-[15px] text-ink-600">Fakultas Ilmu Komputer<br>Universitas Sriwijaya</p>
+             </div>
+         </div>
+ 

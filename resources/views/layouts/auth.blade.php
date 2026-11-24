@@ -115,7 +115,7 @@
                 @endif
                 <div class="h-10 w-px bg-ink-800/50"></div>
                 <div class="leading-tight">
-                    <p class="text-base text-ink-700">Fasilkom Universitas Sriwijaya</p>
+                    <p class="text-base text-ink-700">Fakultas Ilmu Komputer\n Universitas Sriwijaya</p>
                 </div>
             </div>
 
@@ -147,7 +147,7 @@
                     @else
                         <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ink-800 text-sm font-bold text-white">FK</div>
                     @endif
-                    <p class="font-serif text-lg font-bold text-ink-900">Fasilkom Universitas Sriwijaya</p>
+                    <p class="font-serif text-lg font-bold text-ink-900">Fakultas Ilmu Komputer\n Universitas Sriwijaya</p>
                 </div>
 
                 <div class="rounded-xl border border-sand-200 bg-white px-[clamp(1.5rem,3.5vw,3rem)] py-[clamp(1.25rem,4vh,2.5rem)] shadow-[0_28px_56px_-14px_rgba(70,50,25,0.30),0_10px_22px_-8px_rgba(70,50,25,0.16),0_0_0_1px_rgba(118,87,50,0.06)]">

@@ -1,0 +1,41 @@
+diff --git a/database/sql/arsip_kp_ta.sql b/database/sql/arsip_kp_ta.sql
+index 0c9d1b0..cca1d0e 100644
+--- a/database/sql/arsip_kp_ta.sql
++++ b/database/sql/arsip_kp_ta.sql
+@@ -2 +2 @@
+--- Sistem Pengumpulan dan Arsip Digital Berkas KP dan TA (Fasilkom Unsri)
++-- Sistem Pengumpulan dan Arsip Digital Berkas KP dan TA (Fakultas Ilmu Komputer Universitas Sriwijaya)
+diff --git a/database/sql/arsip_kp_ta.sqlite.sql b/database/sql/arsip_kp_ta.sqlite.sql
+index e8b1778..2e33fa3 100644
+--- a/database/sql/arsip_kp_ta.sqlite.sql
++++ b/database/sql/arsip_kp_ta.sqlite.sql
+@@ -1 +1 @@
+--- Dump SQLite: Sistem Arsip Berkas KP dan TA (Fasilkom Unsri)
++-- Dump SQLite: Sistem Arsip Berkas KP dan TA (Fakultas Ilmu Komputer Universitas Sriwijaya)
+diff --git a/resources/views/layouts/auth.blade.php b/resources/views/layouts/auth.blade.php
+index 5c7f207..02360f3 100644
+--- a/resources/views/layouts/auth.blade.php
++++ b/resources/views/layouts/auth.blade.php
+@@ -118 +118 @@ class="col-start-1 row-start-1 self-end transition-opacity duration-1000 ease-in
+-                    <p class="text-base text-ink-700">Fasilkom Universitas Sriwijaya</p>
++                    <p class="text-base text-ink-700">Fakultas Ilmu Komputer<br>Universitas Sriwijaya</p>
+@@ -150 +150 @@ class="col-start-1 row-start-1 self-end transition-opacity duration-1000 ease-in
+-                    <p class="font-serif text-lg font-bold text-ink-900">Fasilkom Universitas Sriwijaya</p>
++                    <p class="font-serif text-lg font-bold leading-tight text-ink-900">Fakultas Ilmu Komputer<br>Universitas Sriwijaya</p>
+diff --git a/resources/views/layouts/guest.blade.php b/resources/views/layouts/guest.blade.php
+index 581d31e..e306b95 100644
+--- a/resources/views/layouts/guest.blade.php
++++ b/resources/views/layouts/guest.blade.php
+@@ -21 +21 @@
+-                <div class="text-sm text-ink-600">Fasilkom Universitas Sriwijaya</div>
++                <div class="text-sm text-ink-600">Fakultas Ilmu Komputer<br>Universitas Sriwijaya</div>
+diff --git a/resources/views/partials/shell-pasir.blade.php b/resources/views/partials/shell-pasir.blade.php
+index 261bcbe..51c6a10 100644
+--- a/resources/views/partials/shell-pasir.blade.php
++++ b/resources/views/partials/shell-pasir.blade.php
+@@ -38 +38 @@ class="sidebar-pasir flex shrink-0 flex-col overflow-hidden border-r border-sand
+-        {{-- Gedung Fasilkom di dasar sidebar (memudar ke atas) --}}
++        {{-- Gedung Fakultas Ilmu Komputer di dasar sidebar (memudar ke atas) --}}
+@@ -60 +60 @@ class="sidebar-pasir flex shrink-0 flex-col overflow-hidden border-r border-sand
+-                <p class="font-serif text-[15px] text-ink-600">Fasilkom Unsri</p>
++                <p class="font-serif text-[15px] text-ink-600">Fakultas Ilmu Komputer<br>Universitas Sriwijaya</p>
